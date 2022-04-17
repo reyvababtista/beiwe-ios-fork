@@ -299,7 +299,7 @@ class TrackingSurveyPresenter : NSObject, ORKTaskViewControllerDelegate {
             data.append(answersString);
             dataFile.store(data);
         }
-        dataFile.closeAndReset();
+        dataFile.flush(true);
         return !dataFile.hasError;
         
     }
