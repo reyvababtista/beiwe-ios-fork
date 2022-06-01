@@ -1,14 +1,14 @@
-/* 
+/*
   InfoPlist.strings
 */
 
-NSCameraUsageDescription = "For medical research with ResearchKit";
-NSHealthShareUsageDescription = "For medical research with ResearchKit";
-NSHealthUpdateUsageDescription = "For medical research with ResearchKit";
-NSLocationAlwaysAndWhenInUseUsageDescription = "Beiwe needs your location at all times to properly conduct medical research.";
-NSLocationAlwaysUsageDescription = "Beiwe needs your location to properly conduct medical research.";
-NSLocationWhenInUseUsageDescription = "Beiwe needs your location to properly conduct medical research.";
-NSMicrophoneUsageDescription = "Record audio survey questions";
-NSMotionUsageDescription = "Beiwe needs access to your sensors to properly conduct medical research.";
-NSPhotoLibraryAddUsageDescription = "For medical research with ResearchKit";
-NSPhotoLibraryUsageDescription = "For medical research with ResearchKit";
+NSCameraUsageDescription = "Für medizinische Forschung mit ResearchKit";
+NSHealthShareUsageDescription = "Für medizinische Forschung mit ResearchKit";
+NSHealthUpdateUsageDescription = "Für medizinische Forschung mit ResearchKit";
+NSLocationAlwaysAndWhenInUseUsageDescription = "Beiwe benötigt jederzeit Ihren Standort, um die Studie optimal durchführen zu können.";
+NSLocationAlwaysUsageDescription = "Beiwe benötigt Ihren Standort, um die Studie optimal durchführen zu können.";
+NSLocationWhenInUseUsageDescription = "Beiwe benötigt Ihren Standort, um die Studie optimal durchführen zu können.";
+NSMicrophoneUsageDescription = "Audio-Befragung Fragen aufnehmen.";
+NSMotionUsageDescription = "Beiwe braucht Zugriff auf Ihre Sensoren, um die Studie optimal durchführen zu können.";
+NSPhotoLibraryAddUsageDescription = "Für medizinische Forschung mit ResearchKit";
+NSPhotoLibraryUsageDescription = "Für medizinische Forschung mit ResearchKit";
