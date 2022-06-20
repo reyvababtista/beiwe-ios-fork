@@ -28,7 +28,7 @@ class EncryptedStorage {
     let type: String
     var filename: URL
     let fileManager = FileManager.default
-    var handle: FileHandle?
+    var file_handle: FileHandle?
     
     var publicKey: String
     var aesKey: Data
@@ -83,7 +83,7 @@ class EncryptedStorage {
             } else {
                 log.info("Create new enc file: \(self.filename)")
             }
-            self.handle = try? FileHandle(forWritingTo: self.filename)
+            self.file_handle = try? FileHandle(forWritingTo: self.filename)
             
             // what case does this handle and why doesn't it count as bad initialization?
             var rsaLine: String = ""
@@ -127,8 +127,8 @@ class EncryptedStorage {
             let line2 = ivHeader.data(using: String.Encoding.utf8)!
             log.info("write the rsa line 1 (rsa key): '\(rsaLine)', '\(line1)'")
             log.info("write the rsa line 2 (iv): '\(ivHeader)', '\(line2)'")
-            self.handle?.write(line1)
-            self.handle?.write(line2)
+            self.file_handle?.write(line1)
+            self.file_handle?.write(line2)
             
             return Promise() // return closure
         }
@@ -136,9 +136,9 @@ class EncryptedStorage {
 
     func close() -> Promise<Void> {
         return write(nil, writeLen: 0, isFlush: true).then(on: self.encryption_queue) { _ -> Promise<Void> in
-            if let handle = self.handle {
+            if let handle = self.file_handle {
                 handle.closeFile()
-                self.handle = nil
+                self.file_handle = nil
                 try FileManager.default.moveItem(at: self.filename, to: self.realFilename)
                 log.info("moved temp data file \(self.filename) to \(self.realFilename)")
             }
@@ -155,7 +155,7 @@ class EncryptedStorage {
             let dataToWriteBuffer = UnsafeMutableRawPointer(mutating: data.bytes)
             let dataToWrite = NSData(bytesNoCopy: dataToWriteBuffer, length: len, freeWhenDone: false)
             let encodedData: String = Crypto.sharedInstance.base64ToBase64URL(dataToWrite.base64EncodedString(options: []))
-            self.handle?.write(encodedData.data(using: String.Encoding.utf8)!)
+            self.file_handle?.write(encodedData.data(using: String.Encoding.utf8)!)
             return .value(len)
         }
 
@@ -216,9 +216,9 @@ class EncryptedStorage {
     }
 
     deinit {
-        if (self.handle != nil) {
-            self.handle?.closeFile()
-            self.handle = nil
+        if (self.file_handle != nil) {
+            self.file_handle?.closeFile()
+            self.file_handle = nil
         }
     }
 }
