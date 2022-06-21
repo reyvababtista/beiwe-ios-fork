@@ -469,13 +469,17 @@ class DataStorage {
             }
             
             if let filename = self.filename, let data = data  {
+                // if file name and data are populated
                 let fileManager = FileManager.default
+                
                 if (!fileManager.fileExists(atPath: filename.path)) {
+                    // if no file exists
                     if (!fileManager.createFile(
                         atPath: filename.path,
                         contents: data,
                         attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
                     )) {
+                        // if creating a file failed
                         self.hasError = true
                         self.errMsg = "Failed to create file."
                         log.info(self.errMsg)
@@ -492,9 +496,11 @@ class DataStorage {
                         // almost definitely blocks the above log statement
                         fatalError("Could not create new data file - 1")
                     } else {
+                        // if creating a file succeeded
                         log.info("Create new data file: \(filename)")
                     }
                     if (self.type != "ios_log") {
+                        // ios log special case
                         self.logClosures.append() {
                             AppEventManager.sharedInstance.logAppEvent(
                                 event: "file_create",
@@ -506,7 +512,9 @@ class DataStorage {
                         }
                     }
                 } else {
+                    // if fie exists
                     if let fileHandle = try? FileHandle(forWritingTo: filename) {
+                        // if file handle instantiated (file open)
                         defer {
                             fileHandle.closeFile()
                         }
@@ -518,6 +526,7 @@ class DataStorage {
                         // this data variable is a string of the full line in base64 including the iv. (i.e. it is encrypted)
                         log.info("Appended data to file: \(filename), size: \(seekPos): \(data)")
                     } else {
+                        // if error opening file
                         self.hasError = true
                         self.errMsg = "Error opening file for writing"
                         log.info(self.errMsg)
@@ -539,6 +548,7 @@ class DataStorage {
                     }
                 }
             } else {
+                // if there was no data or no filename
                 self.errMsg = "No filename.  NO data??"
                 log.error(self.errMsg)
                 self.hasError = true
@@ -557,6 +567,7 @@ class DataStorage {
             }
             
             if (do_reset || force_reset) {
+                // conditionally call reset
                 self.reset()
             }
             self.outputLogClosures()
@@ -641,6 +652,7 @@ class DataStorageManager {
     }
 
     func _flushAll() -> Promise<Void> {
+        // calls flush for all files
         var promises: [Promise<Void>] = []
         for (_, storage) in storageTypes {
             promises.append(storage.flush(true))
@@ -663,6 +675,7 @@ class DataStorageManager {
     
     func prepareForUpload() -> Promise<Void> {
         let prepQ = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default)
+//        let prepQ = DispatchQueue.global(qos: DispatchQoS.QoSClass.utility)  // this is the fix for the warning, not changing atm.
         var filesToUpload: [String] = [ ]
         
         /* Flush once to get all of the files currently processing */
