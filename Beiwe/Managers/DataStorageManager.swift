@@ -246,7 +246,7 @@ class DataStorage {
     var noBuffer = false
     var sanitize = false
     let moveOnClose: Bool
-    let queue: DispatchQueue
+    let storage_ops_queue: DispatchQueue
     var name = ""
     var logClosures:[()->()] = [ ]
     var secKeyRef: SecKey?
@@ -272,7 +272,7 @@ class DataStorage {
         self.moveOnClose = moveOnClose
         self.secKeyRef = keyRef
 
-        self.queue = DispatchQueue(label: "com.rocketfarm.beiwe.dataqueue." + type, attributes: [])
+        self.storage_ops_queue = DispatchQueue(label: "com.rocketfarm.beiwe.dataqueue." + type, attributes: [])
         self.logClosures = []
         self.reset()
         self.outputLogClosures()
@@ -417,7 +417,7 @@ class DataStorage {
     }
 
     func store(_ data: [String]) -> Promise<Void> {
-        return Promise().then(on: queue) { _ -> Promise<Void> in
+        return Promise().then(on: storage_ops_queue) { _ -> Promise<Void> in
             var sanitizedData: [String]
             
             if (self.sanitize) {
@@ -441,7 +441,7 @@ class DataStorage {
     func flush(_ do_reset: Bool = false) -> Promise<Void> {
         // flush does not flush. Like all other file io it appends to the list of closures.
         var force_reset = false
-        return Promise().then(on: queue) { _ -> Promise<Void> in
+        return Promise().then(on: storage_ops_queue) { _ -> Promise<Void> in
             self.logClosures = [ ]
 
 // I am officially disabling this case. We will handle any fallout on the backend.
