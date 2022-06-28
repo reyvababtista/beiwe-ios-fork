@@ -73,7 +73,14 @@ class EncryptedStorage {
         )
     }
 
-    func open_now() -> Void {
+    func open() -> Promise<Void> {
+        return Promise().then(on: self.encryption_queue) {_ -> Promise<Void> in
+            self.open_actual()
+            return Promise()
+        }
+    }
+    
+    fileprivate func open_actual() -> Void {
         if (!self.fileManager.createFile(
             atPath: self.filename.path,
             contents: nil,
@@ -105,15 +112,22 @@ class EncryptedStorage {
         self.file_handle?.write(line2)
     }
     
-    func close_now() {
-        self.write_now(nil, writeLen: 0)
+    func close() -> Promise<Void> {
+        return Promise().then(on: self.encryption_queue) { _ -> Promise<Void> in
+            self.close_actual()
+            return Promise()
+        }
+    }
+    
+    private func close_actual() {
+        self.write_actual(nil, writeLen: 0)
         self.file_handle?.closeFile()
         self.file_handle = nil
         log.info("moved temp data file \(self.filename) to \(self.realFilename)")
         try! FileManager.default.moveItem(at: self.filename, to: self.realFilename)
     }
     
-    func _write_now(_ data: NSData, len: Int) -> Void {
+    private func _write(_ data: NSData, len: Int) -> Void {
         // TODO; what the hell is this return case? why is len even passed in?
         if (len == 0) {
             return
@@ -125,7 +139,15 @@ class EncryptedStorage {
         self.file_handle?.write(encodedData.data(using: String.Encoding.utf8)!)
     }
     
-    func write_now(_ data: NSData?, writeLen: Int) -> Void {
+    func write(_ data: NSData?, writeLen: Int) -> Promise<Int> {
+        // This is called directly in audio file code
+        return Promise().then(on: self.encryption_queue) { _ -> Promise<Int> in
+            let len: Int = self.write_actual(data, writeLen: writeLen)
+            return .value(len)
+        }
+    }
+    
+    private func write_actual(_ data: NSData?, writeLen: Int) -> Int {
         // core write function, as much as anything here can be said to "write"
         if (data != nil && writeLen != 0) {
             // Need to encrypt data
@@ -170,161 +192,11 @@ class EncryptedStorage {
 //            evenLength = (self.currentData.length / 3) * 3
 //        }
         
-        let evenLength = self.currentData.length
-        self._write_now(self.currentData, len: evenLength)
-        self.currentData.replaceBytes(in: NSRange(0..<evenLength), withBytes: nil, length: 0)  //TODO: delete this line
+        self._write(self.currentData, len: self.currentData.length)
+        self.currentData.replaceBytes(in: NSRange(0..<self.currentData.length), withBytes: nil, length: 0)  //TODO: delete this line?
+        return self.currentData.length
     }
     
-    func open() -> Promise<Void> {
-        // THIS FUNCTION IS ONLY USED IN MEDIA FILE ENCRYPTION ; saveEncryptedAudio
-        return Promise().then(on: self.encryption_queue) {_ -> Promise<Void> in
-            // closure 1
-            if (!self.fileManager.createFile(
-                atPath: self.filename.path,
-                contents: nil,
-                attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none])
-            ) {
-                // return closure 1
-                fatalError("could not create file?")
-                return Promise(error: DataStorageErrors.cantCreateFile)
-            } else {
-                log.info("Create new enc file: \(self.filename)")
-            }
-            self.file_handle = try! FileHandle(forWritingTo: self.filename)
-            
-            // how do I catch this failing?
-            var rsaLine: String = try! Crypto.sharedInstance.base64ToBase64URL(
-                SwiftyRSA.encryptString(
-                    Crypto.sharedInstance.base64ToBase64URL(self.aesKey.base64EncodedString()),
-                    publicKey: self.secKeyRef,
-                    padding: []
-                )
-            )
-            
-// the rsaline var was as follows, before I made secKeyRef non-optional.
-//            if let keyRef = self.secKeyRef {
-//                // case: secKeyRef is populated
-//                log.info("that keyRef EXISTS case when creating an encrypted file - 1")
-//                rsaLine_fail_1 = true
-//                rsaLine = try Crypto.sharedInstance.base64ToBase64URL(
-//                    SwiftyRSA.encryptString(
-//                        Crypto.sharedInstance.base64ToBase64URL(self.aesKey.base64EncodedString()),
-//                        publicKey: self.secKeyRef,
-//                        padding: []
-//                ))
-//            } else {
-//                // case: secKeyRef present
-//                log.info("that keyRef DOES NOT EXIST case when creating an encrypted file - 2")
-//                rsaLine_fail_2 = true
-//                rsaLine = try Crypto.sharedInstance.base64ToBase64URL(
-//                    SwiftyRSA.encryptString(
-//                        Crypto.sharedInstance.base64ToBase64URL(self.aesKey.base64EncodedString()),
-//                        publicKeyId: PersistentPasswordManager.sharedInstance.publicKeyName(self.patientId),
-//                        padding: []
-//            ))}
-//            if rsaLine == "" {
-//                if rsaLine_fail_1 {
-//                    fatalError("RSA LINE FAILED TO WRITE, CONDITION 1")
-//                } else if rsaLine_fail_2 {
-//                    fatalError("RSA LINE FAILED TO WRITE, CONDITION 2")
-//                } else {
-//                    fatalError("RSA LINE FAILED TO WRITE, UNCONDITION 3")
-//            }}
-            
-            rsaLine = rsaLine + "\n"
-            let line1 = rsaLine.data(using: String.Encoding.utf8)!
-            let ivHeader = Crypto.sharedInstance.base64ToBase64URL(self.iv.base64EncodedString()) + ":"
-            let line2 = ivHeader.data(using: String.Encoding.utf8)!
-            log.info("write the rsa line 1 (rsa key): '\(rsaLine)', '\(line1)'")
-            log.info("write the rsa line 2 (iv): '\(ivHeader)', '\(line2)'")
-            self.file_handle?.write(line1)
-            self.file_handle?.write(line2)
-            
-            return Promise() // return closure
-        }
-    }
-
-    func close() -> Promise<Void> {
-        // ALSO ONLY CALLED IN AUDIO STUFF
-        return write(nil, writeLen: 0, isFlush: true).then(on: self.encryption_queue) { _ -> Promise<Void> in
-            if let handle = self.file_handle {
-                handle.closeFile()
-                self.file_handle = nil
-                try FileManager.default.moveItem(at: self.filename, to: self.realFilename)
-                log.info("moved temp data file \(self.filename) to \(self.realFilename)")
-            }
-            return Promise()
-        }
-    }
-
-    func _write(_ data: NSData, len: Int) -> Promise<Int> {
-        if (len == 0) {
-            return .value(0)
-        }
-        return Promise().then(on: self.encryption_queue) { _ -> Promise<Int> in
-            self.hasData = true
-            let dataToWriteBuffer = UnsafeMutableRawPointer(mutating: data.bytes)
-            let dataToWrite = NSData(bytesNoCopy: dataToWriteBuffer, length: len, freeWhenDone: false)
-            let encodedData: String = Crypto.sharedInstance.base64ToBase64URL(dataToWrite.base64EncodedString(options: []))
-            self.file_handle?.write(encodedData.data(using: String.Encoding.utf8)!)
-            return .value(len)
-        }
-
-    }
-
-    func write(_ data: NSData?, writeLen: Int, isFlush: Bool = false) -> Promise<Void> {
-        // core write function, as much as anything here can be said to "write"
-        return Promise().then(on: self.encryption_queue) { _ -> Promise<Int> in
-            
-            if (data != nil && writeLen != 0) {
-                // Need to encrypt data
-                let encryptLen = self.stream_cryptor.getOutputLength(inputByteCount: writeLen)
-                let bufferOut = UnsafeMutablePointer<Void>.allocate(capacity: encryptLen)
-                var byteCount: Int = 0
-                let bufferIn = UnsafeMutableRawPointer(mutating: data!.bytes)
-                self.stream_cryptor.update(
-                    bufferIn: bufferIn,
-                    byteCountIn: writeLen,
-                    bufferOut: bufferOut,
-                    byteCapacityOut: encryptLen,
-                    byteCountOut: &byteCount
-                )
-                self.currentData.append(NSData(bytesNoCopy: bufferOut, length: byteCount) as Data)
-            }
-            
-            if (isFlush) {
-                let encryptLen = self.stream_cryptor.getOutputLength(inputByteCount: 0, isFinal: true)
-                if (encryptLen > 0) {
-                    let bufferOut = UnsafeMutablePointer<Void>.allocate(capacity: encryptLen)
-                    var byteCount: Int = 0
-                    self.stream_cryptor.final(bufferOut: bufferOut, byteCapacityOut: encryptLen, byteCountOut: &byteCount)
-                    let finalData = NSData(bytesNoCopy: bufferOut, length: byteCount)
-
-                    let count = finalData.length / MemoryLayout<UInt8>.size
-
-                    // create array of appropriate length:
-                    var array = [UInt8](repeating: 0, count: count)
-
-                    // copy bytes into array
-                    finalData.getBytes(&array, length:count * MemoryLayout<UInt8>.size)
-                    self.currentData.append(finalData as Data)
-                }
-            }
-            
-            // Only write multiples of 3, since we are base64 encoding and would otherwise end up with padding
-            var evenLength: Int
-            if (isFlush) {
-                evenLength = self.currentData.length
-            } else {
-                evenLength = (self.currentData.length / 3) * 3
-            }
-            
-            return self._write(self.currentData, len: evenLength)
-            
-        }.done(on: self.encryption_queue) { evenLength in
-            self.currentData.replaceBytes(in: NSRange(0..<evenLength), withBytes: nil, length: 0)
-        }
-    }
 
     deinit {
         if (self.file_handle != nil) {
@@ -393,7 +265,7 @@ class DataStorage {
         self.outputLogClosures()
     }
 
-    fileprivate func outputLogClosures() {
+    private func outputLogClosures() {
         // TODO: this appears to be the place where we queue up and now execute any app log events.
         let tmpLogClosures: [()->()] = logClosures
         self.logClosures = []
@@ -402,7 +274,7 @@ class DataStorage {
         }
     }
 
-    fileprivate func reset() {
+    private func reset() {
         // called when max filesize is reached, inside flush when the file is empty,
         log.info("DataStorage.reset called...")
         if let filename = filename, let realFilename = realFilename, moveOnClose == true && hasData == true {
@@ -493,17 +365,14 @@ class DataStorage {
         if (self.type != "ios_log") {
             self.logClosures.append() {
                 AppEventManager.sharedInstance.logAppEvent(
-                    event: "file_init",
-                    msg: "Init new data file",
-                    d1: name,
-                    d2: String(self.hasError),
-                    d3: self.errMsg
+                    event: "file_init", msg: "Init new data file",
+                    d1: name, d2: String(self.hasError), d3: self.errMsg
                 )
             }
         }
     }
 
-    fileprivate func _writeLine(_ line: String) {
+    private func _writeLine(_ line: String) {
         let iv: Data? = Crypto.sharedInstance.randomBytes(16)
         if let iv = iv, let aesKey = aesKey {
             let encrypted = Crypto.sharedInstance.aesEncrypt(iv, key: aesKey, plainText: line)
@@ -528,7 +397,7 @@ class DataStorage {
         }
     }
 
-    fileprivate func writeLine(_ line: String) {
+    private func writeLine(_ line: String) {
         self.hasData = true
         self.dataPoints = dataPoints + 1
         self._writeLine(line)
@@ -537,7 +406,8 @@ class DataStorage {
         }
     }
 
-    func store_now(_ data: [String]) {
+    func store(_ data: [String]) {
+        // This appears to be the main write function for most app datastreams
         var sanitizedData: [String]
         
         if (self.sanitize) {
@@ -555,30 +425,8 @@ class DataStorage {
         let csv = sanitizedData.joined(separator: DataStorage.delimiter)
         self.writeLine(csv)
     }
-    
-    func store(_ data: [String]) -> Promise<Void> {
-        return Promise().then(on: storage_ops_queue) { _ -> Promise<Void> in
-            var sanitizedData: [String]
-            
-            if (self.sanitize) {
-                // survey answers and survey timings files have a (naive) comma replacement behavior.
-                sanitizedData = []
-                for line in data {
-                    sanitizedData.append(
-                        line.replacingOccurrences(of: ",", with: ";")
-                            .replacingOccurrences(of: "[\t\n\r]", with: " ", options: .regularExpression)
-                    )
-                }
-            } else {
-                sanitizedData = data
-            }
-            let csv = sanitizedData.joined(separator: DataStorage.delimiter)
-            self.writeLine(csv)
-            return Promise()
-        }
-    }
 
-    func flush_now(_ do_reset: Bool = false) -> Void {
+    func flush(_ do_reset: Bool = false) -> Void {
         // TODO: remove entire reset concept in flush
         // flush does not flush. Like all other file io it appends to the list of closures.
         var force_reset = false
@@ -601,10 +449,8 @@ class DataStorage {
         if (self.type != "ios_log") {  //
             self.logClosures.append() {
                 AppEventManager.sharedInstance.logAppEvent(
-                    event: "file_flush",
-                    msg: "Flushing lines to file",
-                    d1: self.name,
-                    d2: String(self.lines.count)
+                    event: "file_flush", msg: "Flushing lines to file",
+                    d1: self.name, d2: String(self.lines.count)
                 )
             }
         }
@@ -700,145 +546,6 @@ class DataStorage {
         }
         self.outputLogClosures()
     }
-    
-    
-    func flush(_ do_reset: Bool = false) -> Promise<Void> {
-        // flush does not flush. Like all other file io it appends to the list of closures.
-        var force_reset = false
-        return Promise().then(on: storage_ops_queue) { _ -> Promise<Void> in
-            self.logClosures = [ ]
-
-// I am officially disabling this case. We will handle any fallout on the backend.
-// This code is simply too stupid. Flush needs to actually do fileio in all possible scenarios.
-//            if (!self.hasData || self.lines.count == 0) {
-//                log.info("That insane flush case that makes no sense 1")
-//                if (reset) {
-//                    log.info("That insane flush case that makes no sense 2")
-//                    self.reset()
-//                }
-//                return Promise()
-//            }
-            
-            let data = self.lines.joined(separator: "").data(using: String.Encoding.utf8)
-            self.lines = [ ]
-            if (self.type != "ios_log") {
-                self.logClosures.append() {
-                    AppEventManager.sharedInstance.logAppEvent(
-                        event: "file_flush",
-                        msg: "Flushing lines to file",
-                        d1: self.name,
-                        d2: String(self.lines.count)
-                    )
-                }
-            }
-            
-            if let filename = self.filename, let data = data  {
-                // if file name and data are populated
-                let fileManager = FileManager.default
-                
-                if (!fileManager.fileExists(atPath: filename.path)) {
-                    // if no file exists
-                    if (!fileManager.createFile(
-                        atPath: filename.path,
-                        contents: data,
-                        attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
-                    )) {
-                        // if creating a file failed
-                        self.hasError = true
-                        self.errMsg = "Failed to create file."
-                        log.info(self.errMsg)
-                        log.error(self.errMsg)
-                        self.logClosures.append() {
-                            AppEventManager.sharedInstance.logAppEvent(
-                                event: "file_create",
-                                msg: "Could not new data file",
-                                d1: self.name,
-                                d2: String(self.hasError),
-                                d3: self.errMsg
-                            )
-                        }
-                        // almost definitely blocks the above log statement
-                        fatalError("Could not create new data file - 1")
-                    } else {
-                        // if creating a file succeeded
-                        log.info("Create new data file: \(filename)")
-                    }
-                    if (self.type != "ios_log") {
-                        // ios log special case
-                        self.logClosures.append() {
-                            AppEventManager.sharedInstance.logAppEvent(
-                                event: "file_create",
-                                msg: "Create new data file",
-                                d1: self.name,
-                                d2: String(self.hasError),
-                                d3: self.errMsg
-                            )
-                        }
-                    }
-                } else {
-                    // if fie exists
-                    if let fileHandle = try? FileHandle(forWritingTo: filename) {
-                        // if file handle instantiated (file open)
-                        defer {
-                            fileHandle.closeFile()
-                        }
-                        let seekPos = fileHandle.seekToEndOfFile()
-                        fileHandle.write(data)
-                        fileHandle.closeFile()
-                        self.bytesWritten = self.bytesWritten + data.count
-                        
-                        // this data variable is a string of the full line in base64 including the iv. (i.e. it is encrypted)
-                        log.info("Appended data to file: \(filename), size: \(seekPos): \(data)")
-                    } else {
-                        // if error opening file
-                        self.hasError = true
-                        self.errMsg = "Error opening file for writing"
-                        log.info(self.errMsg)
-                        log.error(self.errMsg)
-                        if (self.type != "ios_log") {
-                            self.logClosures.append() {
-                                AppEventManager.sharedInstance.logAppEvent(
-                                    event: "file_err",
-                                    msg: "Error writing to file",
-                                    d1: self.name,
-                                    d2: String(self.hasError),
-                                    d3: self.errMsg
-                                )
-                            }
-                        }
-                        
-                        log.info("another unacceptable failure mode.")
-                        fatalError("this is not a valid failure mode for this app")
-                        exit(1)
-                    }
-                }
-            } else {
-                // if there was no data or no filename
-                self.errMsg = "No filename.  NO data??"
-                log.error(self.errMsg)
-                self.hasError = true
-                if (self.type != "ios_log") {
-                    self.logClosures.append() {
-                        AppEventManager.sharedInstance.logAppEvent(
-                            event: "file_err",
-                            msg: "Error writing to file",
-                            d1: self.name,
-                            d2: String(self.hasError),
-                            d3: self.errMsg
-                        )
-                    }
-                }
-                force_reset = true
-            }
-            
-            if (do_reset || force_reset) {
-                // conditionally call reset
-                self.reset()
-            }
-            self.outputLogClosures()
-            return Promise()
-        }
-    }
 }
 
 class DataStorageManager {
@@ -889,7 +596,7 @@ class DataStorageManager {
 
     }
 
-    // TODO: WHYY IS THIS OPTIONAL
+    // TODO: WHYY IS THIS RETURN OPTIONAL
     func createStore(_ type: String, headers: [String]) -> DataStorage? {
         if (storageTypes[type] == nil) {
             if let publicKey = publicKey, let patientId = study?.patientId {
@@ -909,42 +616,62 @@ class DataStorageManager {
         return storageTypes[type]!
     }
 
-    func closeStore_now(_ type: String) -> Void {
-        if let storage = storageTypes[type] {
-            self.storageTypes.removeValue(forKey: type)
-            storage.flush_now(false)
-        }
-    }
+// This was the first result of removing then re-adding the promise, but I don't think it works as desired
+//    func closeStore(_ type: String) -> Promise<Void> {
+//        // has to return a promise due to conformance to a Protocol
+//        let the_queue = DispatchQueue(label: "com.rocketfarm.beiwe.dataqueue." + type, attributes: [])
+//        return Promise().then(on: the_queue) { _ -> Promise<Void> in
+//            if let storage = self.storageTypes[type] {
+//                self.storageTypes.removeValue(forKey: type)
+//                storage.flush(false)
+//            }
+//            return Promise()
+//        }
+//    }
     
+//    This is the original function
+//    func closeStore(_ type: String) -> Promise<Void> {
+//        // has to return a promise due to conformance to a Protocol
+//        if let storage = storageTypes[type] {
+//            self.storageTypes.removeValue(forKey: type)
+//            return storage.flush(false)
+//        }
+//        return Promise()
+//    }
+
+    // OK, I think this is the best solution.
+    // Keep the above commented code until actually sure about what this code... is for?
     func closeStore(_ type: String) -> Promise<Void> {
+        // has to return a promise due to conformance to a Protocol
         if let storage = storageTypes[type] {
             self.storageTypes.removeValue(forKey: type)
-            return storage.flush(false)
+            storage.flush(false)
         }
         return Promise()
     }
 
-    func _flushAll_now() -> Void {
+    
+    func _flushAll() -> Void {
         // calls flush for all files
         for (_, storage) in storageTypes {
-            storage.flush_now(true)
+            storage.flush(true)
         }
     }
     
-    func _flushAll() -> Promise<Void> {
-        // calls flush for all files
-        var promises: [Promise<Void>] = []
-        for (_, storage) in storageTypes {
-            promises.append(storage.flush(true))
-        }
-        return when(fulfilled: promises)
-    }
+//    func _flushAll_old() -> Promise<Void> {
+//        // calls flush for all files
+//        var promises: [Promise<Void>] = []
+//        for (_, storage) in storageTypes {
+//            promises.append(storage.flush(true))
+//        }
+//        return when(fulfilled: promises)
+//    }
 
     func isUploadFile(_ filename: String) -> Bool {
         return filename.hasSuffix(DataStorageManager.dataFileSuffix) || filename.hasSuffix(".mp4") || filename.hasSuffix(".wav")
     }
     
-    func _moveFile(_ src: URL, dst: URL) {
+    private func _moveFile(_ src: URL, dst: URL) {
         do {
             try FileManager.default.moveItem(at: src, to: dst)
             log.info("moved \(src) to \(dst)")
@@ -953,7 +680,15 @@ class DataStorageManager {
         }
     }
     
-    func prepareForUpload_now() -> Void {
+    func prepareForUpload() -> Promise<Void> {
+        let prepQ = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default)
+        return Promise().then(on: prepQ) { _ -> Promise<Void> in
+            self.prepareForUpload_actual()
+            return Promise()
+        }
+    }
+    
+    private func prepareForUpload_actual() -> Void {
         //TODO: this is a really dangerous general solution to ensuring files are getting uploaded...
         let prepQ = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default)
 //        let prepQ = DispatchQueue.global(qos: DispatchQoS.QoSClass.utility)  // this is the fix for the warning, not changing atm.
@@ -982,37 +717,6 @@ class DataStorageManager {
         for filename in filesToUpload {
             self._moveFile(DataStorageManager.currentDataDirectory().appendingPathComponent(filename),
                            dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
-        }
-    }
-    
-    func prepareForUpload() -> Promise<Void> {
-        let prepQ = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default)
-//        let prepQ = DispatchQueue.global(qos: DispatchQoS.QoSClass.utility)  // this is the fix for the warning, not changing atm.
-        var filesToUpload: [String] = [ ]
-        
-        /* Flush once to get all of the files currently processing */
-        return self._flushAll().then(on: prepQ) { _ -> Promise<Void> in
-            /* And record their names */
-            let path = DataStorageManager.currentDataDirectory().path
-            if let enumerator = FileManager.default.enumerator(atPath: path) {
-                while let filename = enumerator.nextObject() as? String {
-                    if (self.isUploadFile(filename)) {
-                        filesToUpload.append(filename)
-                    } else {
-                        log.warning("Non upload file sitting in directory: \(filename)")
-                    }
-                }
-            }
-        
-            /* Need to flush again, because there is (very slim) one of those files was created after the flush */
-            /** This line is the best candidate for corrupted files. */
-            return self._flushAll()
-        }.then(on: prepQ) { _ -> Promise<Void> in
-            for filename in filesToUpload {
-                self._moveFile(DataStorageManager.currentDataDirectory().appendingPathComponent(filename),
-                               dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
-            }
-            return Promise()
         }
     }
     

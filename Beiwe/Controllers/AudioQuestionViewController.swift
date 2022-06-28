@@ -251,7 +251,7 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
             // closure return
             let data: Data = handle.readData(ofLength: self.OUTPUT_CHUNK_SIZE)
             if (data.count > 0) {
-                return encFile.write(data as NSData, writeLen: data.count).then {
+                return encFile.write(data as NSData, writeLen: data.count).then {_ in
                     // closure recur
                     return self.writeSomeData(handle, encFile: encFile)
                 }
