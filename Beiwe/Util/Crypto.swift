@@ -67,6 +67,7 @@ class Crypto {
     }
 
     func aesEncrypt(_ iv: Data, key: Data, plainText: String) -> Data? {
+        //TODO: MAKE THIS DATA RETURN NON OPTIONA!
         let arrayKey = Array(UnsafeBufferPointer(start: (key as NSData).bytes.bindMemory(to: UInt8.self, capacity: key.count), count: key.count));
         let arrayIv = Array(UnsafeBufferPointer(start: (iv as NSData).bytes.bindMemory(to: UInt8.self, capacity: iv.count), count: iv.count));
 
