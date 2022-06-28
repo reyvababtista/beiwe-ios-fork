@@ -19,7 +19,6 @@ enum DataStorageErrors : Error {
 //    case AES_KEY_GENERATION_FAILED_2
 }
 
-
 /*
  Encrypted Storage
  */
@@ -225,12 +224,9 @@ class DataStorage {
     var hasData: Bool = false  //TODO: PURGE
     var filename: URL?
     var realFilename: URL?
-    var dataPoints = 0
     var patientId: String
-    var bytesWritten = 0  // TODO: check usage but probably PURGE
     var hasError = false  // TODO: PURGE
     var errMsg: String = ""
-    var noBuffer = false  // TODO: PURGE
     var sanitize = false
     let moveOnClose: Bool
     let storage_ops_queue: DispatchQueue
@@ -300,8 +296,6 @@ class DataStorage {
             self.filename = realFilename
         }
         self.lines = [ ]
-        self.dataPoints = 0
-        self.bytesWritten = 0
         self.hasData = false
         self.aesKey = Crypto.sharedInstance.newAesKey(keyLength)
         
@@ -399,11 +393,8 @@ class DataStorage {
 
     private func writeLine(_ line: String) {
         self.hasData = true
-        self.dataPoints = dataPoints + 1
         self._writeLine(line)
-        if (self.noBuffer) {  // TODO: ALWAYS FLUSH WHYYYYY
-            self.flush(false)
-        }
+        self.flush(false)
     }
 
     func store(_ data: [String]) {
@@ -502,7 +493,6 @@ class DataStorage {
                     let seekPos = fileHandle.seekToEndOfFile()
                     fileHandle.write(data)
                     fileHandle.closeFile()
-                    self.bytesWritten = self.bytesWritten + data.count
                     
                     // this data variable is a string of the full line in base64 including the iv. (i.e. it is encrypted)
                     log.info("Appended data to file: \(filename), size: \(seekPos): \(data)")
