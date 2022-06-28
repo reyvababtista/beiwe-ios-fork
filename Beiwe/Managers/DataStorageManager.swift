@@ -54,9 +54,9 @@ class EncryptedStorage {
         
         self.encryption_queue = DispatchQueue(label: "com.rocketfarm.beiwe.dataqueue." + data_stream_type, attributes: [])
         
-        let name = patientId + "_" + self.data_stream_type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
-        self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(name + suffix)
-        self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(name + suffix)
+        let new_name = patientId + "_" + self.data_stream_type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
+        self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(new_name + suffix)
+        self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(new_name + suffix)
         self.aesKey = Crypto.sharedInstance.newAesKey(keyLength)!
         self.iv = Crypto.sharedInstance.randomBytes(16)!
         
@@ -232,7 +232,7 @@ class DataStorage {
     let storage_ops_queue: DispatchQueue
     var name = ""
     var logClosures:[()->()] = [ ]
-    var secKeyRef: SecKey?
+    var secKeyRef: SecKey?  //TODO: make non-optional
     
     // flag used if the aes key generation ever fails, if it failse twice we fatally exit.
     var AES_KEY_GEN_FAIL: Bool = false
@@ -269,7 +269,7 @@ class DataStorage {
             a_promise()
         }
     }
-
+    
     private func reset() {
         // called when max filesize is reached, inside flush when the file is empty,
         log.info("DataStorage.reset called...")
@@ -284,14 +284,13 @@ class DataStorage {
         } else {
             log.info("weird non-reset reset scenario moveonclose was \(moveOnClose) and hasdata was \(hasData).")
         }
-        let name = patientId + "_" + type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
-        self.name = name
+        self.name = patientId + "_" + type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
         self.errMsg = ""
         self.hasError = false
 
-        self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(name + DataStorageManager.dataFileSuffix)
+        self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
         if (moveOnClose) {
-            self.filename = URL(fileURLWithPath:  NSTemporaryDirectory()).appendingPathComponent(name + DataStorageManager.dataFileSuffix)
+            self.filename = URL(fileURLWithPath:  NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
         } else {
             self.filename = realFilename
         }
@@ -360,7 +359,7 @@ class DataStorage {
             self.logClosures.append() {
                 AppEventManager.sharedInstance.logAppEvent(
                     event: "file_init", msg: "Init new data file",
-                    d1: name, d2: String(self.hasError), d3: self.errMsg
+                    d1: self.name, d2: String(self.hasError), d3: self.errMsg
                 )
             }
         }
