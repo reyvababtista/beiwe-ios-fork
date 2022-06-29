@@ -19,15 +19,14 @@ enum DataStorageErrors : Error {
 //    case AES_KEY_GENERATION_FAILED_2
 }
 
+let DELIMITER = ","
+let KEYLENGTH = 128
+
 /*
  Encrypted Storage
  */
 
 class EncryptedStorage {
-
-    static let delimiter = ","
-    let keyLength = 128
-
     let data_stream_type: String
     var filename: URL
     let fileManager = FileManager.default
@@ -57,8 +56,8 @@ class EncryptedStorage {
         let new_name = patientId + "_" + self.data_stream_type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
         self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(new_name + suffix)
         self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(new_name + suffix)
-        self.aesKey = Crypto.sharedInstance.newAesKey(keyLength)!
-        self.iv = Crypto.sharedInstance.randomBytes(16)!
+        self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
+        self.iv = Crypto.sharedInstance.randomBytes(16)
         
         let data_for_key = (aesKey as NSData).bytes.bindMemory(to: UInt8.self, capacity: aesKey.count)
         let data_for_iv = (iv as NSData).bytes.bindMemory(to: UInt8.self, capacity: iv.count)
@@ -210,14 +209,10 @@ class EncryptedStorage {
  */
 
 class DataStorage {
-    static let delimiter = ","
-
-    let keyLength = 128
-
     var headers: [String]
     var type: String
     var lines: [String] = [ ]
-    var aesKey: Data?
+    var aesKey: Data
     var publicKey: String
     var hasData: Bool = false  //TODO: PURGE
     var filename: URL?
@@ -231,20 +226,8 @@ class DataStorage {
     var name = ""
     var logClosures:[()->()] = [ ]
     var secKeyRef: SecKey?  //TODO: make non-optional
-    
-    // flag used if the aes key generation ever fails, if it failse twice we fatally exit.
-    var AES_KEY_GEN_FAIL: Bool = false
-    
 
     init(type: String, headers: [String], patientId: String, publicKey: String, moveOnClose: Bool = false, keyRef: SecKey?) {
-//        log.info("DataStorage.init")
-//        log.info("type: \(type)")
-//        log.info("headers: \(headers)")
-//        log.info("patientId: \(patientId)")
-//        log.info("publicKey: \(publicKey)")
-//        log.info("moveOnClose: \(moveOnClose)")
-//        log.info("keyRef: \(keyRef)")
-
         self.type = type
         self.patientId = patientId
         self.publicKey = publicKey
@@ -252,7 +235,10 @@ class DataStorage {
         self.headers = headers
         self.moveOnClose = moveOnClose
         self.secKeyRef = keyRef
-
+        
+        // needs to be instantiated to avoid optional problems, value is reset inside self.reset.
+        self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
+        
         self.storage_ops_queue = DispatchQueue(label: "com.rocketfarm.beiwe.dataqueue." + type, attributes: [])
         self.logClosures = []
         self.reset()
@@ -269,7 +255,7 @@ class DataStorage {
     }
     
     private func reset() {
-        // called when max filesize is reached, inside flush when the file is empty,
+        // called when max filesize is reached, inside flush when the file is empty
         log.info("DataStorage.reset called...")
         if let filename = filename, let realFilename = realFilename, moveOnClose == true && hasData == true {
             do {
@@ -294,64 +280,46 @@ class DataStorage {
         }
         self.lines = [ ]
         self.hasData = false
-        self.aesKey = Crypto.sharedInstance.newAesKey(keyLength)
+        self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
         
-        if let aesKey = self.aesKey {  //TODO: make this not-optional
-            do {
-                var rsaLine: String?
-                if let keyRef = self.secKeyRef {
-                    rsaLine = try Crypto.sharedInstance.base64ToBase64URL(
-                        SwiftyRSA.encryptString(
-                            Crypto.sharedInstance.base64ToBase64URL(aesKey.base64EncodedString()),
-                            publicKey: keyRef,
-                            padding: []
-                        )) + "\n"
-                } else {
-                    rsaLine = try Crypto.sharedInstance.base64ToBase64URL(
-                        SwiftyRSA.encryptString(
-                            Crypto.sharedInstance.base64ToBase64URL(aesKey.base64EncodedString()),
-                            publicKeyId: PersistentPasswordManager.sharedInstance.publicKeyName(self.patientId),
-                            padding: []
-                        )) + "\n"
-                }
-                self.lines = [ rsaLine! ]
-                self._writeLine(headers.joined(separator: DataStorage.delimiter))
-            
-            } catch let unkErr {
-                // just error, this has actually been tested and doesn't seem to occur?  should be safe tho?
-                self.errMsg = "RSAEncErr: " + String(describing: unkErr)
-                self.lines = [ errMsg + "\n" ]
-                self.hasError = true
-                log.error(errMsg)
-                log.error("AES KEY GENERATION FAILED, error clause 1, EXITING APP.")
-            
-                // We NEED an encryption key, that can't be allowed to fail.
-                if AES_KEY_GEN_FAIL {
-                    fatalError("AES KEY GENERATION FAILED, error clause 1.")
-                } else {
-                    self.AES_KEY_GEN_FAIL = true
-                    self.reset()
-                    self.AES_KEY_GEN_FAIL = false
-                    return
-                }
-            }
+//        do {
+        var rsaLine: String?
+        if let keyRef = self.secKeyRef {
+            rsaLine = try! Crypto.sharedInstance.base64ToBase64URL(
+                SwiftyRSA.encryptString(
+                    Crypto.sharedInstance.base64ToBase64URL(aesKey.base64EncodedString()),
+                    publicKey: keyRef,
+                    padding: []
+                )) + "\n"
         } else {
-            self.errMsg = "Failed to generate AES key"
-            self.lines = [ errMsg + "\n" ]
-            self.hasError = true
-            log.error(errMsg)
-            log.error("AES KEY GENERATION FAILED, error clause 2, EXITING APP.")
-            
-            // We NEED an encryption key, that can't be allowed to fail.
-            if AES_KEY_GEN_FAIL {
-                fatalError("AES KEY GENERATION FAILED, error clause 2.")
-            } else {
-                self.AES_KEY_GEN_FAIL = true
-                self.reset()  // TODO: this is insanely ugly code....
-                self.AES_KEY_GEN_FAIL = false
-                return
-            }
+            rsaLine = try! Crypto.sharedInstance.base64ToBase64URL(
+                SwiftyRSA.encryptString(
+                    Crypto.sharedInstance.base64ToBase64URL(aesKey.base64EncodedString()),
+                    publicKeyId: PersistentPasswordManager.sharedInstance.publicKeyName(self.patientId),
+                    padding: []
+                )) + "\n"
         }
+        self.lines = [ rsaLine! ]
+        self._writeLine(headers.joined(separator: DELIMITER))
+        
+//        } catch let unkErr {
+//            // just error, this has actually been tested and doesn't seem to occur?  should be safe tho?
+//            self.errMsg = "RSAEncErr: " + String(describing: unkErr)
+//            self.lines = [ errMsg + "\n" ]
+//            self.hasError = true
+//            log.error(errMsg)
+//            log.error("AES KEY GENERATION FAILED, error clause 1, EXITING APP.")
+//
+//            // We NEED an encryption key, that can't be allowed to fail.
+//            if AES_KEY_GEN_FAIL {
+//                fatalError("AES KEY GENERATION FAILED, error clause 1.")
+//            } else {
+//                self.AES_KEY_GEN_FAIL = true
+//                self.reset()
+//                self.AES_KEY_GEN_FAIL = false
+//                return
+//            }
+//        }
 
         if (self.type != "ios_log") {
             self.logClosures.append() {
@@ -364,24 +332,16 @@ class DataStorage {
     }
 
     private func _writeLine(_ line: String) {
-        let iv: Data? = Crypto.sharedInstance.randomBytes(16)
-        if let iv = iv, let aesKey = aesKey {
-            let encrypted = Crypto.sharedInstance.aesEncrypt(iv, key: aesKey, plainText: line)
-            if let encrypted = encrypted  {
-                self.lines.append(
-                    Crypto.sharedInstance.base64ToBase64URL(iv.base64EncodedString(options: []))
-                    + ":"
-                    + Crypto.sharedInstance.base64ToBase64URL(encrypted.base64EncodedString(options: []))
-                    + "\n"
-                )
-                self.flush(false)
-            }
-        } else {
-            //TODO: ABSOLUTELY NOT THIS CASE SHOULD CRASH
-            self.errMsg = "Can't generate IV, skipping data"
-            log.error(self.errMsg)
-            self.hasError = true
-            fatalError("ABSOLUTELY NOT THIS CASE SHOULD CRASH")
+        let iv: Data = Crypto.sharedInstance.randomBytes(16)
+        let encrypted = Crypto.sharedInstance.aesEncrypt(iv, key: aesKey, plainText: line)
+        if let encrypted = encrypted  {
+            self.lines.append(
+                Crypto.sharedInstance.base64ToBase64URL(iv.base64EncodedString(options: []))
+                + ":"
+                + Crypto.sharedInstance.base64ToBase64URL(encrypted.base64EncodedString(options: []))
+                + "\n"
+            )
+            self.flush(false)
         }
     }
 
@@ -407,7 +367,7 @@ class DataStorage {
         } else {
             sanitizedData = data
         }
-        let csv = sanitizedData.joined(separator: DataStorage.delimiter)
+        let csv = sanitizedData.joined(separator: DELIMITER)
         self.writeLine(csv)
     }
     

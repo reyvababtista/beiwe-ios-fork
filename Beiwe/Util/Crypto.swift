@@ -29,22 +29,22 @@ class Crypto {
             .replacingOccurrences(of: "+", with: "-");
     }
 
-    func randomBytes(_ length: Int) -> Data? {
+    func randomBytes(_ length: Int) -> Data {
+        // generates random data for whatever purpose we desire.
         var data = Data(count: length)
         let result = data.withUnsafeMutableBytes { [count=data.count]
             (mutableBytes: UnsafeMutablePointer<UInt8>) -> Int32 in
             SecRandomCopyBytes(kSecRandomDefault, count, mutableBytes)
         }
-
+        
         if (result == errSecSuccess) {
-            return data;
+            return data
         } else {
-            return nil;
+            fatalError("random data generation failed")
         }
-
     }
 
-    func newAesKey(_ keyLength: Int = 128) -> Data? {
+    func newAesKey(_ keyLength: Int = 128) -> Data {
         let length = (keyLength+7) / 8;
         return randomBytes(length);
     }
