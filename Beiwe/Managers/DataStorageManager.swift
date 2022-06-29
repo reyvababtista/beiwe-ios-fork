@@ -79,7 +79,7 @@ class EncryptedStorage {
         }
     }
     
-    fileprivate func open_actual() -> Void {
+    private func open_actual() -> Void {
         if (!self.fileManager.createFile(
             atPath: self.filename.path,
             contents: nil,
@@ -210,10 +210,8 @@ class EncryptedStorage {
  */
 
 class DataStorage {
-
     static let delimiter = ","
 
-    let flushLines = 100  // TODO PURGE
     let keyLength = 128
 
     var headers: [String]
@@ -376,10 +374,7 @@ class DataStorage {
                     + Crypto.sharedInstance.base64ToBase64URL(encrypted.base64EncodedString(options: []))
                     + "\n"
                 )
-                //TODO: ALWAYS FLUSH
-                if (lines.count >= flushLines) {
-                    self.flush(false)
-                }
+                self.flush(false)
             }
         } else {
             //TODO: ABSOLUTELY NOT THIS CASE SHOULD CRASH
@@ -415,7 +410,7 @@ class DataStorage {
         let csv = sanitizedData.joined(separator: DataStorage.delimiter)
         self.writeLine(csv)
     }
-
+    
     func flush(_ do_reset: Bool = false) -> Void {
         // TODO: remove entire reset concept in flush
         // flush does not flush. Like all other file io it appends to the list of closures.
