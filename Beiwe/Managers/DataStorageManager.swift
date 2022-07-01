@@ -22,6 +22,8 @@ enum DataStorageErrors : Error {
 let DELIMITER = ","
 let KEYLENGTH = 128
 
+// TODO: convert All fatalError calls to sentry error reports with real error information.
+
 /*
  Encrypted Storage
  */
@@ -218,7 +220,7 @@ class DataStorage {
     var filename: URL
     var realFilename: URL
     var patientId: String
-    var hasError = false  // TODO: PURGE
+    var hasError = false  // This is used as a return value from a write operation
     var errMsg: String = ""
     var sanitize = false
     let moveOnClose: Bool
@@ -260,6 +262,26 @@ class DataStorage {
         }
     }
     
+    private func get_rsa_line() -> String {
+        // TODO: why? these two functions are not identical, the call to encryptString
+        // have different args, publicKey vs publicKeyId. And self.secKeyRef is sometimes not present?
+        if let keyRef = self.secKeyRef {
+            return try! Crypto.sharedInstance.base64ToBase64URL(
+                SwiftyRSA.encryptString(
+                    Crypto.sharedInstance.base64ToBase64URL(aesKey.base64EncodedString()),
+                    publicKey: keyRef,
+                    padding: []
+                )) + "\n"
+        } else {
+            return try! Crypto.sharedInstance.base64ToBase64URL(
+                SwiftyRSA.encryptString(
+                    Crypto.sharedInstance.base64ToBase64URL(aesKey.base64EncodedString()),
+                    publicKeyId: PersistentPasswordManager.sharedInstance.publicKeyName(self.patientId),
+                    padding: []
+                )) + "\n"
+        }
+    }
+    
     private func reset() {
         // called when max filesize is reached, inside flush when the file is empty
         log.info("DataStorage.reset called...")
@@ -286,32 +308,14 @@ class DataStorage {
         self.lines = [ ]
         self.hasData = false
         self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
-        
-//        do {
-        var rsaLine: String?
-        if let keyRef = self.secKeyRef {
-            rsaLine = try! Crypto.sharedInstance.base64ToBase64URL(
-                SwiftyRSA.encryptString(
-                    Crypto.sharedInstance.base64ToBase64URL(aesKey.base64EncodedString()),
-                    publicKey: keyRef,
-                    padding: []
-                )) + "\n"
-        } else {
-            rsaLine = try! Crypto.sharedInstance.base64ToBase64URL(
-                SwiftyRSA.encryptString(
-                    Crypto.sharedInstance.base64ToBase64URL(aesKey.base64EncodedString()),
-                    publicKeyId: PersistentPasswordManager.sharedInstance.publicKeyName(self.patientId),
-                    padding: []
-                )) + "\n"
-        }
-        self.lines = [ rsaLine! ]
+        self.lines = [ get_rsa_line() ]
         self._writeLine(headers.joined(separator: DELIMITER))
 
+        // log new creating new file.
         if (self.type != "ios_log") {
             self.logClosures.append() {
                 AppEventManager.sharedInstance.logAppEvent(
-                    event: "file_init", msg: "Init new data file",
-                    d1: self.name, d2: String(self.hasError), d3: self.errMsg
+                    event: "file_init", msg: "Init new data file", d1: self.name
                 )
             }
         }
@@ -320,7 +324,7 @@ class DataStorage {
     private func _writeLine(_ line: String) {
         let iv: Data = Crypto.sharedInstance.randomBytes(16)
         let encrypted = Crypto.sharedInstance.aesEncrypt(iv, key: aesKey, plainText: line)
-        if let encrypted = encrypted  {
+        if let encrypted = encrypted {
             self.lines.append(
                 Crypto.sharedInstance.base64ToBase64URL(iv.base64EncodedString(options: []))
                 + ":"
@@ -372,10 +376,11 @@ class DataStorage {
             self.logClosures.append() {
                 AppEventManager.sharedInstance.logAppEvent(
                     event: "file_create", msg: "Could not new data file",
-                    d1: self.name, d2: String(self.hasError), d3: self.errMsg
+                    d1: self.name, d2: self.errMsg
                 )
             }
-            // almost definitely blocks the above log statement
+            // TODO: convert to sentry error report with real error information.
+            // almost definitely blocks the above app log enclosure
             fatalError("Could not create new data file - 1")
         } else {
             // if creating a file succeeded
@@ -386,7 +391,7 @@ class DataStorage {
             self.logClosures.append() {
                 AppEventManager.sharedInstance.logAppEvent(
                     event: "file_create", msg: "Create new data file",
-                    d1: self.name, d2: String(self.hasError), d3: self.errMsg
+                    d1: self.name, d2: self.errMsg
                 )
             }
         }
@@ -439,19 +444,18 @@ class DataStorage {
                     // this data variable is a string of the full line in base64 including the iv. (i.e. it is encrypted)
 //                    log.info("Appended data to file: \(filename), size: \(seekPos): \(data)")
                     if seekPos == 0 {
-                        log.info("empty file write:, \(data)")
+                        log.info("empty file write to \(self.filename): '\(data)'")
                     }
                 } else {
                     // if error opening file
                     self.hasError = true
                     self.errMsg = "Error opening file for writing"
-                    log.info(self.errMsg)
                     log.error(self.errMsg)
                     if (self.type != "ios_log") {
                         self.logClosures.append() {
                             AppEventManager.sharedInstance.logAppEvent(
                                 event: "file_err", msg: "Error writing to file",
-                                d1: self.name, d2: String(self.hasError), d3: self.errMsg
+                                d1: self.name, d2: self.errMsg
                             )
                         }
                     }
@@ -460,14 +464,14 @@ class DataStorage {
             }
         } else {
             // if there was no data or no filename
-            self.errMsg = "No filename.  NO data??"
+            self.errMsg = "No filename. NO data??"
             log.error(self.errMsg)
             self.hasError = true
             if (self.type != "ios_log") {
                 self.logClosures.append() {
                     AppEventManager.sharedInstance.logAppEvent(
                         event: "file_err", msg: "Error writing to file",
-                        d1: self.name, d2: String(self.hasError), d3: self.errMsg
+                        d1: self.name, d2: self.errMsg
                     )
                 }
             }
