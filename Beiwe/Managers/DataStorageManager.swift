@@ -14,9 +14,6 @@ import IDZSwiftCommonCrypto
 enum DataStorageErrors : Error {
     case cantCreateFile
     case notInitialized
-//    case RSA_LINE_FAILED_TO_WRITE
-//    case AES_KEY_GENERATION_FAILED_1
-//    case AES_KEY_GENERATION_FAILED_2
 }
 
 let DELIMITER = ","
@@ -226,7 +223,7 @@ class DataStorage {
     let moveOnClose: Bool
     let storage_ops_queue: DispatchQueue
     var name = ""
-    var logClosures:[()->()] = [ ]
+    var appLogClosures:[()->()] = [ ]
     var secKeyRef: SecKey?  //TODO: make non-optional
 
     init(type: String, headers: [String], patientId: String, publicKey: String, moveOnClose: Bool = false, keyRef: SecKey?) {
@@ -248,15 +245,15 @@ class DataStorage {
         }
         
         self.storage_ops_queue = DispatchQueue(label: "com.rocketfarm.beiwe.dataqueue." + type, attributes: [])
-        self.logClosures = []
+        self.appLogClosures = []
         self.reset()
-        self.outputLogClosures()
+        self.executeAppLogClosures()
     }
 
-    private func outputLogClosures() {
+    private func executeAppLogClosures() {
         // TODO: this appears to be the place where we queue up and now execute any app log events.
-        let tmpLogClosures: [()->()] = logClosures
-        self.logClosures = []
+        let tmpLogClosures: [()->()] = appLogClosures
+        self.appLogClosures = []
         for a_promise in tmpLogClosures {
             a_promise()
         }
@@ -294,26 +291,25 @@ class DataStorage {
                 fatalError("Error moving temp data \(self.filename) to \(self.realFilename)")
             }
         }
-        
-        self.name = patientId + "_" + type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
         self.errMsg = ""
         self.hasError = false
 
+        self.name = patientId + "_" + type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
         self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
         if (moveOnClose) {
             self.filename = URL(fileURLWithPath:  NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
         } else {
             self.filename = realFilename
         }
-        self.lines = [ ]
+        
         self.hasData = false
         self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
-        self.lines = [ get_rsa_line() ]
-        self._writeLine(headers.joined(separator: DELIMITER))
+        self.lines = [ self.get_rsa_line() ]  // clears existing lines
+        self.encrypted_write(headers.joined(separator: DELIMITER))
 
-        // log new creating new file.
+        // log creating new file.
         if (self.type != "ios_log") {
-            self.logClosures.append() {
+            self.appLogClosures.append() {
                 AppEventManager.sharedInstance.logAppEvent(
                     event: "file_init", msg: "Init new data file", d1: self.name
                 )
@@ -321,7 +317,7 @@ class DataStorage {
         }
     }
 
-    private func _writeLine(_ line: String) {
+    private func encrypted_write(_ line: String) {
         let iv: Data = Crypto.sharedInstance.randomBytes(16)
         let encrypted = Crypto.sharedInstance.aesEncrypt(iv, key: aesKey, plainText: line)
         if let encrypted = encrypted {
@@ -333,12 +329,6 @@ class DataStorage {
             )
             self.flush(false)
         }
-    }
-
-    private func writeLine(_ line: String) {
-        self.hasData = true
-        self._writeLine(line)
-        self.flush(false)
     }
 
     func store(_ data: [String]) {
@@ -357,11 +347,13 @@ class DataStorage {
         } else {
             sanitizedData = data
         }
-        let csv = sanitizedData.joined(separator: DELIMITER)
-        self.writeLine(csv)
+        
+        self.hasData = true
+        self.encrypted_write(sanitizedData.joined(separator: DELIMITER))
+        self.flush(false)
     }
     
-    func create_file(_ data: Data?) {
+    func create_file_with_data(_ data: Data?) {
         // if no file exists
         if (!FileManager.default.createFile(
             atPath: filename.path,
@@ -371,9 +363,8 @@ class DataStorage {
             // if creating a file failed
             self.hasError = true
             self.errMsg = "Failed to create file."
-            log.info(self.errMsg)
             log.error(self.errMsg)
-            self.logClosures.append() {
+            self.appLogClosures.append() {
                 AppEventManager.sharedInstance.logAppEvent(
                     event: "file_create", msg: "Could not new data file",
                     d1: self.name, d2: self.errMsg
@@ -382,18 +373,51 @@ class DataStorage {
             // TODO: convert to sentry error report with real error information.
             // almost definitely blocks the above app log enclosure
             fatalError("Could not create new data file - 1")
-        } else {
-            // if creating a file succeeded
-            log.info("Create new data file: \(filename)")
         }
+        
+        log.info("Created new data file: \(filename)")  // if creating a file succeeded
         if (self.type != "ios_log") {
             // ios log special case
-            self.logClosures.append() {
+            self.appLogClosures.append() {
                 AppEventManager.sharedInstance.logAppEvent(
-                    event: "file_create", msg: "Create new data file",
-                    d1: self.name, d2: self.errMsg
+                    event: "file_create", msg: "Create new data file", d1: self.name, d2: self.errMsg
                 )
             }
+        }
+    }
+    
+    func write_raw_to_end_of_file(_ data: Data) {
+        // if file handle instantiated (file open) append data (a line) to the end of the file.
+        // it appears to be the case that lines are constructed ending with \n, so we don't handle that here.
+        if let fileHandle = try? FileHandle(forWritingTo: filename) {
+            defer {
+                fileHandle.closeFile()
+            }
+            
+            let seekPos = fileHandle.seekToEndOfFile()
+            fileHandle.write(data)
+            fileHandle.closeFile()
+            
+            // this data variable is a string of the full line in base64 including the iv. (i.e. it is encrypted)
+            // log.info("Appended data to file: \(filename), size: \(seekPos): \(data)")
+            if seekPos == 0 {
+                log.error("empty file write to \(self.filename): '\(data)'")
+            }
+        } else {
+            // if error opening file
+            self.hasError = true
+            self.errMsg = "Error opening file for writing"
+            log.error(self.errMsg)
+            if (self.type != "ios_log") {
+                self.appLogClosures.append() {
+                    AppEventManager.sharedInstance.logAppEvent(
+                        event: "file_err", msg: "Error writing to file",
+                        d1: self.name, d2: self.errMsg
+                    )
+                }
+            }
+            // Currently don't care if this blocks the above closure from executing.
+            fatalError("unable to open file \(self.filename)")
         }
     }
     
@@ -401,77 +425,25 @@ class DataStorage {
         // TODO: remove entire reset concept in flush
         // flush does not flush. Like all other file io it appends to the list of closures.
         var force_reset = false
-        self.logClosures = [ ]
-
-// I am officially disabling this case. We will handle any fallout on the backend.
-// This code is simply too stupid. Flush needs to actually do fileio in all possible scenarios.
-//        if (!self.hasData || self.lines.count == 0) {
-//            log.info("That insane flush case that makes no sense 1")
-//            if (reset) {
-//                log.info("That insane flush case that makes no sense 2")
-//                self.reset()
-//            }
-//            return
-//        }
-        
-        let data: Data? = self.lines.joined(separator: "").data(using: String.Encoding.utf8)
+        self.appLogClosures = [ ]
         self.lines = [ ]
-        // TODO: this is getting purged later...
-        if (self.type != "ios_log") {  //
-//            self.logClosures.append() {
-//                AppEventManager.sharedInstance.logAppEvent(
-//                    event: "file_flush", msg: "Flushing lines to file",
-//                    d1: self.name, d2: String(self.lines.count)
-//                )
-//            }
-        }
         
-        if let data = data  {
+        if let data: Data = self.lines.joined(separator: "").data(using: String.Encoding.utf8)  {
             // if file name and data are populated
             if (!FileManager.default.fileExists(atPath: filename.path)) {
-                self.create_file(data)
+                self.create_file_with_data(data)
             } else {
-                // if fie exists
-                if let fileHandle = try? FileHandle(forWritingTo: filename) {
-                    // if file handle instantiated (file open)
-                    defer {
-                        fileHandle.closeFile()
-                    }
-                    let seekPos = fileHandle.seekToEndOfFile()
-                    fileHandle.write(data) 
-                    fileHandle.closeFile()
-                    
-                    // this data variable is a string of the full line in base64 including the iv. (i.e. it is encrypted)
-//                    log.info("Appended data to file: \(filename), size: \(seekPos): \(data)")
-                    if seekPos == 0 {
-                        log.info("empty file write to \(self.filename): '\(data)'")
-                    }
-                } else {
-                    // if error opening file
-                    self.hasError = true
-                    self.errMsg = "Error opening file for writing"
-                    log.error(self.errMsg)
-                    if (self.type != "ios_log") {
-                        self.logClosures.append() {
-                            AppEventManager.sharedInstance.logAppEvent(
-                                event: "file_err", msg: "Error writing to file",
-                                d1: self.name, d2: self.errMsg
-                            )
-                        }
-                    }
-                    fatalError("this is not a valid failure mode for this app")
-                }
+                self.write_raw_to_end_of_file(data)
             }
         } else {
-            // if there was no data or no filename
-            self.errMsg = "No filename. NO data??"
+            // Clause executes if x.data(using: String.Encoding.utf8) fails (it returns optional)
+            self.errMsg = "Error encapsulating data"
             log.error(self.errMsg)
             self.hasError = true
             if (self.type != "ios_log") {
-                self.logClosures.append() {
+                self.appLogClosures.append() {
                     AppEventManager.sharedInstance.logAppEvent(
-                        event: "file_err", msg: "Error writing to file",
-                        d1: self.name, d2: self.errMsg
+                        event: "file_err", msg: self.errMsg, d1: self.name
                     )
                 }
             }
@@ -482,7 +454,7 @@ class DataStorage {
             // conditionally call reset
             self.reset()
         }
-        self.outputLogClosures()
+        self.executeAppLogClosures()
     }
 }
 
