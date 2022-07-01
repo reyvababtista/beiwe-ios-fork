@@ -215,8 +215,8 @@ class DataStorage {
     var aesKey: Data
     var publicKey: String
     var hasData: Bool = false  //TODO: PURGE
-    var filename: URL?
-    var realFilename: URL?
+    var filename: URL
+    var realFilename: URL
     var patientId: String
     var hasError = false  // TODO: PURGE
     var errMsg: String = ""
@@ -238,6 +238,12 @@ class DataStorage {
         
         // needs to be instantiated to avoid optional problems, value is reset inside self.reset.
         self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
+        self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
+        if (self.moveOnClose) {
+            self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
+        } else {
+            self.filename = realFilename
+        }
         
         self.storage_ops_queue = DispatchQueue(label: "com.rocketfarm.beiwe.dataqueue." + type, attributes: [])
         self.logClosures = []
@@ -257,17 +263,16 @@ class DataStorage {
     private func reset() {
         // called when max filesize is reached, inside flush when the file is empty
         log.info("DataStorage.reset called...")
-        if let filename = filename, let realFilename = realFilename, moveOnClose == true && hasData == true {
+        if moveOnClose == true && hasData == true {
             do {
-                try FileManager.default.moveItem(at: filename, to: realFilename)
-                log.info("moved temp data file \(filename) to \(realFilename)")
+                try FileManager.default.moveItem(at: self.filename, to: self.realFilename)
+                log.info("moved temp data file \(self.filename) to \(self.realFilename)")
             } catch {
-                log.error("Error moving temp data \(filename) to \(realFilename)")
-                fatalError("Error moving temp data \(filename) to \(realFilename)")
+                log.error("Error moving temp data \(self.filename) to \(self.realFilename)")
+                fatalError("Error moving temp data \(self.filename) to \(self.realFilename)")
             }
-        } else {
-            log.info("weird non-reset reset scenario moveonclose was \(moveOnClose) and hasdata was \(hasData).")
         }
+        
         self.name = patientId + "_" + type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
         self.errMsg = ""
         self.hasError = false
@@ -301,25 +306,6 @@ class DataStorage {
         }
         self.lines = [ rsaLine! ]
         self._writeLine(headers.joined(separator: DELIMITER))
-        
-//        } catch let unkErr {
-//            // just error, this has actually been tested and doesn't seem to occur?  should be safe tho?
-//            self.errMsg = "RSAEncErr: " + String(describing: unkErr)
-//            self.lines = [ errMsg + "\n" ]
-//            self.hasError = true
-//            log.error(errMsg)
-//            log.error("AES KEY GENERATION FAILED, error clause 1, EXITING APP.")
-//
-//            // We NEED an encryption key, that can't be allowed to fail.
-//            if AES_KEY_GEN_FAIL {
-//                fatalError("AES KEY GENERATION FAILED, error clause 1.")
-//            } else {
-//                self.AES_KEY_GEN_FAIL = true
-//                self.reset()
-//                self.AES_KEY_GEN_FAIL = false
-//                return
-//            }
-//        }
 
         if (self.type != "ios_log") {
             self.logClosures.append() {
@@ -371,6 +357,41 @@ class DataStorage {
         self.writeLine(csv)
     }
     
+    func create_file(_ data: Data?) {
+        // if no file exists
+        if (!FileManager.default.createFile(
+            atPath: filename.path,
+            contents: data,
+            attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
+        )) {
+            // if creating a file failed
+            self.hasError = true
+            self.errMsg = "Failed to create file."
+            log.info(self.errMsg)
+            log.error(self.errMsg)
+            self.logClosures.append() {
+                AppEventManager.sharedInstance.logAppEvent(
+                    event: "file_create", msg: "Could not new data file",
+                    d1: self.name, d2: String(self.hasError), d3: self.errMsg
+                )
+            }
+            // almost definitely blocks the above log statement
+            fatalError("Could not create new data file - 1")
+        } else {
+            // if creating a file succeeded
+            log.info("Create new data file: \(filename)")
+        }
+        if (self.type != "ios_log") {
+            // ios log special case
+            self.logClosures.append() {
+                AppEventManager.sharedInstance.logAppEvent(
+                    event: "file_create", msg: "Create new data file",
+                    d1: self.name, d2: String(self.hasError), d3: self.errMsg
+                )
+            }
+        }
+    }
+    
     func flush(_ do_reset: Bool = false) -> Void {
         // TODO: remove entire reset concept in flush
         // flush does not flush. Like all other file io it appends to the list of closures.
@@ -387,56 +408,23 @@ class DataStorage {
 //            }
 //            return
 //        }
-            
-        let data = self.lines.joined(separator: "").data(using: String.Encoding.utf8)
+        
+        let data: Data? = self.lines.joined(separator: "").data(using: String.Encoding.utf8)
         self.lines = [ ]
         // TODO: this is getting purged later...
         if (self.type != "ios_log") {  //
-            self.logClosures.append() {
-                AppEventManager.sharedInstance.logAppEvent(
-                    event: "file_flush", msg: "Flushing lines to file",
-                    d1: self.name, d2: String(self.lines.count)
-                )
-            }
+//            self.logClosures.append() {
+//                AppEventManager.sharedInstance.logAppEvent(
+//                    event: "file_flush", msg: "Flushing lines to file",
+//                    d1: self.name, d2: String(self.lines.count)
+//                )
+//            }
         }
-            
-        if let filename = self.filename, let data = data  {
+        
+        if let data = data  {
             // if file name and data are populated
-            let fileManager = FileManager.default
-            
-            if (!fileManager.fileExists(atPath: filename.path)) {
-                // if no file exists
-                if (!fileManager.createFile(
-                    atPath: filename.path,
-                    contents: data,
-                    attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
-                )) {
-                    // if creating a file failed
-                    self.hasError = true
-                    self.errMsg = "Failed to create file."
-                    log.info(self.errMsg)
-                    log.error(self.errMsg)
-                    self.logClosures.append() {
-                        AppEventManager.sharedInstance.logAppEvent(
-                            event: "file_create", msg: "Could not new data file",
-                            d1: self.name, d2: String(self.hasError), d3: self.errMsg
-                        )
-                    }
-                    // almost definitely blocks the above log statement
-                    fatalError("Could not create new data file - 1")
-                } else {
-                    // if creating a file succeeded
-                    log.info("Create new data file: \(filename)")
-                }
-                if (self.type != "ios_log") {
-                    // ios log special case
-                    self.logClosures.append() {
-                        AppEventManager.sharedInstance.logAppEvent(
-                            event: "file_create", msg: "Create new data file",
-                            d1: self.name, d2: String(self.hasError), d3: self.errMsg
-                        )
-                    }
-                }
+            if (!FileManager.default.fileExists(atPath: filename.path)) {
+                self.create_file(data)
             } else {
                 // if fie exists
                 if let fileHandle = try? FileHandle(forWritingTo: filename) {
@@ -445,11 +433,14 @@ class DataStorage {
                         fileHandle.closeFile()
                     }
                     let seekPos = fileHandle.seekToEndOfFile()
-                    fileHandle.write(data)
+                    fileHandle.write(data) 
                     fileHandle.closeFile()
                     
                     // this data variable is a string of the full line in base64 including the iv. (i.e. it is encrypted)
-                    log.info("Appended data to file: \(filename), size: \(seekPos): \(data)")
+//                    log.info("Appended data to file: \(filename), size: \(seekPos): \(data)")
+                    if seekPos == 0 {
+                        log.info("empty file write:, \(data)")
+                    }
                 } else {
                     // if error opening file
                     self.hasError = true
@@ -464,7 +455,6 @@ class DataStorage {
                             )
                         }
                     }
-                    log.info("another unacceptable failure mode.")
                     fatalError("this is not a valid failure mode for this app")
                 }
             }
@@ -501,7 +491,7 @@ class DataStorageManager {
     var study: Study?
     var secKeyRef: SecKey?
     
-    // FUXME: we are using the cache directory, we should be using applicationSupportDirectory (Library/Application support/)
+    // TODO: we are using the cache directory, we should be using applicationSupportDirectory (Library/Application support/)
     // https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html
     static func currentDataDirectory() -> URL {
         let cacheDir = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true)[0]
