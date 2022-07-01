@@ -210,20 +210,16 @@ class EncryptedStorage {
 class DataStorage {
     var headers: [String]
     var type: String
-    var lines: [String] = [ ]
     var aesKey: Data
     var publicKey: String
-    var hasData: Bool = false  //TODO: PURGE
     var filename: URL
     var realFilename: URL
     var patientId: String
-    var hasError = false  // This is used as a return value from a write operation
+    var hasError = false  // This is used as a return value from io operations in other parts of the codebase
     var errMsg: String = ""
     var sanitize = false
     let moveOnClose: Bool
-    let storage_ops_queue: DispatchQueue
     var name = ""
-    var appLogClosures:[()->()] = [ ]
     var secKeyRef: SecKey?  //TODO: make non-optional
 
     init(type: String, headers: [String], patientId: String, publicKey: String, moveOnClose: Bool = false, keyRef: SecKey?) {
@@ -235,33 +231,54 @@ class DataStorage {
         self.moveOnClose = moveOnClose
         self.secKeyRef = keyRef
         
-        // needs to be instantiated to avoid optional problems, value is reset inside self.reset.
+        // these need to be instantiated to allow non-optionals, they are immediately reset in self.reset()
         self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
+        self.realFilename = URL(fileURLWithPath:  NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
+        self.filename = realFilename
+
+        self.reset() // properly creates mutables
+    }
+    
+    private func reset() {
+        // called when max filesize is reached, inside flush when the file is empty
+        // generally resets all object assets and creates a new filename.
+        log.info("DataStorage.reset called on \(self.name)...")
+        if moveOnClose == true {
+            do {
+                if check_file_exists() {
+                    try FileManager.default.moveItem(at: self.filename, to: self.realFilename)
+                    log.info("moved temp data file \(self.filename) to \(self.realFilename)")
+                }
+            } catch {
+                log.error("Error moving temp data \(self.filename) to \(self.realFilename)")
+                fatalError("Error moving temp data \(self.filename) to \(self.realFilename)")
+            }
+        }
+        self.errMsg = ""
+        self.hasError = false
+        // set new name, filenames
+        self.name = patientId + "_" + type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
         self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
-        if (self.moveOnClose) {
-            self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
+        
+        if (moveOnClose) {
+            self.filename = URL(fileURLWithPath:  NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
         } else {
             self.filename = realFilename
         }
         
-        self.storage_ops_queue = DispatchQueue(label: "com.rocketfarm.beiwe.dataqueue." + type, attributes: [])
-        self.appLogClosures = []
-        self.reset()
-        self.executeAppLogClosures()
-    }
+        // generate and write encryptiion key
+        self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
+        self.encrypted_write(self.get_rsa_line())
+        self.encrypted_write(headers.joined(separator: DELIMITER))
 
-    private func executeAppLogClosures() {
-        // TODO: this appears to be the place where we queue up and now execute any app log events.
-        let tmpLogClosures: [()->()] = appLogClosures
-        self.appLogClosures = []
-        for a_promise in tmpLogClosures {
-            a_promise()
-        }
+        // log creating new file.
+        self.conditionalApplog(event: "file_init", msg: "Init new data file", d1: self.name)
     }
     
     private func get_rsa_line() -> String {
-        // TODO: why? these two functions are not identical, the call to encryptString
-        // have different args, publicKey vs publicKeyId. And self.secKeyRef is sometimes not present?
+        // Returns the entire raw string of the first line of a file containing an RSA-encoded decryption key.
+        // TODO: why are these two functions are not identical, the call to encryptString
+        //   have different args, publicKey vs publicKeyId. And self.secKeyRef is sometimes not present?
         if let keyRef = self.secKeyRef {
             return try! Crypto.sharedInstance.base64ToBase64URL(
                 SwiftyRSA.encryptString(
@@ -279,58 +296,75 @@ class DataStorage {
         }
     }
     
-    private func reset() {
-        // called when max filesize is reached, inside flush when the file is empty
-        log.info("DataStorage.reset called...")
-        if moveOnClose == true && hasData == true {
-            do {
-                try FileManager.default.moveItem(at: self.filename, to: self.realFilename)
-                log.info("moved temp data file \(self.filename) to \(self.realFilename)")
-            } catch {
-                log.error("Error moving temp data \(self.filename) to \(self.realFilename)")
-                fatalError("Error moving temp data \(self.filename) to \(self.realFilename)")
-            }
-        }
-        self.errMsg = ""
-        self.hasError = false
-
-        self.name = patientId + "_" + type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
-        self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
-        if (moveOnClose) {
-            self.filename = URL(fileURLWithPath:  NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
-        } else {
-            self.filename = realFilename
-        }
-        
-        self.hasData = false
-        self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
-        self.lines = [ self.get_rsa_line() ]  // clears existing lines
-        self.encrypted_write(headers.joined(separator: DELIMITER))
-
-        // log creating new file.
-        if (self.type != "ios_log") {
-            self.appLogClosures.append() {
-                AppEventManager.sharedInstance.logAppEvent(
-                    event: "file_init", msg: "Init new data file", d1: self.name
-                )
-            }
-        }
-    }
-
     private func encrypted_write(_ line: String) {
+        self.ensure_file_exists()
         let iv: Data = Crypto.sharedInstance.randomBytes(16)
-        let encrypted = Crypto.sharedInstance.aesEncrypt(iv, key: aesKey, plainText: line)
-        if let encrypted = encrypted {
-            self.lines.append(
-                Crypto.sharedInstance.base64ToBase64URL(iv.base64EncodedString(options: []))
-                + ":"
-                + Crypto.sharedInstance.base64ToBase64URL(encrypted.base64EncodedString(options: []))
-                + "\n"
+        let encrypted = Crypto.sharedInstance.aesEncrypt(iv, key: aesKey, plainText: line)!
+        let base64_data = (
+            Crypto.sharedInstance.base64ToBase64URL(iv.base64EncodedString(options: []))
+            + ":"
+            + Crypto.sharedInstance.base64ToBase64URL(encrypted.base64EncodedString(options: []))
+            + "\n"
+        ).data(using: String.Encoding.utf8)!
+        write_raw_to_end_of_file(base64_data)
+    }
+    
+    func check_file_exists() -> Bool {
+        return FileManager.default.fileExists(atPath: filename.path)
+    }
+    
+    func ensure_file_exists() {
+        // if there is no file, create it with these permissions and no data
+        if (!check_file_exists()) {
+            let created = FileManager.default.createFile(
+                atPath: filename.path,
+                contents: "".data(using: String.Encoding.utf8),
+                attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
             )
-            self.flush(false)
+            var message: String
+            if created {
+                message = "Create new data file"
+            } else {
+                message = "Could not create new data file"
+            }
+            log.error("\(message): \(filename)")
+            self.conditionalApplog(event: "file_create", msg: message, d1: self.name, d2: self.errMsg)
+            if !created {
+                //TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
+                fatalError(message)
+            }
         }
     }
-
+    
+    func write_raw_to_end_of_file(_ data: Data) {
+        ensure_file_exists()
+        // if file handle instantiated (file open) append data (a line) to the end of the file.
+        // it appears to be the case that lines are constructed ending with \n, so we don't handle that here.
+        if let fileHandle = try? FileHandle(forWritingTo: self.filename) {
+            defer {
+                fileHandle.closeFile()
+            }
+            let seekPos = fileHandle.seekToEndOfFile()
+            fileHandle.write(data)
+            fileHandle.closeFile()
+            
+            // this data variable is a string of the full line in base64 including the iv. (i.e. it is encrypted)
+            // log.info("Appended data to file: \(filename), size: \(seekPos): \(data)")
+            if seekPos == 0 {
+                log.error("empty file write to \(self.filename): '\(data)'")
+            }
+        } else { // error opening file
+            self.hasError = true
+            self.errMsg = "Error opening file for writing"
+            log.error(self.errMsg)
+            self.conditionalApplog(
+                event: "file_err", msg: "Error writing to file", d1: self.name, d2: self.errMsg
+            )
+            // TODO: make this not crash the app...
+            fatalError("unable to open file \(self.filename)")
+        }
+    }
+    
     func store(_ data: [String]) {
         // This appears to be the main write function for most app datastreams
         var sanitizedData: [String]
@@ -347,114 +381,30 @@ class DataStorage {
         } else {
             sanitizedData = data
         }
-        
-        self.hasData = true
+        // This code was originally writted as follows (pseudocode)
+        //   ln[1]: self.do_actual_file_io_immediately(some_data)
+        //   ln[2]: self.flush()
+        // The problem is that flush function simply isn't a classic io-is-buffered-so-call-flush-to-be-sure call.
+        // Instead the code [used to, I'm trying to remove it] implemented a caching mechanism, and flush would flush the cache.
+        // This function explicitly bypassed the cache, and would write to the file before other cached/buffered file io executed.
+        // If the initial write operation of a file, the RSA-encrypted decryption key, was in the cache (it would be) then that
+        // line would occur after `some_data` was written, breaking the expected format of the data.
+        // Until we make all io immediate (in progress) the order needs to be reversed.
         self.encrypted_write(sanitizedData.joined(separator: DELIMITER))
-        self.flush(false)
-    }
-    
-    func create_file_with_data(_ data: Data?) {
-        // if no file exists
-        if (!FileManager.default.createFile(
-            atPath: filename.path,
-            contents: data,
-            attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
-        )) {
-            // if creating a file failed
-            self.hasError = true
-            self.errMsg = "Failed to create file."
-            log.error(self.errMsg)
-            self.appLogClosures.append() {
-                AppEventManager.sharedInstance.logAppEvent(
-                    event: "file_create", msg: "Could not new data file",
-                    d1: self.name, d2: self.errMsg
-                )
-            }
-            // TODO: convert to sentry error report with real error information.
-            // almost definitely blocks the above app log enclosure
-            fatalError("Could not create new data file - 1")
-        }
-        
-        log.info("Created new data file: \(filename)")  // if creating a file succeeded
-        if (self.type != "ios_log") {
-            // ios log special case
-            self.appLogClosures.append() {
-                AppEventManager.sharedInstance.logAppEvent(
-                    event: "file_create", msg: "Create new data file", d1: self.name, d2: self.errMsg
-                )
-            }
-        }
-    }
-    
-    func write_raw_to_end_of_file(_ data: Data) {
-        // if file handle instantiated (file open) append data (a line) to the end of the file.
-        // it appears to be the case that lines are constructed ending with \n, so we don't handle that here.
-        if let fileHandle = try? FileHandle(forWritingTo: filename) {
-            defer {
-                fileHandle.closeFile()
-            }
-            
-            let seekPos = fileHandle.seekToEndOfFile()
-            fileHandle.write(data)
-            fileHandle.closeFile()
-            
-            // this data variable is a string of the full line in base64 including the iv. (i.e. it is encrypted)
-            // log.info("Appended data to file: \(filename), size: \(seekPos): \(data)")
-            if seekPos == 0 {
-                log.error("empty file write to \(self.filename): '\(data)'")
-            }
-        } else {
-            // if error opening file
-            self.hasError = true
-            self.errMsg = "Error opening file for writing"
-            log.error(self.errMsg)
-            if (self.type != "ios_log") {
-                self.appLogClosures.append() {
-                    AppEventManager.sharedInstance.logAppEvent(
-                        event: "file_err", msg: "Error writing to file",
-                        d1: self.name, d2: self.errMsg
-                    )
-                }
-            }
-            // Currently don't care if this blocks the above closure from executing.
-            fatalError("unable to open file \(self.filename)")
-        }
     }
     
     func flush(_ do_reset: Bool = false) -> Void {
-        // TODO: remove entire reset concept in flush
-        // flush does not flush. Like all other file io it appends to the list of closures.
-        var force_reset = false
-        self.appLogClosures = [ ]
-        self.lines = [ ]
-        
-        if let data: Data = self.lines.joined(separator: "").data(using: String.Encoding.utf8)  {
-            // if file name and data are populated
-            if (!FileManager.default.fileExists(atPath: filename.path)) {
-                self.create_file_with_data(data)
-            } else {
-                self.write_raw_to_end_of_file(data)
-            }
-        } else {
-            // Clause executes if x.data(using: String.Encoding.utf8) fails (it returns optional)
-            self.errMsg = "Error encapsulating data"
-            log.error(self.errMsg)
-            self.hasError = true
-            if (self.type != "ios_log") {
-                self.appLogClosures.append() {
-                    AppEventManager.sharedInstance.logAppEvent(
-                        event: "file_err", msg: self.errMsg, d1: self.name
-                    )
-                }
-            }
-            force_reset = true
-        }
-        
-        if (do_reset || force_reset) {
+        // This flush call currently exists to allow conditional calls to reset, I guess.
+        if (do_reset) {
             // conditionally call reset
             self.reset()
         }
-        self.executeAppLogClosures()
+    }
+    
+    private func conditionalApplog(event: String, msg: String = "", d1: String = "", d2: String = "", d3: String = "", d4: String = "") {
+        if (self.type != "ios_log") {
+            AppEventManager.sharedInstance.logAppEvent(event: event, msg: msg, d1: d1, d2: d2, d3: d3, d4: d4)
+        }
     }
 }
 
