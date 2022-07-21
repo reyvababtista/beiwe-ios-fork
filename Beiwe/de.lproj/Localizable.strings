@@ -19,9 +19,9 @@
 "registration_new_password_hint" = "mindestens 6 Zeichen";
 "registration_confirm_new_password_label" = "Passwort bestätigen:";
 "registration_confirm_new_password_hint" = "mindestens 6 Zeichen";
-"phone_number_entry_your_clinician_label" = "Telefonnummer des Studienleiters:";
+"phone_number_entry_your_clinician_label" = "Studienunterstützung:";
 "phone_number_entry_your_clinician_hint" = "12 Ziffern";
-"phone_number_entry_research_assistant_label" = "Telefonnummer der Forschungsassistentin";
+"phone_number_entry_research_assistant_label" = "technischen Unterstützung:";
 "phone_number_entry_research_assistant_hint" = "12 Ziffern";
 "registration_submit" = "Anmelden";
 "http_message_server_not_found" = "Bitte bestätigen Sie, dass die URL korrekt ist. Beiwe konnte keine Verbindung zum Server herstellen.";
@@ -47,7 +47,7 @@
 
 "cancel_button_text" = "Abbrechen";
 "ok_button_text" = "OK";
-"default_call_clinician_text" = "Studienleiter anrufen";
+"default_call_clinician_text" = "Studienunterstützung anrufen";
 "call_clinician_confirmation_title" = "Bestätigen";
 "call_clinician_confirmation_text" = "Möchten Sie jetzt anrufen?";
 
@@ -64,7 +64,7 @@
 "upload_data_button" = "Daten hochladen";
 "check_for_surveys_button" = "Befragung prüfen";
 "change_password_button" = "Passwort ändern";
-"call_research_assistant_button" = "Forschungsassistentin kontaktieren";
+"call_research_assistant_button" = "technische Unterstützung anrufen";
 "logout_button" = "Abmelden";
 "unregister_button" = "Studie verlassen";
 "unregister_alert_title" = "Studienteilnahme beenden";
