@@ -20,9 +20,9 @@
 "registration_confirm_new_password_label" = "Passwort bestätigen:";
 "registration_confirm_new_password_hint" = "mindestens 6 Zeichen";
 "phone_number_entry_your_clinician_label" = "Telefonnummer des Studienleiters:";
-"phone_number_entry_your_clinician_hint" = "";
+"phone_number_entry_your_clinician_hint" = "12 Ziffern";
 "phone_number_entry_research_assistant_label" = "Telefonnummer der Forschungsassistentin";
-"phone_number_entry_research_assistant_hint" = "";
+"phone_number_entry_research_assistant_hint" = "12 Ziffern";
 "registration_submit" = "Anmelden";
 "http_message_server_not_found" = "Bitte bestätigen Sie, dass die URL korrekt ist. Beiwe konnte keine Verbindung zum Server herstellen.";
 "couldnt_register" = "Registrierung fehlgeschlagen.";
@@ -33,7 +33,7 @@
 
 /* Change password screen */
 "title_activity_reset_password" = "Passwort zurücksetzen:";
-"forgot_password_title" = "Passwort vergessen";
+"forgot_password_title" = "Wenden Sie sich bitte an Ihr Forschungsteam und teilen Sie ihnen Ihren Benutzernamen mit, damit sie Ihnen ein vorläufiges Passwort geben können.";
 "reset_password_current_password_caption" = "Passwort zurücksetzen:";
 "forgot_password_temporary_password_caption" = "vorläufiges Passwort:";
 "reset_password_new_password_caption" = "neues Passwort:";
