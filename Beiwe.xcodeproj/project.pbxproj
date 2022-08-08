@@ -188,6 +188,14 @@
 		A42DC84D7FED35C57E1B1EE0 /* Pods_Beiwe.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Beiwe.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		B58A34E5862CE908C83EB133 /* Pods-Beiwe.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Beiwe.release.xcconfig"; path = "Target Support Files/Pods-Beiwe/Pods-Beiwe.release.xcconfig"; sourceTree = "<group>"; };
 		C222DB6B2786C1ED00ACB3EC /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		E949EF7428480E59009E183F /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Main.strings; sourceTree = "<group>"; };
+		E949EF7528480E59009E183F /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/LaunchScreen.strings; sourceTree = "<group>"; };
+		E949EF7628480E59009E183F /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		E949EF7728480E59009E183F /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = Beiwe/de.lproj/Localizable.strings; sourceTree = "<group>"; };
+		E949EF7828480E6D009E183F /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/Main.strings; sourceTree = "<group>"; };
+		E949EF7928480E6D009E183F /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/LaunchScreen.strings; sourceTree = "<group>"; };
+		E949EF7A28480E6D009E183F /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		E949EF7B28480E6E009E183F /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = Beiwe/it.lproj/Localizable.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -484,6 +492,8 @@
 				en,
 				Base,
 				"zh-Hant",
+				de,
+				it,
 			);
 			mainGroup = 83F98C2D1C923C3600E0B64B;
 			productRefGroup = 83F98C371C923C3600E0B64B /* Products */;
@@ -718,6 +728,8 @@
 			children = (
 				59912EB2230EF09400CAF7EB /* Base */,
 				59912EB6230EF3D100CAF7EB /* zh-Hant */,
+				E949EF7728480E59009E183F /* de */,
+				E949EF7B28480E6E009E183F /* it */,
 			);
 			name = Localizable.strings;
 			sourceTree = "<group>";
@@ -727,6 +739,8 @@
 			children = (
 				59912EBA2311A33A00CAF7EB /* zh-Hant */,
 				59912EBD2311A66B00CAF7EB /* en */,
+				E949EF7628480E59009E183F /* de */,
+				E949EF7A28480E6D009E183F /* it */,
 			);
 			name = InfoPlist.strings;
 			sourceTree = "<group>";
@@ -736,6 +750,8 @@
 			children = (
 				83F98C3E1C923C3600E0B64B /* Base */,
 				59912EB4230EF3D100CAF7EB /* zh-Hant */,
+				E949EF7428480E59009E183F /* de */,
+				E949EF7828480E6D009E183F /* it */,
 			);
 			name = Main.storyboard;
 			sourceTree = "<group>";
@@ -745,6 +761,8 @@
 			children = (
 				83F98C431C923C3600E0B64B /* Base */,
 				59912EB5230EF3D100CAF7EB /* zh-Hant */,
+				E949EF7528480E59009E183F /* de */,
+				E949EF7928480E6D009E183F /* it */,
 			);
 			name = LaunchScreen.storyboard;
 			sourceTree = "<group>";
