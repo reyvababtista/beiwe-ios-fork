@@ -130,7 +130,6 @@ class RegisterViewController: FormViewController {
                             ApiManager.sharedInstance.patientId = patientId;
                             ApiManager.sharedInstance.customApiUrl = customApiUrl;
                             
-                            
                             ApiManager.sharedInstance.makePostRequest(registerStudyRequest).then {
                                 (studySettings, _) -> Promise<Study> in
                                 // testing three arbitrary response body values to ensure we hit the correct server and not some random server

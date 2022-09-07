@@ -166,13 +166,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             // App crashes if this isn't called on main thread
             DispatchQueue.main.async {
                 application.registerForRemoteNotifications()
-                let token = Messaging.messaging().fcmToken
-                if (token != nil) {
-                    self.sendFCMToken(fcmToken: token ?? "")
+                if let token = Messaging.messaging().fcmToken {
+                    self.sendFCMToken(fcmToken: token)
                 }
             }
         }
-        
         return true
     }
     
@@ -180,7 +178,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         if (identifier == currentRootView) {
             return;
         }
-        let desiredViewController:UIViewController = (self.storyboard?.instantiateViewController(withIdentifier: identifier))!;
+        let desiredViewController:UIViewController = (self.storyboard?.instantiateViewController(withIdentifier: identifier))!
         
         changeRootViewController(desiredViewController, identifier: identifier);
     }
@@ -452,15 +450,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func checkFirebaseCredentials() {
         guard let studySettings = StudyManager.sharedInstance.currentStudy?.studySettings else {
             log.error("Study not found")
-            AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Unable to configure Firebase App. No study found.")
+            AppEventManager.sharedInstance.logAppEvent(
+                event: "push_notification", msg: "Unable to configure Firebase App. No study found.")
             return
         }
+        
         if (studySettings.googleAppID == "") {
             guard let password = PersistentPasswordManager.sharedInstance.passwordForStudy() else {
                 log.error("could not retrieve password")
                 return
             }
-            let registerStudyRequest = RegisterStudyRequest(patientId: ApiManager.sharedInstance.patientId, phoneNumber: "NOT_SUPPLIED", newPassword: password)
+            let registerStudyRequest = RegisterStudyRequest(
+                patientId: ApiManager.sharedInstance.patientId, phoneNumber: "NOT_SUPPLIED", newPassword: password)
+            
             ApiManager.sharedInstance.makePostRequest(registerStudyRequest).then {
                 (studySettings, _) -> Promise<Void> in
                 print(studySettings)
@@ -471,13 +473,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                 }
                 if (FirebaseApp.app() == nil && studySettings.googleAppID != "") {
                     self.configureFirebase(studySettings: studySettings)
-                    AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Registered for push notifications with Firebase")
+                    AppEventManager.sharedInstance.logAppEvent(
+                        event: "push_notification", msg: "Registered for push notifications with Firebase")
                 }
                 return Promise()
             }
         } else if (FirebaseApp.app() == nil) {
-            configureFirebase(studySettings: studySettings)
-            AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Registered for push notifications with Firebase")
+            self.configureFirebase(studySettings: studySettings)
+            AppEventManager.sharedInstance.logAppEvent(
+                event: "push_notification", msg: "Registered for push notifications with Firebase")
         }
     }
 
