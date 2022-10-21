@@ -268,31 +268,32 @@ class DataStorage {
         
         // generate and write encryptiion key
         self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
-        self.encrypted_write(self.get_rsa_line())
+        self.write_raw_to_end_of_file(self.get_rsa_line())
         self.encrypted_write(headers.joined(separator: DELIMITER))
 
         // log creating new file.
         self.conditionalApplog(event: "file_init", msg: "Init new data file", d1: self.name)
     }
     
-    private func get_rsa_line() -> String {
+    private func get_rsa_line() -> Data {
         // Returns the entire raw string of the first line of a file containing an RSA-encoded decryption key.
         // TODO: why are these two functions are not identical, the call to encryptString
         //   have different args, publicKey vs publicKeyId. And self.secKeyRef is sometimes not present?
+        
         if let keyRef = self.secKeyRef {
             return try! Crypto.sharedInstance.base64ToBase64URL(
-                SwiftyRSA.encryptString(
+                (SwiftyRSA.encryptString(
                     Crypto.sharedInstance.base64ToBase64URL(aesKey.base64EncodedString()),
                     publicKey: keyRef,
                     padding: []
-                )) + "\n"
+                )) + "\n" ).data(using: String.Encoding.utf8)!
         } else {
             return try! Crypto.sharedInstance.base64ToBase64URL(
-                SwiftyRSA.encryptString(
+                (SwiftyRSA.encryptString(
                     Crypto.sharedInstance.base64ToBase64URL(aesKey.base64EncodedString()),
                     publicKeyId: PersistentPasswordManager.sharedInstance.publicKeyName(self.patientId),
                     padding: []
-                )) + "\n"
+                )) + "\n").data(using: String.Encoding.utf8)!
         }
     }
     
