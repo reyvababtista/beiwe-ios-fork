@@ -30,7 +30,6 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
     var timer: Timer?
     var currentLength: Double = 0
     var suffix = ".mp4"
-    let OUTPUT_CHUNK_SIZE = 128 * 1024
 
     @IBOutlet weak var maxLengthLabel: UILabel!
     @IBOutlet weak var currentLengthLabel: UILabel!
@@ -249,7 +248,7 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
     func writeSomeData(_ handle: FileHandle, encFile: EncryptedStorage) -> Promise<Void> {
         return Promise().then(on: DispatchQueue.global(qos: .background)) {_ -> Promise<Void> in
             // closure return
-            let data: Data = handle.readData(ofLength: self.OUTPUT_CHUNK_SIZE)
+            let data: Data = handle.readDataToEndOfFile()
             if (data.count > 0) {
                 return encFile.write(data as NSData, writeLen: data.count).then {_ in
                     // closure recur
@@ -257,7 +256,7 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
                 }
             }
             /* We're done... */
-            AppEventManager.sharedInstance.logAppEvent(event: "audio_save_closing", msg: "Closing audio file", d1: encFile.realFilename.lastPathComponent)
+            AppEventManager.sharedInstance.logAppEvent(event: "audio_save_closing", msg: "Closing audio file", d1: encFile.eventualFilename.lastPathComponent)
             return encFile.close()
         }
 

@@ -22,45 +22,46 @@ let KEYLENGTH = 128
 // TODO: convert All fatalError calls to sentry error reports with real error information.
 
 /*
- Encrypted Storage
+ (Binary, mostly for audio files) Encrypted Storage
  */
-
+// EncryptedStorage Originally included a buffered write pattern in AudioQuestionViewController.
+// orig comment: only write multiples of 3, since we are base64 encoding and would otherwise end up with padding
+//    if (isFlush)
+//        evenLength = self.currentData.length
+//    else
+//        evenLength = (self.currentData.length / 3) * 3
+//    self._write(new_data, len: new_data.length)
+//    self.currentData.replaceBytes(in: NSRange(0..<self.currentData.length), withBytes: nil, length: 0)
 class EncryptedStorage {
-    let data_stream_type: String
+    // files
     var filename: URL
+    var eventualFilename: URL
+    var debug_shortname: String
     let fileManager = FileManager.default
     var file_handle: FileHandle?
-    
+    // encryption
     var publicKey: String
     var aesKey: Data
     var iv: Data
     var secKeyRef: SecKey
-    
-    var realFilename: URL
-    var patientId: String
-    
+    // machinery
     let encryption_queue: DispatchQueue
     var stream_cryptor: StreamCryptor
-    var currentData: NSMutableData = NSMutableData()  //TODO:100% purge this
-    var hasData = false
     
     init(data_stream_type: String, suffix: String, patientId: String, publicKey: String, keyRef: SecKey?) {
-        self.patientId = patientId
-        self.publicKey = publicKey
-        self.data_stream_type = data_stream_type
-        self.secKeyRef = keyRef!
-        
-        self.encryption_queue = DispatchQueue(label: "com.rocketfarm.beiwe.dataqueue." + data_stream_type, attributes: [])
-        
-        let new_name = patientId + "_" + self.data_stream_type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
-        self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(new_name + suffix)
-        self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(new_name + suffix)
+        // queue name
+        self.encryption_queue = DispatchQueue(label: "beiwe.dataqueue." + data_stream_type, attributes: [])
+        // file names
+        self.debug_shortname = patientId + "_" + data_stream_type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
+        self.eventualFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.debug_shortname + suffix)
+        self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.debug_shortname + suffix)
+        // encryption setup
         self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
         self.iv = Crypto.sharedInstance.randomBytes(16)
-        
+        self.publicKey = publicKey
+        self.secKeyRef = keyRef!
         let data_for_key = (aesKey as NSData).bytes.bindMemory(to: UInt8.self, capacity: aesKey.count)
         let data_for_iv = (iv as NSData).bytes.bindMemory(to: UInt8.self, capacity: iv.count)
-        
         self.stream_cryptor = StreamCryptor(
             operation: .encrypt,
             algorithm: .aes,
@@ -76,39 +77,7 @@ class EncryptedStorage {
             return Promise()
         }
     }
-    
-    private func open_actual() -> Void {
-        if (!self.fileManager.createFile(
-            atPath: self.filename.path,
-            contents: nil,
-            attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none])
-        ) {
-            // return closure 1
-            fatalError("could not create file?")
-        } else {
-            log.info("Created a new encrypted file: \(self.filename)")
-        }
-        self.file_handle = try! FileHandle(forWritingTo: self.filename)
-        
-        // how do I catch this failing?
-        var rsaLine: String = try! Crypto.sharedInstance.base64ToBase64URL(
-            SwiftyRSA.encryptString(
-                Crypto.sharedInstance.base64ToBase64URL(self.aesKey.base64EncodedString()),
-                publicKey: self.secKeyRef,
-                padding: []
-            )
-        )
-        
-        rsaLine = rsaLine + "\n"
-        let line1 = rsaLine.data(using: String.Encoding.utf8)!
-        let ivHeader = Crypto.sharedInstance.base64ToBase64URL(self.iv.base64EncodedString()) + ":"
-        let line2 = ivHeader.data(using: String.Encoding.utf8)!
-        log.info("write the rsa line 1 (rsa key): '\(rsaLine)', '\(line1)'")
-        log.info("write the rsa line 2 (iv): '\(ivHeader)', '\(line2)'")
-        self.file_handle?.write(line1)
-        self.file_handle?.write(line2)
-    }
-    
+
     func close() -> Promise<Void> {
         return Promise().then(on: self.encryption_queue) { _ -> Promise<Void> in
             self.close_actual()
@@ -116,37 +85,57 @@ class EncryptedStorage {
         }
     }
     
-    private func close_actual() {
-        self.write_actual(nil, writeLen: 0)
-        self.file_handle?.closeFile()
-        self.file_handle = nil
-        log.info("moved temp data file \(self.filename) to \(self.realFilename)")
-        try! FileManager.default.moveItem(at: self.filename, to: self.realFilename)
-    }
-    
-    private func _write(_ data: NSData, len: Int) -> Void {
-        // TODO; what the hell is this return case? why is len even passed in?
-        if (len == 0) {
-            return
-        }
-        self.hasData = true
-        let dataToWriteBuffer = UnsafeMutableRawPointer(mutating: data.bytes)
-        let dataToWrite = NSData(bytesNoCopy: dataToWriteBuffer, length: len, freeWhenDone: false)
-        let encodedData: String = Crypto.sharedInstance.base64ToBase64URL(dataToWrite.base64EncodedString(options: []))
-        self.file_handle?.write(encodedData.data(using: String.Encoding.utf8)!)
-    }
-    
     func write(_ data: NSData?, writeLen: Int) -> Promise<Int> {
         // This is called directly in audio file code
+        log.info("write called on \(self.debug_shortname)...")
         return Promise().then(on: self.encryption_queue) { _ -> Promise<Int> in
+            log.info("write (promise) called on \(self.eventualFilename)...")
             let len: Int = self.write_actual(data, writeLen: writeLen)
             return .value(len)
         }
     }
     
+    private func open_actual() -> Void {
+        // open file
+        if (!self.fileManager.createFile(
+            atPath: self.filename.path,
+            contents: nil,
+            attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none])
+        ) {
+            fatalError("could not create file?")
+        } else {
+            log.info("Created a new encrypted file: \(self.filename)")
+        }
+        self.file_handle = try! FileHandle(forWritingTo: self.filename)
+        
+        //write the rsa line and iv immediately
+        let rsaLine: String = try! Crypto.sharedInstance.base64ToBase64URL(
+            SwiftyRSA.encryptString(
+                Crypto.sharedInstance.base64ToBase64URL(self.aesKey.base64EncodedString()),
+                publicKey: self.secKeyRef,
+                padding: []
+            )
+        ) + "\n"
+        let ivHeader = Crypto.sharedInstance.base64ToBase64URL(self.iv.base64EncodedString()) + ":"
+        self.file_handle?.write(rsaLine.data(using: String.Encoding.utf8)!)
+        self.file_handle?.write(ivHeader.data(using: String.Encoding.utf8)!)
+    }
+    
+    private func close_actual() {
+        self.file_handle?.closeFile()
+        self.file_handle = nil
+        try! FileManager.default.moveItem(at: self.filename, to: self.eventualFilename)
+        log.info("moved temp data file \(self.filename) to \(self.eventualFilename)")
+    }
+    
     private func write_actual(_ data: NSData?, writeLen: Int) -> Int {
         // core write function, as much as anything here can be said to "write"
+        log.info("write_actual called on \(self.eventualFilename)...")
+        let new_data: NSMutableData = NSMutableData()
+        
+        // setup to write - this case should be impossible
         if (data != nil && writeLen != 0) {
+            log.info("write_actual case 1")
             // Need to encrypt data
             let encryptLen = self.stream_cryptor.getOutputLength(inputByteCount: writeLen)
             let bufferOut = UnsafeMutablePointer<Void>.allocate(capacity: encryptLen)
@@ -159,42 +148,37 @@ class EncryptedStorage {
                 byteCapacityOut: encryptLen,
                 byteCountOut: &byteCount
             )
-            self.currentData.append(NSData(bytesNoCopy: bufferOut, length: byteCount) as Data)
+            new_data.append(NSData(bytesNoCopy: bufferOut, length: byteCount) as Data)
         }
         
-        //TODO: why can this be 0, and what happens if this occurs
+        // again, this case should be impossible
         let encryptLen = self.stream_cryptor.getOutputLength(inputByteCount: 0, isFinal: true)
         if (encryptLen > 0) {
+            log.info("write_actual case 2")
+            // mostly setup of these obscure pointers to an array of data (there must be a better way to do this...)
             let bufferOut = UnsafeMutablePointer<Void>.allocate(capacity: encryptLen)
             var byteCount: Int = 0
             self.stream_cryptor.final(bufferOut: bufferOut, byteCapacityOut: encryptLen, byteCountOut: &byteCount)
-            
-            // setup to write
+            // setup to write an array of appropriate length
             let finalData = NSData(bytesNoCopy: bufferOut, length: byteCount)
-            let count = finalData.length / MemoryLayout<UInt8>.size
-            var array = [UInt8](repeating: 0, count: count)  // array of appropriate length:
-
-            // copy bytes into array
-            finalData.getBytes(&array, length:count * MemoryLayout<UInt8>.size)
-            self.currentData.append(finalData as Data)
+            var array = [UInt8](repeating: 0, count: finalData.length / MemoryLayout<UInt8>.size)
+            // copy bytes into array (its an array of bytes, length is just length), append to new_data
+            finalData.getBytes(&array, length:finalData.length)
+            new_data.append(finalData as Data)
         }
-        
-        // Original comment;
-        // Only write multiples of 3, since we are base64 encoding and would otherwise end up with padding
-        //TODO: this is either purely base64 padding, or it interaccts with the self.currentdata nonsense
-//        var evenLength: Int
-//        if (isFlush) {
-//            evenLength = self.currentData.length
-//        } else {
-//            evenLength = (self.currentData.length / 3) * 3
-//        }
-        
-        self._write(self.currentData, len: self.currentData.length)
-        self.currentData.replaceBytes(in: NSRange(0..<self.currentData.length), withBytes: nil, length: 0)  //TODO: delete this line?
-        return self.currentData.length
+                
+        // this was formerly the _write function
+        if (new_data.length != 0) {
+            log.info("write_actual case 3")
+            let dataToWriteBuffer = UnsafeMutableRawPointer(mutating: new_data.bytes)
+            let dataToWrite = NSData(bytesNoCopy: dataToWriteBuffer, length: new_data.length, freeWhenDone: false)
+            let encodedData: String = Crypto.sharedInstance.base64ToBase64URL(dataToWrite.base64EncodedString(options: []))
+            self.file_handle?.write(encodedData.data(using: String.Encoding.utf8)!)
+        }
+        log.info("write_actual finished")
+        return new_data.length
     }
     
-
     deinit {
         if (self.file_handle != nil) {
             self.file_handle?.closeFile()
