@@ -17,7 +17,7 @@ struct PersistentPasswordManager {
     fileprivate let rsaKeyPrefix = PersistentPasswordManager.bundlePrefix + ".rsapk.";
 
     init() {
-        #if (arch(i386) || arch(x86_64)) && os(iOS)
+        #if targetEnvironment(simulator)
              keychain = KeychainSwift(keyPrefix: PersistentPasswordManager.bundlePrefix + ".")
         #else
             keychain = KeychainSwift()
