@@ -75,8 +75,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         
         // Add the destination to the logger
         log.add(destination: crashlyticsLogDestination)
-        
-        
+                
         log.info("applicationDidFinishLaunching")
         log.logAppDetails()
         
@@ -448,6 +447,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     }
     
     func checkFirebaseCredentials() {
+        // case: unregistered - this is probably wrong or incomplete, it needs to accept the token regardless
+        // of app state, but it doesn't have an app google id to do so.  TODO: like on android make a waiter on
+        // a thread that checks once a second until we do? or call to register in registration explicitly
+        // and note that here.  Guess - I don't think we updated the app to store extra data at registration.
         guard let studySettings = StudyManager.sharedInstance.currentStudy?.studySettings else {
             log.error("Study not found")
             AppEventManager.sharedInstance.logAppEvent(
@@ -455,22 +458,27 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             return
         }
         
+        // case: there is no set google app id ()
         if (studySettings.googleAppID == "") {
+            // case: no password set? is that a proxy for registered?
             guard let password = PersistentPasswordManager.sharedInstance.passwordForStudy() else {
-                log.error("could not retrieve password")
+                log.error("firebase could not be registered, no user password")
                 return
             }
-            let registerStudyRequest = RegisterStudyRequest(
-                patientId: ApiManager.sharedInstance.patientId, phoneNumber: "NOT_SUPPLIED", newPassword: password)
             
-            ApiManager.sharedInstance.makePostRequest(registerStudyRequest).then {
+            // why do we register? surely we have this value already, right?
+            let registerStudyRequest = RegisterStudyRequest(
+                patientId: ApiManager.sharedInstance.patientId, phoneNumber: "NOT_SUPPLIED", newPassword: password
+            )
+            
+            _ = ApiManager.sharedInstance.makePostRequest(registerStudyRequest).then {
                 (studySettings, _) -> Promise<Void> in
-                print(studySettings)
-                // testing response body values to ensure we hit the correct server and not some random server
-                // that happened to return a 200
+                // test response body, ensure we hit a beiwe server and a rando that happened to return a 200
                 guard studySettings.clientPublicKey != nil else {
                     throw RegisterViewController.RegistrationError.incorrectServer
                 }
+                
+                // case: if not already registered with firebase(?) configure firebase
                 if (FirebaseApp.app() == nil && studySettings.googleAppID != "") {
                     self.configureFirebase(studySettings: studySettings)
                     AppEventManager.sharedInstance.logAppEvent(
@@ -478,6 +486,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                 }
                 return Promise()
             }
+            
+        // case: there was a google app id:
         } else if (FirebaseApp.app() == nil) {
             self.configureFirebase(studySettings: studySettings)
             AppEventManager.sharedInstance.logAppEvent(
@@ -528,8 +538,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         if (fcmToken != "") {
             let fcmTokenRequest = FCMTokenRequest(fcmToken: fcmToken)
             ApiManager.sharedInstance.makePostRequest(fcmTokenRequest).catch {
-                (error) in
-                log.error("Error registering FCM token: \(error)")
+                (error) in log.error("Error registering FCM token: \(error)")
                 AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Error registering FCM token: \(error)")
             }
         }
@@ -582,9 +591,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             }
             // Emits a surveyUpdated event to the listener
             StudyManager.sharedInstance.surveysUpdatedEvent.emit(0);
-             Recline.shared.save(study).catch { _ in
-                 log.error("Failed to save study after processing surveys");
-             }
+            Recline.shared.save(study).catch { _ in
+                log.error("Failed to save study after processing surveys");
+            }
             
             // set badge number
             UIApplication.shared.applicationIconBadgeNumber = study.activeSurveys.count
@@ -599,6 +608,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         options.clientID = studySettings.clientID
         options.databaseURL = studySettings.databaseURL
         options.storageBucket = studySettings.storageBucket
+        
         // initialize Firebase on the main thread
         DispatchQueue.main.async {
             let isBeiwe2 = Configuration.sharedInstance.settings["config-server"] as? Bool ?? false;
