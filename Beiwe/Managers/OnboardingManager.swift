@@ -41,7 +41,7 @@ class OnboardingManager : NSObject, ORKTaskViewControllerDelegate {
     }
 
     func closeOnboarding() {
-        AppDelegate.sharedInstance().transitionToCurrentAppState();
+        AppDelegate.sharedInstance().transitionToLoadedAppState();
         retainSelf = nil;
     }
 

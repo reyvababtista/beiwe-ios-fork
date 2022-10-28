@@ -19,9 +19,9 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        self.navigationController?.presentTransparentNavigationBar();
+        self.navigationController?.presentTransparentNavigationBar()
 
-        var clinicianText: String;
+        var clinicianText: String
         clinicianText = StudyManager.sharedInstance.currentStudy?.studySettings?.callClinicianText ?? NSLocalizedString("default_call_clinician_text", comment: "")
         callClinicianButton.setTitle(clinicianText, for: UIControl.State())
         callClinicianButton.setTitle(clinicianText, for: UIControl.State.highlighted)
@@ -34,7 +34,7 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
         }
 
         password.delegate = self
-        loginButton.isEnabled = false;
+        loginButton.isEnabled = false
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(tap))
         view.addGestureRecognizer(tapGesture)
 
@@ -47,29 +47,29 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
     }
     
     @IBAction func loginPressed(_ sender: AnyObject) {
-        password.resignFirstResponder();
-        PKHUD.sharedHUD.dimsBackground = true;
-        PKHUD.sharedHUD.userInteractionOnUnderlyingViewsEnabled = false;
+        password.resignFirstResponder()
+        PKHUD.sharedHUD.dimsBackground = true
+        PKHUD.sharedHUD.userInteractionOnUnderlyingViewsEnabled = false
 
         if let password = password.text, password.count > 0 {
             if (AppDelegate.sharedInstance().checkPasswordAndLogin(password)) {
                 // register for notifications and log in?
-                HUD.flash(.success, delay: 0.5);
+                HUD.flash(.success, delay: 0.5)
                 AppDelegate.sharedInstance().checkFirebaseCredentials()
                 if let token: String = Messaging.messaging().fcmToken {
                     AppDelegate.sharedInstance().sendFCMToken(fcmToken: token)
                 }
-                AppDelegate.sharedInstance().transitionToCurrentAppState()
+                AppDelegate.sharedInstance().transitionToLoadedAppState()
             } else {
-                HUD.flash(.error, delay: 1);
+                HUD.flash(.error, delay: 1)
             }
         }
     }
 
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        loginPressed(self);
-        textField.resignFirstResponder();
-        return true;
+        loginPressed(self)
+        textField.resignFirstResponder()
+        return true
     }
 
     @objc func tap(_ gesture: UITapGestureRecognizer) {
@@ -92,21 +92,21 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
     }
 
     func textFieldShouldEndEditing(_ textField: UITextField) -> Bool {
-        return true;
+        return true
     }
 
     @IBAction func forgotPassword(_ sender: AnyObject) {
-        let vc = ChangePasswordViewController();
-        vc.isForgotPassword = true;
+        let vc = ChangePasswordViewController()
+        vc.isForgotPassword = true
         vc.finished = { _ in
-            self.dismiss(animated: true, completion: nil);
+            self.dismiss(animated: true, completion: nil)
         }
-        present(vc, animated: true, completion: nil);
+        present(vc, animated: true, completion: nil)
 
     }
 
     @IBAction func callClinician(_ sender: AnyObject) {
-        confirmAndCallClinician(self);
+        confirmAndCallClinician(self)
     }
 
 }

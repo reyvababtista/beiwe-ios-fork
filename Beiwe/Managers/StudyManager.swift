@@ -28,16 +28,16 @@ class StudyManager {
     var isStudyLoaded: Bool {
         return currentStudy != nil;
     }
-
+    
     func loadDefaultStudy() -> Promise<Bool> {
         currentStudy = nil;
         gpsManager = nil;
         return firstly { () -> Promise<[Study]> in
             return Recline.shared.queryAll()
-            }.then { (studies: [Study]) -> Promise<Bool> in
+        }.then { (studies: [Study]) -> Promise<Bool> in
             if (studies.count > 1) {
                 log.error("Multiple Studies: \(studies)")
-                Crashlytics.sharedInstance().recordError(NSError(domain: "com.rf.beiwe.studies", code: 1, userInfo: nil))
+               // Crashlytics.sharedInstance().recordError(NSError(domain: "com.rf.beiwe.studies", code: 1, userInfo: nil))
             }
             if (studies.count > 0) {
                 self.currentStudy = studies[0];
@@ -45,7 +45,6 @@ class StudyManager {
             }
                 return .value(true)
         }
-
     }
 
     func setApiCredentials() {
@@ -68,9 +67,9 @@ class StudyManager {
             } else {
                 log.error("No public key found.  Can't store");
             }
-
         }
     }
+    
     func startStudyDataServices() {
         if gpsManager != nil {
             return;
@@ -79,7 +78,6 @@ class StudyManager {
         DataStorageManager.sharedInstance.setCurrentStudy(self.currentStudy!, secKeyRef: keyRef);
         self.prepareDataServices();
         NotificationCenter.default.addObserver(self, selector: #selector(self.reachabilityChanged), name: ReachabilityChangedNotification, object: nil)
-
     }
 
     func prepareDataServices() {
@@ -109,27 +107,21 @@ class StudyManager {
         if (studySettings.powerState) {
             gpsManager!.addDataService(PowerStateManager());
         }
-
         if (studySettings.proximity) {
             gpsManager!.addDataService(ProximityManager());
         }
-
         if (studySettings.reachability) {
             gpsManager!.addDataService(ReachabilityManager());
         }
-
         if (studySettings.gyro) {
             gpsManager!.addDataService(studySettings.gyroOnDurationSeconds, off: studySettings.gyroOffDurationSeconds, handler: GyroManager());
         }
-
         if (studySettings.magnetometer && studySettings.magnetometerOnDurationSeconds > 0) {
             gpsManager!.addDataService(studySettings.magnetometerOnDurationSeconds, off: studySettings.magnetometerOffDurationSeconds, handler: MagnetometerManager());
         }
-
         if (studySettings.motion && studySettings.motionOnDurationSeconds > 0) {
             gpsManager!.addDataService(studySettings.motionOnDurationSeconds, off: studySettings.motionOffDurationSeconds, handler: DeviceMotionManager());
         }
-
         gpsManager!.startGpsAndTimer();
     }
 
@@ -415,7 +407,6 @@ class StudyManager {
                 log.error("Failed to save study after processing surveys");
             }
         }
-
         if let gpsManager = gpsManager  {
             gpsManager.resetNextSurveyUpdate(closestNextSurveyTime);
         }

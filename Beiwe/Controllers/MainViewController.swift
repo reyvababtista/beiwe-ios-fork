@@ -221,7 +221,7 @@ class MainViewController: UIViewController {
         let OKAction = UIAlertAction(title: NSLocalizedString("ok_button_text", comment: ""), style: .default) { (action) in
             StudyManager.sharedInstance.leaveStudy().done {_ -> Void in
                 AppDelegate.sharedInstance().isLoggedIn = false;
-                AppDelegate.sharedInstance().transitionToCurrentAppState();
+                AppDelegate.sharedInstance().transitionToLoadedAppState();
             }
         }
         alertController.addAction(OKAction)
@@ -253,7 +253,7 @@ class MainViewController: UIViewController {
     }
     @IBAction func logout(_ sender: AnyObject) {
         AppDelegate.sharedInstance().isLoggedIn = false;
-        AppDelegate.sharedInstance().transitionToCurrentAppState();
+        AppDelegate.sharedInstance().transitionToLoadedAppState();
     }
     // MARK: - Navigation
 

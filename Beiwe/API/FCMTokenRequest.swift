@@ -16,14 +16,11 @@ struct FCMTokenRequest : Mappable, ApiRequest {
     
     var fcmToken: String?;
     
-    
     init(fcmToken: String) {
         self.fcmToken = fcmToken;
     }
     
-    init?(map: Map) {
-    
-    }
+    init?(map: Map) {}
     
     // Mappable
     mutating func mapping(map: Map) {

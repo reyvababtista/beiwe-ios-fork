@@ -169,7 +169,7 @@ class Recline {
             return self._queryAll()
         }
     }
-
+    
 
     func _purge<T: ReclineObject>(_ obj: T) -> Promise<Bool> {
         return Promise { seal in

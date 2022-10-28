@@ -30,6 +30,7 @@ struct PersistentPasswordManager {
     }
 
     func passwordForStudy(_ study: String = Constants.defaultStudyId) -> String? {
+        // passwords are stored on a per-study basis, so in principle someone could have multiple instances of study information present.
         return keychain.get(keyForStudy(study, prefix: passwordKeyPrefix));
     }
 
