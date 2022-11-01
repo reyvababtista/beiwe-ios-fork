@@ -6,116 +6,109 @@
 //  Copyright © 2016 Rocketfarm Studios. All rights reserved.
 //
 
-import UIKit
-import ResearchKit
 import EmitterKit
 import Hakuba
-import XLActionController
+import ResearchKit
 import Sentry
+import UIKit
+import XLActionController
 
 class MainViewController: UIViewController {
-
-    var listeners: [Listener] = [];
-    var hakuba: Hakuba!;
+    var listeners: [Listener] = []
+    var hakuba: Hakuba!
     var selectedSurvey: ActiveSurvey?
 
+    
     @IBOutlet weak var haveAQuestionLabel: UILabel!
     @IBOutlet weak var callClinicianButton: UIButton!
     @IBOutlet weak var footerSeperator: UIView!
+    @IBOutlet weak var surveyTableView: UITableView!
     @IBOutlet var activeSurveyHeader: UIView!
     @IBOutlet var emptySurveyHeader: UIView!
-    @IBOutlet weak var surveyTableView: UITableView!
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        self.navigationController?.presentTransparentNavigationBar();
-        let leftImage : UIImage? = UIImage(named:"ic-user")!.withRenderingMode(.alwaysOriginal);
-        self.navigationItem.leftBarButtonItem = UIBarButtonItem(image: leftImage, style: UIBarButtonItem.Style.plain, target: self, action: #selector(userButton))
-        /*
-        let rightImage : UIImage? = UIImage(named:"ic-info")!.imageWithRenderingMode(.AlwaysOriginal);
-        self.navigationItem.rightBarButtonItem = UIBarButtonItem(image: rightImage, style: UIBarButtonItemStyle.Plain, target: self, action: #selector(infoButton))
-        */
-        self.navigationController?.navigationBar.tintColor = UIColor.white
-        self.navigationItem.rightBarButtonItem = nil;
+
+        navigationController?.presentTransparentNavigationBar()
+        let leftImage: UIImage? = UIImage(named: "ic-user")!.withRenderingMode(.alwaysOriginal)
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            image: leftImage, style: UIBarButtonItem.Style.plain, target: self, action: #selector(userButton))
+        // let rightImage : UIImage? = UIImage(named:"ic-info")!.imageWithRenderingMode(.AlwaysOriginal);
+        // self.navigationItem.rightBarButtonItem = UIBarButtonItem(image: rightImage, style: UIBarButtonItemStyle.Plain, target: self, action: #selector(infoButton))
+        navigationController?.navigationBar.tintColor = UIColor.white
+        navigationItem.rightBarButtonItem = nil
 
         // Do any additional setup after loading the view.
+        hakuba = Hakuba(tableView: surveyTableView)
+        surveyTableView.backgroundView = nil
+        surveyTableView.backgroundColor = UIColor.clear
+        // hakuba.registerCell(SurveyCell)
 
-        hakuba = Hakuba(tableView: surveyTableView);
-        surveyTableView.backgroundView = nil;
-        surveyTableView.backgroundColor = UIColor.clear;
-        /*hakuba
-            .registerCell(SurveyCell) */
-
-        var clinicianText: String;
+        var clinicianText: String
         clinicianText = StudyManager.sharedInstance.currentStudy?.studySettings?.callClinicianText ?? NSLocalizedString("default_call_clinician_text", comment: "")
         callClinicianButton.setTitle(clinicianText, for: UIControl.State())
         callClinicianButton.setTitle(clinicianText, for: UIControl.State.highlighted)
         if #available(iOS 9.0, *) {
             callClinicianButton.setTitle(clinicianText, for: UIControl.State.focused)
         }
-        
+
         // Hide call button if it's disabled in the study settings
         if !(StudyManager.sharedInstance.currentStudy?.studySettings?.callClinicianButtonEnabled)! {
             haveAQuestionLabel.isHidden = true
             callClinicianButton.isHidden = true
         }
-        
+
         listeners += StudyManager.sharedInstance.surveysUpdatedEvent.on { [weak self] data in
-            self?.refreshSurveys();
+            self?.refreshSurveys()
         }
 
-        if (AppDelegate.sharedInstance().debugEnabled) {
-            addDebugMenu();
+        if AppDelegate.sharedInstance().debugEnabled {
+            addDebugMenu()
         }
 
-        refreshSurveys();
-
+        refreshSurveys()
     }
 
     func refreshSurveys() {
-        hakuba.removeAll();
+        hakuba.removeAll()
         let section = Section() // create a new section
 
-        hakuba
-            .insert(section, atIndex: 0)
-            .bump()
+        hakuba.insert(section, atIndex: 0).bump()
 
-        var cnt = 0;
+        var count = 0
         if let activeSurveys = StudyManager.sharedInstance.currentStudy?.activeSurveys {
-            let sortedSurveys = activeSurveys.sorted { (s1, s2) -> Bool in
-                return s1.1.received > s2.1.received;
+            let sortedSurveys = activeSurveys.sorted { s1, s2 -> Bool in
+                s1.1.received > s2.1.received
             }
 
             // because surveys do not have their state cleared when the done button is pressed, the buttons retain
             // the incomplete label and tapping on a finished always available survey results in loading to the "done" buttton on that survey.
             // (and creating a new file. see comments in StudyManager.swift for explination of this behavior.)
-            
-            for (_,active_survey) in sortedSurveys {
-                if (!active_survey.isComplete || active_survey.survey?.alwaysAvailable ?? false) {
+
+            for (_, active_survey) in sortedSurveys {
+                if !active_survey.isComplete || active_survey.survey?.alwaysAvailable ?? false {
                     let cellmodel = SurveyCellModel(activeSurvey: active_survey) { [weak self] cell in
-                        cell.isSelected = false;
+                        cell.isSelected = false
                         if let strongSelf = self, let surveyCell = cell as? SurveyCell, let surveyId = surveyCell.cellmodel?.activeSurvey.survey?.surveyId {
                             strongSelf.presentSurvey(surveyId)
                         }
                     }
                     hakuba[0].append(cellmodel)
-                    cnt += 1;
+                    count += 1
                 }
             }
-            hakuba[0].bump();
+            hakuba[0].bump()
         }
-        if (cnt > 0) {
+        if count > 0 {
             footerSeperator.isHidden = false
-            surveyTableView.tableHeaderView = activeSurveyHeader;
+            surveyTableView.tableHeaderView = activeSurveyHeader
             surveyTableView.isScrollEnabled = true
         } else {
             footerSeperator.isHidden = true
-            surveyTableView.tableHeaderView = emptySurveyHeader;
+            surveyTableView.tableHeaderView = emptySurveyHeader
             surveyTableView.isScrollEnabled = false
         }
-
     }
-
 
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
@@ -123,150 +116,143 @@ class MainViewController: UIViewController {
     }
 
     func addDebugMenu() {
-
-        let tapRecognizer = UITapGestureRecognizer.init(target: self, action: #selector(debugTap))
-        tapRecognizer.numberOfTapsRequired = 2;
-        tapRecognizer.numberOfTouchesRequired = 2;
-        self.view.addGestureRecognizer(tapRecognizer)
+        // adds a debug command? (Keary never told us about this.)
+        let tapRecognizer = UITapGestureRecognizer(target: self, action: #selector(debugTap))
+        tapRecognizer.numberOfTapsRequired = 2
+        tapRecognizer.numberOfTouchesRequired = 2
+        view.addGestureRecognizer(tapRecognizer)
     }
 
     @objc func debugTap(_ gestureRecognizer: UIGestureRecognizer) {
-        if (gestureRecognizer.state != .ended) {
+        if gestureRecognizer.state != .ended {
             return
         }
 
-        refreshSurveys();
+        refreshSurveys()
 
         let actionController = BWXLActionController()
         actionController.settings.cancelView.backgroundColor = AppColors.highlightColor
 
-        actionController.headerData = nil;
+        actionController.headerData = nil
 
-        actionController.addAction(Action(ActionData(title: NSLocalizedString("upload_data_button", comment: "")), style: .default) { (action) in
+        actionController.addAction(Action(ActionData(title: NSLocalizedString("upload_data_button", comment: "")), style: .default) { _action in
             DispatchQueue.main.async {
                 self.Upload(self)
             }
-            });
-        actionController.addAction(Action(ActionData(title: NSLocalizedString("check_for_surveys_button", comment: "")), style: .default) { (action) in
+        })
+        actionController.addAction(Action(ActionData(title: NSLocalizedString("check_for_surveys_button", comment: "")), style: .default) { _action in
             DispatchQueue.main.async {
                 self.checkSurveys(self)
             }
+        })
 
-            });
-
-        self.present(actionController, animated: true) {
-
-        }
+        present(actionController, animated: true) {}
     }
-    
+
     @objc func userButton() {
         let actionController = BWXLActionController()
         actionController.settings.cancelView.backgroundColor = AppColors.highlightColor
-
-        actionController.headerData = nil;
-
-        actionController.addAction(Action(ActionData(title: NSLocalizedString("change_password_button", comment: "")), style: .default) { (action) in
+        actionController.headerData = nil
+        actionController.addAction(Action(ActionData(title: NSLocalizedString("change_password_button", comment: "")), style: .default) { _action in
             DispatchQueue.main.async {
-                self.changePassword(self);
+                self.changePassword(self)
             }
-        });
-        
+        }
+)
+
         // Only add Call button if it's enabled by the study
         if (StudyManager.sharedInstance.currentStudy?.studySettings?.callResearchAssistantButtonEnabled)! {
-            actionController.addAction(Action(ActionData(title: NSLocalizedString("call_research_assistant_button", comment: "")), style: .default) { (action) in
+            actionController.addAction(Action(ActionData(title: NSLocalizedString("call_research_assistant_button", comment: "")), style: .default) { _action in
                 DispatchQueue.main.async {
                     confirmAndCallClinician(self, callAssistant: true)
                 }
-            });
+            })
         }
-        
-        actionController.addAction(Action(ActionData(title: NSLocalizedString("logout_button", comment: "")), style: .default) { (action) in
-            DispatchQueue.main.async {
-                self.logout(self);
-            }
 
-        });
-        actionController.addAction(Action(ActionData(title: NSLocalizedString("unregister_button", comment: "")), style: .destructive) { (action) in
+        actionController.addAction(Action(ActionData(title: NSLocalizedString("logout_button", comment: "")), style: .default) { _action in
             DispatchQueue.main.async {
-                self.leaveStudy(self);
+                self.logout(self)
             }
-        });
-        self.present(actionController, animated: true)
+        })
+        
+        actionController.addAction(Action(ActionData(title: NSLocalizedString("unregister_button", comment: "")), style: .destructive) { _action in
+            DispatchQueue.main.async {
+                self.leaveStudy(self)
+            }
+        })
+        present(actionController, animated: true)
     }
 
     func infoButton() {
-
     }
-    
+
     @IBAction func Upload(_ sender: AnyObject) {
-        StudyManager.sharedInstance.upload(false);
+        StudyManager.sharedInstance.upload(false)
     }
-
 
     @IBAction func callClinician(_ sender: AnyObject) {
         // Present modal...
-        confirmAndCallClinician(self);
+        confirmAndCallClinician(self)
     }
 
     @IBAction func checkSurveys(_ sender: AnyObject) {
-        StudyManager.sharedInstance.checkSurveys();
+        StudyManager.sharedInstance.checkSurveys()
     }
+
     @IBAction func leaveStudy(_ sender: AnyObject) {
         let alertController = UIAlertController(title: NSLocalizedString("unregister_alert_title", comment: ""), message: NSLocalizedString("unregister_alert_text", comment: ""), preferredStyle: .alert)
 
-        let cancelAction = UIAlertAction(title: NSLocalizedString("cancel_button_text", comment: ""), style: .cancel) { (action) in
+        let cancelAction = UIAlertAction(title: NSLocalizedString("cancel_button_text", comment: ""), style: .cancel) { _ in
         }
         alertController.addAction(cancelAction)
 
-        let OKAction = UIAlertAction(title: NSLocalizedString("ok_button_text", comment: ""), style: .default) { (action) in
-            StudyManager.sharedInstance.leaveStudy().done {_ -> Void in
-                AppDelegate.sharedInstance().isLoggedIn = false;
-                AppDelegate.sharedInstance().transitionToLoadedAppState();
+        let OKAction = UIAlertAction(title: NSLocalizedString("ok_button_text", comment: ""), style: .default) { _ in
+            StudyManager.sharedInstance.leaveStudy().done { _ in
+                AppDelegate.sharedInstance().isLoggedIn = false
+                AppDelegate.sharedInstance().transitionToLoadedAppState()
             }
         }
         alertController.addAction(OKAction)
-        
-        self.present(alertController, animated: true) {
+
+        present(alertController, animated: true) {
         }
     }
 
     func presentSurvey(_ surveyId: String) {
         guard let activeSurvey = StudyManager.sharedInstance.currentStudy?.activeSurveys[surveyId], let survey = activeSurvey.survey, let surveyType = survey.surveyType else {
-            return;
+            return
         }
 
-        switch(surveyType) {
+        switch surveyType {
         case .TrackingSurvey:
-            TrackingSurveyPresenter(surveyId: surveyId, activeSurvey: activeSurvey, survey: survey).present(self);
+            TrackingSurveyPresenter(surveyId: surveyId, activeSurvey: activeSurvey, survey: survey).present(self)
         case .AudioSurvey:
             selectedSurvey = activeSurvey
             performSegue(withIdentifier: "audioQuestionSegue", sender: self)
-            //AudioSurveyPresenter(surveyId: surveyId, activeSurvey: activeSurvey, survey: survey).present(self);
+            // AudioSurveyPresenter(surveyId: surveyId, activeSurvey: activeSurvey, survey: survey).present(self);
         }
     }
 
-
     @IBAction func changePassword(_ sender: AnyObject) {
-        let changePasswordController = ChangePasswordViewController();
-        changePasswordController.isForgotPassword = false;
-        present(changePasswordController, animated: true, completion: nil);
+        let changePasswordController = ChangePasswordViewController()
+        changePasswordController.isForgotPassword = false
+        present(changePasswordController, animated: true, completion: nil)
     }
+
     @IBAction func logout(_ sender: AnyObject) {
-        AppDelegate.sharedInstance().isLoggedIn = false;
-        AppDelegate.sharedInstance().transitionToLoadedAppState();
+        AppDelegate.sharedInstance().isLoggedIn = false
+        AppDelegate.sharedInstance().transitionToLoadedAppState()
     }
+
     // MARK: - Navigation
 
     // In a storyboard-based application, you will often want to do a little preparation before navigation
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
         // Get the new view controller using segue.destinationViewController.
         // Pass the selected object to the new view controller.
-        if (segue.identifier == "audioQuestionSegue") {
+        if segue.identifier == "audioQuestionSegue" {
             let questionController: AudioQuestionViewController = segue.destination as! AudioQuestionViewController
             questionController.activeSurvey = selectedSurvey
         }
     }
-
-
-
 }

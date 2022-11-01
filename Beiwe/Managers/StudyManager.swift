@@ -14,36 +14,38 @@ import Crashlytics
 import Firebase
 
 class StudyManager {
-    static let sharedInstance = StudyManager();
+    static let sharedInstance = StudyManager()
+    static var real_study_loaded = false
 
     let MAX_UPLOAD_DATA: Int64 = 250 * (1024 * 1024)
     let appDelegate = UIApplication.shared.delegate as! AppDelegate
-    let calendar = Calendar.current;
-    var keyRef: SecKey?;
+    let calendar = Calendar.current
+    var keyRef: SecKey?
 
-    var currentStudy: Study?;
-    var gpsManager: GPSManager?;
-    var isUploading = false;
-    let surveysUpdatedEvent: Event<Int> = Event<Int>();
+    var currentStudy: Study?
+    var gpsManager: GPSManager?
+    var isUploading = false
+    let surveysUpdatedEvent: Event<Int> = Event<Int>()
     var isStudyLoaded: Bool {
-        return currentStudy != nil;
+        return currentStudy != nil
     }
     
     func loadDefaultStudy() -> Promise<Bool> {
-        currentStudy = nil;
-        gpsManager = nil;
+        currentStudy = nil
+        gpsManager = nil
         return firstly { () -> Promise<[Study]> in
-            return Recline.shared.queryAll()
+            Recline.shared.queryAll()
         }.then { (studies: [Study]) -> Promise<Bool> in
-            if (studies.count > 1) {
+            if studies.count > 1 {
                 log.error("Multiple Studies: \(studies)")
-               // Crashlytics.sharedInstance().recordError(NSError(domain: "com.rf.beiwe.studies", code: 1, userInfo: nil))
+                // Crashlytics.sharedInstance().recordError(NSError(domain: "com.rf.beiwe.studies", code: 1, userInfo: nil))
             }
-            if (studies.count > 0) {
-                self.currentStudy = studies[0];
+            if studies.count > 0 {
+                self.currentStudy = studies[0]
                 AppDelegate.sharedInstance().setDebuggingUser(self.currentStudy?.patientId ?? "unknown")
+                StudyManager.real_study_loaded = true
             }
-                return .value(true)
+            return .value(true)
         }
     }
 
@@ -167,6 +169,7 @@ class StudyManager {
         return promise.then(on: DispatchQueue.global(qos: .default)) { _ -> Promise<Bool> in
             //self.gpsManager = nil;
             self.currentStudy = nil;
+            StudyManager.real_study_loaded = false
             return .value(true)
         }
         // catch is not needed since we are just assigning

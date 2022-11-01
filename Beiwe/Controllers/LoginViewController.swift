@@ -44,6 +44,7 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
+        log.warning("didReceiveMemoryWarning")
     }
     
     @IBAction func loginPressed(_ sender: AnyObject) {

@@ -366,7 +366,7 @@ class DataStorage {
         } else {
             sanitizedData = data
         }
-        // This code was originally writted as follows (pseudocode)
+        // This code was originally written as follows (pseudocode)
         //   ln[1]: self.do_actual_file_io_immediately(some_data)
         //   ln[2]: self.flush()
         // The problem is that flush function simply isn't a classic io-is-buffered-so-call-flush-to-be-sure call.
