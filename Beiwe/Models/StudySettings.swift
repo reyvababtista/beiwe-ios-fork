@@ -7,7 +7,7 @@
 //
 
 import Foundation
-import ObjectMapper;
+import ObjectMapper
 
 /*
  Example JSON:
@@ -43,8 +43,8 @@ import ObjectMapper;
 
 struct ConsentSection: Mappable {
 
-    var text: String = "";
-    var more: String = "";
+    var text: String = ""
+    var more: String = ""
 
     init?(map: Map) {
 
@@ -58,62 +58,62 @@ struct ConsentSection: Mappable {
 }
 struct StudySettings : Mappable {
 
-    var clientPublicKey: String?;
-    var aboutPageText = "";
-    var accelerometer  = false;
-    var accelerometerOffDurationSeconds = 300;
-    var accelerometerOnDurationSeconds = 0;
-    var bluetooth = false;
-    var bluetoothGlobalOffsetSeconds = 0;
-    var bluetoothOnDurationSeconds = 0;
-    var bluetoothTotalDurationSeconds = 0;
-    var callClinicianText = "Call My Clinician";
-    var calls = false;
-    var checkForNewSurveysFreqSeconds = 21600;
-    var consentFormText = "I have read and understood the information about the study and all of my questions about the study have been answered by the study researchers.";
-    var createNewDataFileFrequencySeconds = 900;
-    var gps = false;
-    var gpsOffDurationSeconds = 300;
-    var gpsOnDurationSeconds = 0;
-    var powerState = false;
-    var secondsBeforeAutoLogout = 300;
-    var submitSurveySuccessText = "Thank you for completing the survey.  A clinician will not see your answers immediately, so if you need help or are thinking about harming yourself, please contact your clinician.  You can also press the \"Call My Clinician\" button.";
-    var texts = false;
-    var uploadDataFileFrequencySeconds = 3600;
-    var voiceRecordingMaxLengthSeconds = 300;
-    var wifi = false;
-    var wifiLogFrequencySeconds = 300;
-    var proximity = false;
-    var magnetometer = false;
-    var magnetometerOffDurationSeconds = 300;
-    var magnetometerOnDurationSeconds = 0;
-    var gyro = false;
-    var gyroOffDurationSeconds = 300;
-    var gyroOnDurationSeconds = 0;
-    var motion = false;
-    var motionOffDurationSeconds = 300;
-    var motionOnDurationSeconds = 0;
-    var reachability = false;
-    var uploadOverCellular = false;
-    var consentSections: [String:ConsentSection] = [:];
-    var fuzzGps = false;
-    var callClinicianButtonEnabled = true;
-    var callResearchAssistantButtonEnabled = true;
-    var clientID = "";
-    var reversedClientID = "";
-    var apiKey = "";
-    var gcmSenderID = "";
-    var plistVersion = 1;
-    var bundleID = "";
-    var projectID = "";
-    var storageBucket = "";
-    var isAdsEnabled = false;
-    var isAnalyticsEnabled = false;
-    var isAppInviteEnabled = true;
-    var isGcmEnabled = true;
-    var isSignInEnabled = true;
-    var googleAppID = "";
-    var databaseURL = "";
+    var clientPublicKey: String?
+    var aboutPageText = ""
+    var accelerometer  = false
+    var accelerometerOffDurationSeconds = 300
+    var accelerometerOnDurationSeconds = 0
+    var bluetooth = false
+    var bluetoothGlobalOffsetSeconds = 0
+    var bluetoothOnDurationSeconds = 0
+    var bluetoothTotalDurationSeconds = 0
+    var callClinicianText = "Call My Clinician"
+    var calls = false
+    var checkForNewSurveysFreqSeconds = 21600
+    var consentFormText = "I have read and understood the information about the study and all of my questions about the study have been answered by the study researchers."
+    var createNewDataFileFrequencySeconds = 900
+    var gps = false
+    var gpsOffDurationSeconds = 300
+    var gpsOnDurationSeconds = 0
+    var powerState = false
+    var secondsBeforeAutoLogout = 300
+    var submitSurveySuccessText = "Thank you for completing the survey.  A clinician will not see your answers immediately, so if you need help or are thinking about harming yourself, please contact your clinician.  You can also press the \"Call My Clinician\" button."
+    var texts = false
+    var uploadDataFileFrequencySeconds = 3600
+    var voiceRecordingMaxLengthSeconds = 300
+    var wifi = false
+    var wifiLogFrequencySeconds = 300
+    var proximity = false
+    var magnetometer = false
+    var magnetometerOffDurationSeconds = 300
+    var magnetometerOnDurationSeconds = 0
+    var gyro = false
+    var gyroOffDurationSeconds = 300
+    var gyroOnDurationSeconds = 0
+    var motion = false
+    var motionOffDurationSeconds = 300
+    var motionOnDurationSeconds = 0
+    var reachability = false
+    var uploadOverCellular = false
+    var consentSections: [String:ConsentSection] = [:]
+    var fuzzGps = false
+    var callClinicianButtonEnabled = true
+    var callResearchAssistantButtonEnabled = true
+    var clientID = ""
+    var reversedClientID = ""
+    var apiKey = ""
+    var gcmSenderID = ""
+    var plistVersion = 1
+    var bundleID = ""
+    var projectID = ""
+    var storageBucket = ""
+    var isAdsEnabled = false
+    var isAnalyticsEnabled = false
+    var isAppInviteEnabled = true
+    var isGcmEnabled = true
+    var isSignInEnabled = true
+    var googleAppID = ""
+    var databaseURL = ""
     
     init?(map: Map) {
 
@@ -121,62 +121,62 @@ struct StudySettings : Mappable {
 
     // Mappable
     mutating func mapping(map: Map) {
-        clientPublicKey                 <- map["client_public_key"];
-        aboutPageText                   <- map["device_settings.about_page_text"];
-        accelerometer                   <- map["device_settings.accelerometer"];
-        accelerometerOffDurationSeconds <- map["device_settings.accelerometer_off_duration_seconds"]
-        accelerometerOnDurationSeconds  <- map["device_settings.accelerometer_on_duration_seconds"]
-        bluetooth                       <- map["device_settings.bluetooth"]
-        bluetoothGlobalOffsetSeconds    <- map["device_settings.bluetooth_global_offset_seconds"]
-        bluetoothOnDurationSeconds      <- map["device_settings.bluetooth_on_duration_seconds"]
-        bluetoothTotalDurationSeconds   <- map["device_settings.bluetooth_total_duration_seconds"]
-        callClinicianText               <- map["device_settings.call_clinician_button_text"]
-        calls                           <- map["device_settings.calls"]
-        checkForNewSurveysFreqSeconds   <- map["device_settings.check_for_new_surveys_frequency_seconds"]
-        consentFormText                 <- map["device_settings.consent_form_text"]
+        clientPublicKey                     <- map["client_public_key"]
+        aboutPageText                       <- map["device_settings.about_page_text"]
+        accelerometer                       <- map["device_settings.accelerometer"]
+        accelerometerOffDurationSeconds     <- map["device_settings.accelerometer_off_duration_seconds"]
+        accelerometerOnDurationSeconds      <- map["device_settings.accelerometer_on_duration_seconds"]
+        bluetooth                           <- map["device_settings.bluetooth"]
+        bluetoothGlobalOffsetSeconds        <- map["device_settings.bluetooth_global_offset_seconds"]
+        bluetoothOnDurationSeconds          <- map["device_settings.bluetooth_on_duration_seconds"]
+        bluetoothTotalDurationSeconds       <- map["device_settings.bluetooth_total_duration_seconds"]
+        callClinicianText                   <- map["device_settings.call_clinician_button_text"]
+        calls                               <- map["device_settings.calls"]
+        checkForNewSurveysFreqSeconds       <- map["device_settings.check_for_new_surveys_frequency_seconds"]
+        consentFormText                     <- map["device_settings.consent_form_text"]
         createNewDataFileFrequencySeconds   <- map["device_settings.create_new_data_files_frequency_seconds"]
-        gps                             <- map["device_settings.gps"]
-        gpsOffDurationSeconds           <- map["device_settings.gps_off_duration_seconds"]
-        gpsOnDurationSeconds            <- map["device_settings.gps_on_duration_seconds"]
-        powerState                      <- map["device_settings.power_state"]
-        secondsBeforeAutoLogout         <- map["device_settings.seconds_before_auto_logout"]
-        submitSurveySuccessText         <- map["device_settings.survey_submit_success_toast_text"]
-        texts                           <- map["device_settings.texts"]
-        uploadDataFileFrequencySeconds  <- map["device_settings.upload_data_files_frequency_seconds"]
-        voiceRecordingMaxLengthSeconds  <- map["device_settings.voice_recording_max_time_length_seconds"]
-        wifi                            <- map["device_settings.wifi"]
-        wifiLogFrequencySeconds         <- map["device_settings.wifi_log_frequency_seconds"]
-        proximity                       <- map["device_settings.proximity"];
-        magnetometer                    <- map["device_settings.magnetometer"];
-        magnetometerOffDurationSeconds  <- map["device_settings.magnetometer_off_duration_seconds"];
-        magnetometerOnDurationSeconds  <- map["device_settings.magnetometer_on_duration_seconds"];
-        gyro                           <- map["device_settings.gyro"];
-        gyroOffDurationSeconds         <- map["device_settings.gyro_off_duration_seconds"];
-        gyroOnDurationSeconds          <- map["device_settings.gyro_on_duration_seconds"];
-        motion                         <- map["device_settings.devicemotion"];
-        motionOffDurationSeconds       <- map["device_settings.devicemotion_off_duration_seconds"];
-        motionOnDurationSeconds        <- map["device_settings.devicemotion_on_duration_seconds"];
-        reachability                   <- map["device_settings.reachability"];
-        consentSections                <- map["device_settings.consent_sections"]
-        uploadOverCellular             <- map["device_settings.allow_upload_over_cellular_data"]
-        fuzzGps                        <- map["device_settings.use_gps_fuzzing"]
-        callClinicianButtonEnabled     <- map["device_settings.call_clinician_button_enabled"]
+        gps                                 <- map["device_settings.gps"]
+        gpsOffDurationSeconds               <- map["device_settings.gps_off_duration_seconds"]
+        gpsOnDurationSeconds                <- map["device_settings.gps_on_duration_seconds"]
+        powerState                          <- map["device_settings.power_state"]
+        secondsBeforeAutoLogout             <- map["device_settings.seconds_before_auto_logout"]
+        submitSurveySuccessText             <- map["device_settings.survey_submit_success_toast_text"]
+        texts                               <- map["device_settings.texts"]
+        uploadDataFileFrequencySeconds      <- map["device_settings.upload_data_files_frequency_seconds"]
+        voiceRecordingMaxLengthSeconds      <- map["device_settings.voice_recording_max_time_length_seconds"]
+        wifi                                <- map["device_settings.wifi"]
+        wifiLogFrequencySeconds             <- map["device_settings.wifi_log_frequency_seconds"]
+        proximity                           <- map["device_settings.proximity"]
+        magnetometer                        <- map["device_settings.magnetometer"]
+        magnetometerOffDurationSeconds      <- map["device_settings.magnetometer_off_duration_seconds"]
+        magnetometerOnDurationSeconds       <- map["device_settings.magnetometer_on_duration_seconds"]
+        gyro                                <- map["device_settings.gyro"]
+        gyroOffDurationSeconds              <- map["device_settings.gyro_off_duration_seconds"]
+        gyroOnDurationSeconds               <- map["device_settings.gyro_on_duration_seconds"]
+        motion                              <- map["device_settings.devicemotion"]
+        motionOffDurationSeconds            <- map["device_settings.devicemotion_off_duration_seconds"]
+        motionOnDurationSeconds             <- map["device_settings.devicemotion_on_duration_seconds"]
+        reachability                        <- map["device_settings.reachability"]
+        consentSections                     <- map["device_settings.consent_sections"]
+        uploadOverCellular                  <- map["device_settings.allow_upload_over_cellular_data"]
+        fuzzGps                             <- map["device_settings.use_gps_fuzzing"]
+        callClinicianButtonEnabled          <- map["device_settings.call_clinician_button_enabled"]
         callResearchAssistantButtonEnabled  <- map["device_settings.call_research_assistant_button_enabled"]
-        clientID                        <- map["ios_plist.CLIENT_ID"]
-        reversedClientID                <- map["ios_plist.REVERSED_CLIENT_ID"]
-        apiKey                          <- map["ios_plist.API_KEY"]
-        gcmSenderID                     <- map["ios_plist.GCM_SENDER_ID"]
-        plistVersion                    <- map["ios_plist.PLIST_VERSION"]
-        bundleID                        <- map["ios_plist.BUNDLE_ID"]
-        projectID                       <- map["ios_plist.PROJECT_ID"]
-        storageBucket                   <- map["ios_plist.STORAGE_BUCKET"]
-        isAdsEnabled                    <- map["ios_plist.IS_ADS_ENABLED"]
-        isAnalyticsEnabled              <- map["ios_plist.IS_ANALYTICS_ENABLED"]
-        isAppInviteEnabled              <- map["ios_plist.IS_APPINVITE_ENABLED"]
-        isGcmEnabled                    <- map["ios_plist.IS_GCM_ENABLED"]
-        isSignInEnabled                 <- map["ios_plist.IS_SIGNIN_ENABLED"]
-        googleAppID                     <- map["ios_plist.GOOGLE_APP_ID"]
-        databaseURL                     <- map["ios_plist.DATABASE_URL"]
+        clientID                            <- map["ios_plist.CLIENT_ID"]
+        reversedClientID                    <- map["ios_plist.REVERSED_CLIENT_ID"]
+        apiKey                              <- map["ios_plist.API_KEY"]
+        gcmSenderID                         <- map["ios_plist.GCM_SENDER_ID"]
+        plistVersion                        <- map["ios_plist.PLIST_VERSION"]
+        bundleID                            <- map["ios_plist.BUNDLE_ID"]
+        projectID                           <- map["ios_plist.PROJECT_ID"]
+        storageBucket                       <- map["ios_plist.STORAGE_BUCKET"]
+        isAdsEnabled                        <- map["ios_plist.IS_ADS_ENABLED"]
+        isAnalyticsEnabled                  <- map["ios_plist.IS_ANALYTICS_ENABLED"]
+        isAppInviteEnabled                  <- map["ios_plist.IS_APPINVITE_ENABLED"]
+        isGcmEnabled                        <- map["ios_plist.IS_GCM_ENABLED"]
+        isSignInEnabled                     <- map["ios_plist.IS_SIGNIN_ENABLED"]
+        googleAppID                         <- map["ios_plist.GOOGLE_APP_ID"]
+        databaseURL                         <- map["ios_plist.DATABASE_URL"]
     }
     
 }
