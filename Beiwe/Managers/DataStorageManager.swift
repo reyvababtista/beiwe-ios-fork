@@ -87,9 +87,9 @@ class EncryptedStorage {
     
     func write(_ data: NSData?, writeLen: Int) -> Promise<Int> {
         // This is called directly in audio file code
-        log.info("write called on \(self.debug_shortname)...")
+        // log.info("write called on \(self.debug_shortname)...")
         return Promise().then(on: self.encryption_queue) { _ -> Promise<Int> in
-            log.info("write (promise) called on \(self.eventualFilename)...")
+            // log.info("write (promise) called on \(self.eventualFilename)...")
             let len: Int = self.write_actual(data, writeLen: writeLen)
             return .value(len)
         }
@@ -104,7 +104,7 @@ class EncryptedStorage {
         ) {
             fatalError("could not create file?")
         } else {
-            log.info("Created a new encrypted file: \(self.filename)")
+            // log.info("Created a new encrypted file: \(self.filename)")
         }
         self.file_handle = try! FileHandle(forWritingTo: self.filename)
         
@@ -125,17 +125,17 @@ class EncryptedStorage {
         self.file_handle?.closeFile()
         self.file_handle = nil
         try! FileManager.default.moveItem(at: self.filename, to: self.eventualFilename)
-        log.info("moved temp data file \(self.filename) to \(self.eventualFilename)")
+        // log.info("moved temp data file \(self.filename) to \(self.eventualFilename)")
     }
     
     private func write_actual(_ data: NSData?, writeLen: Int) -> Int {
         // core write function, as much as anything here can be said to "write"
-        log.info("write_actual called on \(self.eventualFilename)...")
+        // log.info("write_actual called on \(self.eventualFilename)...")
         let new_data: NSMutableData = NSMutableData()
         
         // setup to write - this case should be impossible
         if (data != nil && writeLen != 0) {
-            log.info("write_actual case 1")
+            // log.info("write_actual case 1")
             // Need to encrypt data
             let encryptLen = self.stream_cryptor.getOutputLength(inputByteCount: writeLen)
             let bufferOut = UnsafeMutablePointer<Void>.allocate(capacity: encryptLen)
@@ -154,7 +154,7 @@ class EncryptedStorage {
         // again, this case should be impossible
         let encryptLen = self.stream_cryptor.getOutputLength(inputByteCount: 0, isFinal: true)
         if (encryptLen > 0) {
-            log.info("write_actual case 2")
+            // log.info("write_actual case 2")
             // mostly setup of these obscure pointers to an array of data (there must be a better way to do this...)
             let bufferOut = UnsafeMutablePointer<Void>.allocate(capacity: encryptLen)
             var byteCount: Int = 0
@@ -169,13 +169,13 @@ class EncryptedStorage {
                 
         // this was formerly the _write function
         if (new_data.length != 0) {
-            log.info("write_actual case 3")
+            // log.info("write_actual case 3")
             let dataToWriteBuffer = UnsafeMutableRawPointer(mutating: new_data.bytes)
             let dataToWrite = NSData(bytesNoCopy: dataToWriteBuffer, length: new_data.length, freeWhenDone: false)
             let encodedData: String = Crypto.sharedInstance.base64ToBase64URL(dataToWrite.base64EncodedString(options: []))
             self.file_handle?.write(encodedData.data(using: String.Encoding.utf8)!)
         }
-        log.info("write_actual finished")
+        // log.info("write_actual finished")
         return new_data.length
     }
     
@@ -226,12 +226,12 @@ class DataStorage {
     private func reset() {
         // called when max filesize is reached, inside flush when the file is empty
         // generally resets all object assets and creates a new filename.
-        log.info("DataStorage.reset called on \(self.name)...")
+        // log.info("DataStorage.reset called on \(self.name)...")
         if moveOnClose == true {
             do {
                 if check_file_exists() {
                     try FileManager.default.moveItem(at: self.filename, to: self.realFilename)
-                    log.info("moved temp data file \(self.filename) to \(self.realFilename)")
+                    // log.info("moved temp data file \(self.filename) to \(self.realFilename)")
                 }
             } catch {
                 log.error("Error moving temp data \(self.filename) to \(self.realFilename)")
@@ -312,7 +312,7 @@ class DataStorage {
             } else {
                 message = "Could not create new data file"
             }
-            log.error("\(message): \(filename)")
+            // log.error("\(message): \(filename)")
             self.conditionalApplog(event: "file_create", msg: message, d1: self.name, d2: self.errMsg)
             if !created {
                 //TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
@@ -442,7 +442,7 @@ class DataStorageManager {
     }
 
     // TODO: WHYY IS THIS RETURN OPTIONAL
-    func createStore(_ type: String, headers: [String]) -> DataStorage? {
+    func createStore(_ type: String, headers: [String]) -> DataStorage {
         if (storageTypes[type] == nil) {
             if let publicKey = publicKey, let patientId = study?.patientId {
                 storageTypes[type] = DataStorage(
@@ -454,8 +454,6 @@ class DataStorageManager {
                 )
             } else {
                 fatalError("No public key found! Can't store data")
-                log.error("No public key found! Can't store data")
-                return nil
             }
         }
         return storageTypes[type]!
@@ -519,7 +517,7 @@ class DataStorageManager {
     private func _moveFile(_ src: URL, dst: URL) {
         do {
             try FileManager.default.moveItem(at: src, to: dst)
-            log.info("moved \(src) to \(dst)")
+            // log.info("moved \(src) to \(dst)")
         } catch {
             log.error("Error moving \(src) to \(dst)")
         }

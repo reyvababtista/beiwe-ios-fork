@@ -1,21 +1,13 @@
-//
-//  GPSManager.swift
-//  Beiwe
-//
-//  Created by Keary Griffin on 3/29/16.
-//  Copyright © 2016 Rocketfarm Studios. All rights reserved.
-//
-
 import Foundation
 import CoreLocation
 import Darwin
 import PromiseKit
 
 protocol DataServiceProtocol {
-    func initCollecting() -> Bool;
-    func startCollecting();
-    func pauseCollecting();
-    func finishCollecting() -> Promise<Void>;
+    func initCollecting() -> Bool
+    func startCollecting()
+    func pauseCollecting()
+    func finishCollecting() -> Promise<Void>
 }
 
 class DataServiceStatus {
