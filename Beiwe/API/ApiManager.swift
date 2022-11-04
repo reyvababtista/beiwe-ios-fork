@@ -77,6 +77,8 @@ class ApiManager {
         parameters["password"] = (password == nil) ? hashedPassword : Crypto.sharedInstance.sha256Base64URL(password!)
         parameters["device_id"] = PersistentAppUUID.sharedInstance.uuid
         parameters["patient_id"] = patientId
+        
+        
         // parameters.removeValueForKey("password");
         // parameters.removeValueForKey("device_id");
         // parameters.removeValueForKey("patient_id");
@@ -143,12 +145,15 @@ class ApiManager {
 
     func arrayPostRequest<T: ApiRequest>(_ requestObject: T) -> Promise<([T.ApiReturnType], Int)> where T: Mappable {
         var parameters = requestObject.toJSON()
+        // credential parameters
         parameters["password"] = hashedPassword
         parameters["device_id"] = PersistentAppUUID.sharedInstance.uuid
         parameters["patient_id"] = patientId
-        // parameters.removeValueForKey("password");
-        // parameters.removeValueForKey("device_id");
-        // parameters.removeValueForKey("patient_id");
+        // tracking info
+        parameters["version_code"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+        // parameters["version_name"] =  // There isn't really anything to stick into this one for ios
+        parameters["os_version"] = UIDevice.current.systemVersion
+        
         let headers = generateHeaders()
         return Promise { seal in
             Alamofire.request(baseApiUrl + T.apiEndpoint, method: .post, parameters: parameters, headers: headers)
