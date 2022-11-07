@@ -1,11 +1,3 @@
-//
-//  AppDelegate.swift
-//  Beiwe
-//
-//  Created by Keary Griffin on 3/10/16.
-//  Copyright © 2016 Rocketfarm Studios. All rights reserved.
-//
-
 import Sentry
 import UIKit
 import Fabric
@@ -68,14 +60,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     }
 
     func appStartLog() {
-        log.info("AppUUID: \(PersistentAppUUID.sharedInstance.uuid)")
+        print("AppUUID: \(PersistentAppUUID.sharedInstance.uuid)")
         let uiDevice = UIDevice.current
         // let modelVersionId = UIDevice.current.model + "/" + UIDevice.current.systemVersion  // this used to be a (completely usused class variable)
-        log.info("name: \(uiDevice.name)")
-        log.info("systemName: \(uiDevice.systemName)")
-        log.info("systemVersion: \(uiDevice.systemVersion)")
-        log.info("model: \(uiDevice.model)")
-        log.info("platform: \(platform())")
+        print("name: \(uiDevice.name)")
+        print("systemName: \(uiDevice.systemName)")
+        print("systemVersion: \(uiDevice.systemVersion)")
+        print("model: \(uiDevice.model)")
+        print("platform: \(platform())")
     }
 
     func initializeReachability() {
@@ -83,7 +75,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             reachability = try Reachability()
             try reachability!.startNotifier()
         } catch {
-            log.error("Unable to create or start Reachability")
+            print("Unable to create or start Reachability")
         }
     }
     
@@ -148,7 +140,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     func transitionToLoadedAppState() {
         self.transition_count += 1
-        log.info("transitionToLoadedAppState incremented to \(transition_count)")
+        print("transitionToLoadedAppState incremented to \(transition_count)")
 
         // anything that depends on app state at initialization time needs to go after this has run
         if let currentStudy = StudyManager.sharedInstance.currentStudy {
@@ -201,8 +193,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
     func applicationWillEnterForeground(_ application: UIApplication) {
-        log.info("applicationWillEnterForeground")
-        // Called as part of the transition from the background to the inactive state.
+        print("applicationWillEnterForeground")
+        // Called as part of the transition from the background to the inactive (Eli does not know who wrote "inactive") state.
         // here you can undo many of the changes made on entering the background.
 
         UNUserNotificationCenter.current().getDeliveredNotifications { notifications in
@@ -227,13 +219,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     }
     
     func application(_ application: UIApplication, willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        log.info("applicationWillFinishLaunchingWithOptions")
+        print("applicationWillFinishLaunchingWithOptions")
         return true
     }
     
     func applicationWillTerminate(_ application: UIApplication) {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
-        log.info("applicationWillTerminate")
+        print("applicationWillTerminate")
         AppEventManager.sharedInstance.logAppEvent(event: "terminate", msg: "Application terminating")
         
         let dispatchGroup = DispatchGroup()
@@ -244,13 +236,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             dispatchGroup.leave()
         }
         dispatchGroup.wait()
-        log.info("applicationWillTerminate exiting")
+        print("applicationWillTerminate exiting")
     }
     
     func applicationWillResignActive(_ application: UIApplication) {
         // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
         // Use this method to pause ongoing tasks, disable timers, and throttle down OpenGL ES frame rates. Games should use this method to pause the game.
-        log.info("applicationWillResignActive")
+        print("applicationWillResignActive")
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -259,7 +251,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     func applicationDidBecomeActive(_ application: UIApplication) {
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
-        log.info("applicationDidBecomeActive")
+        print("applicationDidBecomeActive")
         AppEventManager.sharedInstance.logAppEvent(event: "foreground", msg: "Application entered foreground")
 
         // Send FCM Token everytime the app launches
@@ -274,25 +266,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func applicationDidEnterBackground(_ application: UIApplication) {
         // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
         // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
-        log.info("applicationDidEnterBackground")
+        print("applicationDidEnterBackground")
         timeEnteredBackground = Date()
         AppEventManager.sharedInstance.logAppEvent(event: "background", msg: "Application entered background")
     }
 
     
     func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
-        log.info("applicationDidReceiveMemoryWarning")
+        print("applicationDidReceiveMemoryWarning")
         AppEventManager.sharedInstance.logAppEvent(event: "memory_warn", msg: "Application received memory warning")
     }
 
     func applicationProtectedDataDidBecomeAvailable(_ application: UIApplication) {
-        log.info("applicationProtectedDataDidBecomeAvailable")
+        print("applicationProtectedDataDidBecomeAvailable")
         lockEvent.emit(false)
         AppEventManager.sharedInstance.logAppEvent(event: "unlocked", msg: "Phone/keystore unlocked")
     }
 
     func applicationProtectedDataWillBecomeUnavailable(_ application: UIApplication) {
-        log.info("applicationProtectedDataWillBecomeUnavailable")
+        print("applicationProtectedDataWillBecomeUnavailable")
         lockEvent.emit(true)
         AppEventManager.sharedInstance.logAppEvent(event: "locked", msg: "Phone/keystore locked")
     }
@@ -338,15 +330,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        log.error("Failed to register for notifications: \(error.localizedDescription)")
+        print("Failed to register for notifications: \(error.localizedDescription)")
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Failed to register for notifications: \(error.localizedDescription)")
     }
 
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) {
         // If you are receiving a notification message while your app is in the background,
-        // this callback will not be fired till the user taps on the notification launching the application.
+        // this callback will not be fired until the user taps on the notification launching the application.
 
-        log.info("Background push notification received")
+        print("Background push notification received")
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Background push notification received")
         // Print message ID, full message.
         if let messageID = userInfo[gcmMessageIDKey] {
@@ -366,7 +358,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // If you are receiving a notification message while your app is in the background,
         // this callback will not be fired till the user taps on the notification launching the application.
 
-        log.info("Foreground push notification received")
+        print("Foreground push notification received")
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Foreground push notification received")
         // Print message ID, full message.
         if let messageID = userInfo[gcmMessageIDKey] {
@@ -388,7 +380,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     func handleSurveyNotification(userInfo: Dictionary<AnyHashable, Any>) {
         guard let surveyIdsString = userInfo["survey_ids"] else {
-            log.error("no surveyIds found")
+            print("no surveyIds found")
             return
         }
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Received notification while app was killed")
@@ -414,10 +406,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         let surveyIds = try! JSONDecoder().decode([String].self, from: Data(json.utf8))
         for surveyId in surveyIds {
             if !(StudyManager.sharedInstance.currentStudy?.surveyExists(surveyId: surveyId) ?? false) {
-                log.info("Received notification for new survey \(surveyId)")
+                print("Received notification for new survey \(surveyId)")
                 AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Received notification for new survey \(surveyId)")
             } else {
-                log.info("Received notification for survey \(surveyId)")
+                print("Received notification for survey \(surveyId)")
                 AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Received notification for survey \(surveyId)")
             }
         }
@@ -427,12 +419,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     // downloads all of the surveys in the study
     func downloadSurveys(surveyIds: [String], sentTime: TimeInterval = 0) {
         guard let study = StudyManager.sharedInstance.currentStudy else {
-            log.error("Could not find study")
+            print("Could not find study")
             return
         }
         Recline.shared.save(study).then { _ -> Promise<([Survey], Int)> in
             let surveyRequest = GetSurveysRequest()
-            log.info("Requesting surveys")
+            print("Requesting surveys")
             return ApiManager.sharedInstance.arrayPostRequest(surveyRequest)
         }.then {
             surveys, _ -> Promise<Void> in
@@ -442,7 +434,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             self.setActiveSurveys(surveyIds: surveyIds, sentTime: sentTime)
         }.catch {
             error in
-            log.error("Error downloading surveys: \(error)")
+            print("Error downloading surveys: \(error)")
             AppEventManager.sharedInstance.logAppEvent(event: "survey_download", msg: "Error downloading surveys: \(error)")
             // try setting the active surveys anyway, even if download failed, can still use previously downloaded surveys
             self.setActiveSurveys(surveyIds: surveyIds, sentTime: sentTime)
@@ -465,14 +457,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                     }
                     study.activeSurveys[surveyId] = activeSurvey
                 } else {
-                    log.error("Could not get survey")
+                    print("Could not get survey")
                     AppEventManager.sharedInstance.logAppEvent(event: "survey_download", msg: "Could not get obtain survey for ActiveSurvey")
                 }
             }
             // Emits a surveyUpdated event to the listener
             StudyManager.sharedInstance.surveysUpdatedEvent.emit(0)
             Recline.shared.save(study).catch { _ in
-                log.error("Failed to save study after processing surveys")
+                print("Failed to save study after processing surveys")
             }
 
             // set badge number
@@ -512,7 +504,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         if fcmToken != "" {
             let fcmTokenRequest = FCMTokenRequest(fcmToken: fcmToken)
             ApiManager.sharedInstance.makePostRequest(fcmTokenRequest).catch {
-                error in log.error("Error registering FCM token: \(error)")
+                error in print("Error registering FCM token: \(error)")
                 AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Error registering FCM token: \(error)")
             }
         }
@@ -538,7 +530,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             } else {
                 FirebaseApp.configure()
             }
-            log.info("Configured Firebase")
+            print("Configured Firebase")
         }
     }
 
@@ -548,7 +540,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // a thread that checks once a second until we do? or call to register in registration explicitly
         // and note that here.  Guess - I don't think we updated the app to store extra data at registration.
         guard let studySettings = StudyManager.sharedInstance.currentStudy?.studySettings else {
-            log.error("Study not found")
+            print("Study not found")
             AppEventManager.sharedInstance.logAppEvent(
                 event: "push_notification", msg: "Unable to configure Firebase App. No study found.")
             return
@@ -558,7 +550,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         if studySettings.googleAppID == "" {
             // case: no password set? is that a proxy for registered?
             guard let password = PersistentPasswordManager.sharedInstance.passwordForStudy() else {
-                log.error("firebase could not be registered, no user password")
+                print("firebase could not be registered, no user password")
                 return
             }
 
@@ -704,7 +696,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             }
             try Client.shared?.startCrashHandler()
         } catch let error {
-            log.error("\(error)")
+            print("\(error)")
         }
     }
 }
@@ -733,7 +725,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     func userNotificationCenter(
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        log.info("Foreground push notification received in extension")
+        print("Foreground push notification received in extension")
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Foreground push notification received")
         printMessageInfo(notification.request)
         handleAnySurveys(notification.request)
@@ -744,7 +736,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     func userNotificationCenter(
         _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        log.info("Background push notification received in extension")
+        print("Background push notification received in extension")
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Background push notification received")
         printMessageInfo(response.notification.request)
         handleAnySurveys(response.notification.request)
