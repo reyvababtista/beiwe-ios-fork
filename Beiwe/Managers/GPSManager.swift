@@ -1,6 +1,6 @@
-import Foundation
 import CoreLocation
 import Darwin
+import Foundation
 import PromiseKit
 
 protocol DataServiceProtocol {
@@ -11,75 +11,73 @@ protocol DataServiceProtocol {
 }
 
 class DataServiceStatus {
-    let onDurationSeconds: Double;
-    let offDurationSeconds: Double;
-    var currentlyOn: Bool;
-    var nextToggleTime: Date?;
-    let handler: DataServiceProtocol;
+    let onDurationSeconds: Double
+    let offDurationSeconds: Double
+    var currentlyOn: Bool
+    var nextToggleTime: Date?
+    let handler: DataServiceProtocol
 
     init(onDurationSeconds: Int, offDurationSeconds: Int, handler: DataServiceProtocol) {
-        self.onDurationSeconds = Double(onDurationSeconds);
-        self.offDurationSeconds = Double(offDurationSeconds);
-        self.handler = handler;
-        currentlyOn = false;
-        nextToggleTime = Date();
+        self.onDurationSeconds = Double(onDurationSeconds)
+        self.offDurationSeconds = Double(offDurationSeconds)
+        self.handler = handler
+        currentlyOn = false
+        nextToggleTime = Date()
     }
 }
 
-class GPSManager : NSObject, CLLocationManagerDelegate, DataServiceProtocol {
-    let locationManager = CLLocationManager();
-    var lastLocations: [CLLocation]?;
-    var isCollectingGps: Bool = false;
-    var dataCollectionServices: [DataServiceStatus] = [ ];
-    var gpsStore: DataStorage?;
-    var areServicesRunning = false;
-    static let headers = [ "timestamp", "latitude", "longitude", "altitude", "accuracy"];
-    var isDeferringUpdates = false;
-    var nextSurveyUpdate: TimeInterval = 0, nextServiceDate: TimeInterval = 0;
-    var timer: Timer?;
-    var enableGpsFuzzing: Bool = false;
-    var fuzzGpsLatitudeOffset: Double = 0.0;
-    var fuzzGpsLongitudeOffset: Double = 0.0;
+class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
+    let locationManager = CLLocationManager()
+    var lastLocations: [CLLocation]?
+    var isCollectingGps: Bool = false
+    var dataCollectionServices: [DataServiceStatus] = []
+    var gpsStore: DataStorage?
+    var areServicesRunning = false
+    static let headers = ["timestamp", "latitude", "longitude", "altitude", "accuracy"]
+    var isDeferringUpdates = false
+    var nextSurveyUpdate: TimeInterval = 0, nextServiceDate: TimeInterval = 0
+    var timer: Timer?
+    var enableGpsFuzzing: Bool = false
+    var fuzzGpsLatitudeOffset: Double = 0.0
+    var fuzzGpsLongitudeOffset: Double = 0.0
 
     func gpsAllowed() -> Bool {
-        return CLLocationManager.locationServicesEnabled() &&  CLLocationManager.authorizationStatus() == .authorizedAlways;
+        return CLLocationManager.locationServicesEnabled() && CLLocationManager.authorizationStatus() == .authorizedAlways
     }
 
     func startGpsAndTimer() -> Bool {
-
-        locationManager.delegate = self;
-        locationManager.activityType = CLActivityType.other;
+        locationManager.delegate = self
+        locationManager.activityType = CLActivityType.other
         if #available(iOS 9.0, *) {
             locationManager.allowsBackgroundLocationUpdates = true
         } else {
             // Fallback on earlier versions
-        };
+        }
         locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
-        locationManager.distanceFilter = 99999;
-        locationManager.requestAlwaysAuthorization();
-        locationManager.pausesLocationUpdatesAutomatically = false;
-        locationManager.startUpdatingLocation();
+        locationManager.distanceFilter = 99999
+        locationManager.requestAlwaysAuthorization()
+        locationManager.pausesLocationUpdatesAutomatically = false
+        locationManager.startUpdatingLocation()
         locationManager.startMonitoringSignificantLocationChanges()
 
-        if (!gpsAllowed()) {
-            return false;
+        if !gpsAllowed() {
+            return false
         }
 
         areServicesRunning = true
         startPollTimer(1.0)
 
-        return true;
-
+        return true
     }
 
     func stopAndClear() -> Promise<Void> {
-        locationManager.stopUpdatingLocation();
+        locationManager.stopUpdatingLocation()
         areServicesRunning = false
-        clearPollTimer();
-        var promise = Promise();
+        clearPollTimer()
+        var promise = Promise()
         for dataStatus in dataCollectionServices {
             // use .done because not returning anything
-            promise = promise.done(on: DispatchQueue.global(qos: .default)) {_ in
+            promise = promise.done(on: DispatchQueue.global(qos: .default)) { _ in
                 dataStatus.handler.finishCollecting().then(on: DispatchQueue.global(qos: .default)) {
                     // need to explicitly state return type
                     _ -> Promise<Void> in
@@ -87,170 +85,172 @@ class GPSManager : NSObject, CLLocationManagerDelegate, DataServiceProtocol {
                     return Promise()
 
                 }.catch(on: DispatchQueue.global(qos: .default)) {
-                        _ in print("err from finish collecting")
+                    _ in print("err from finish collecting")
                 }
             }
         }
 
-        dataCollectionServices.removeAll();
-        return promise;
+        dataCollectionServices.removeAll()
+        return promise
     }
 
     func dispatchToServices() -> TimeInterval {
-        let currentDate = Date().timeIntervalSince1970;
-        var nextServiceDate = currentDate + (60 * 60);
+        let currentDate = Date().timeIntervalSince1970
+        var nextServiceDate = currentDate + (60 * 60)
 
         for dataStatus in dataCollectionServices {
             if let nextToggleTime = dataStatus.nextToggleTime {
-                var serviceDate = nextToggleTime.timeIntervalSince1970;
-                if (serviceDate <= currentDate) {
-                    if (dataStatus.currentlyOn) {
-                        dataStatus.handler.pauseCollecting();
-                        dataStatus.currentlyOn = false;
-                        dataStatus.nextToggleTime = Date(timeIntervalSince1970: currentDate + dataStatus.offDurationSeconds);
+                var serviceDate = nextToggleTime.timeIntervalSince1970
+                if serviceDate <= currentDate {
+                    if dataStatus.currentlyOn {
+                        dataStatus.handler.pauseCollecting()
+                        dataStatus.currentlyOn = false
+                        dataStatus.nextToggleTime = Date(timeIntervalSince1970: currentDate + dataStatus.offDurationSeconds)
                     } else {
-                        dataStatus.handler.startCollecting();
-                        dataStatus.currentlyOn = true;
+                        dataStatus.handler.startCollecting()
+                        dataStatus.currentlyOn = true
                         /* If there is no off time, we run forever... */
-                        if (dataStatus.offDurationSeconds == 0) {
-                            dataStatus.nextToggleTime = nil;
+                        if dataStatus.offDurationSeconds == 0 {
+                            dataStatus.nextToggleTime = nil
                         } else {
-                            dataStatus.nextToggleTime = Date(timeIntervalSince1970: currentDate + dataStatus.onDurationSeconds);
+                            dataStatus.nextToggleTime = Date(timeIntervalSince1970: currentDate + dataStatus.onDurationSeconds)
                         }
                     }
-                    serviceDate = dataStatus.nextToggleTime?.timeIntervalSince1970 ?? DBL_MAX;
+                    serviceDate = dataStatus.nextToggleTime?.timeIntervalSince1970 ?? DBL_MAX
                 }
-                nextServiceDate = min(nextServiceDate, serviceDate);
+                nextServiceDate = min(nextServiceDate, serviceDate)
             }
         }
-        return nextServiceDate;
+        return nextServiceDate
     }
 
     @objc func pollServices() {
-        log.info("Polling...");
-        clearPollTimer();
+        log.info("Polling...")
+        clearPollTimer()
         AppEventManager.sharedInstance.logAppEvent(event: "poll_service", msg: "Polling service")
-        if (!areServicesRunning) {
+        if !areServicesRunning {
             return
         }
 
-        nextServiceDate = dispatchToServices();
+        nextServiceDate = dispatchToServices()
 
-        let currentTime = Date().timeIntervalSince1970;
-        StudyManager.sharedInstance.periodicNetworkTransfers();
+        let currentTime = Date().timeIntervalSince1970
+        StudyManager.sharedInstance.periodicNetworkTransfers()
 
-        if (currentTime > nextSurveyUpdate) {
-            nextSurveyUpdate = StudyManager.sharedInstance.updateActiveSurveys();
+        if currentTime > nextSurveyUpdate {
+            nextSurveyUpdate = StudyManager.sharedInstance.updateActiveSurveys()
         }
 
-        setTimerForService();
-
+        setTimerForService()
     }
 
     func setTimerForService() {
-        nextServiceDate = min(nextSurveyUpdate, nextServiceDate);
-        let currentTime = Date().timeIntervalSince1970;
-        let nextServiceSeconds = max(nextServiceDate - currentTime, 1.0);
+        nextServiceDate = min(nextSurveyUpdate, nextServiceDate)
+        let currentTime = Date().timeIntervalSince1970
+        let nextServiceSeconds = max(nextServiceDate - currentTime, 1.0)
         startPollTimer(nextServiceSeconds)
     }
 
     func clearPollTimer() {
         if let timer = timer {
-            timer.invalidate();
-            self.timer = nil;
+            timer.invalidate()
+            self.timer = nil
         }
     }
 
     func resetNextSurveyUpdate(_ time: Double) {
         nextSurveyUpdate = time
-        if (nextSurveyUpdate < nextServiceDate) {
-            setTimerForService();
+        if nextSurveyUpdate < nextServiceDate {
+            setTimerForService()
         }
     }
 
     func startPollTimer(_ seconds: Double) {
-        clearPollTimer();
+        clearPollTimer()
         timer = Timer.scheduledTimer(timeInterval: seconds, target: self, selector: #selector(pollServices), userInfo: nil, repeats: false)
-        log.info("Timer set for: \(seconds)");
+        log.info("Timer set for: \(seconds)")
         AppEventManager.sharedInstance.logAppEvent(event: "set_timer", msg: "Set timer for \(seconds) seconds", d1: String(seconds))
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        if (!areServicesRunning) {
+        if !areServicesRunning {
             return
         }
 
-        if (isCollectingGps) {
-            recordGpsData(manager, locations: locations);
+        if isCollectingGps {
+            recordGpsData(manager, locations: locations)
         }
     }
 
     func locationManager(_ manager: CLLocationManager, didFinishDeferredUpdatesWithError error: Error?) {
-        isDeferringUpdates = false;
+        isDeferringUpdates = false
     }
 
     func recordGpsData(_ manager: CLLocationManager, locations: [CLLocation]) {
-        //print("Record locations: \(locations)");
+        // print("Record locations: \(locations)");
         for loc in locations {
-            var data: [String] = [];
+            var data: [String] = []
 
             //     static let headers = [ "timestamp", "latitude", "longitude", "altitude", "accuracy", "vert_accuracy"];
             var lat = loc.coordinate.latitude
             var lng = loc.coordinate.longitude
             if enableGpsFuzzing {
                 lat = lat + fuzzGpsLatitudeOffset
-                lng = ((lng + fuzzGpsLongitudeOffset + 180.0).truncatingRemainder(dividingBy: 360.0) ) - 180.0
+                lng = ((lng + fuzzGpsLongitudeOffset + 180.0).truncatingRemainder(dividingBy: 360.0)) - 180.0
             }
             data.append(String(Int64(loc.timestamp.timeIntervalSince1970 * 1000)))
             data.append(String(lat))
             data.append(String(lng))
             data.append(String(loc.altitude))
             data.append(String(loc.horizontalAccuracy))
-            gpsStore?.store(data);
+            gpsStore?.store(data)
         }
     }
 
     func addDataService(_ on: Int, off: Int, handler: DataServiceProtocol) {
-        let dataServiceStatus = DataServiceStatus(onDurationSeconds: on, offDurationSeconds: off, handler: handler);
-        if  handler.initCollecting() {
-            dataCollectionServices.append(dataServiceStatus);
+        let dataServiceStatus = DataServiceStatus(onDurationSeconds: on, offDurationSeconds: off, handler: handler)
+        if handler.initCollecting() {
+            dataCollectionServices.append(dataServiceStatus)
         }
-
     }
 
     func addDataService(_ handler: DataServiceProtocol) {
-        addDataService(1, off: 0, handler: handler);
+        addDataService(1, off: 0, handler: handler)
     }
+
     /* Data service protocol */
 
     func initCollecting() -> Bool {
-        guard  gpsAllowed() else {
+        guard gpsAllowed() else {
             log.error("GPS not enabled.  Not initializing collection")
-            return false;
+            return false
         }
-        gpsStore = DataStorageManager.sharedInstance.createStore("gps", headers: GPSManager.headers);
-        isCollectingGps = false;
-        return true;
+        gpsStore = DataStorageManager.sharedInstance.createStore("gps", headers: GPSManager.headers)
+        isCollectingGps = false
+        return true
     }
+
     func startCollecting() {
-        log.info("Turning GPS collection on");
+        log.info("Turning GPS collection on")
         AppEventManager.sharedInstance.logAppEvent(event: "gps_on", msg: "GPS collection on")
-        isCollectingGps = true;
+        isCollectingGps = true
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = kCLDistanceFilterNone;
+        locationManager.distanceFilter = kCLDistanceFilterNone
     }
+
     func pauseCollecting() {
-        log.info("Pausing GPS collection");
+        log.info("Pausing GPS collection")
         AppEventManager.sharedInstance.logAppEvent(event: "gps_off", msg: "GPS collection off")
-        isCollectingGps = false;
+        isCollectingGps = false
         locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
-        locationManager.distanceFilter = 99999;
-        gpsStore?.flush();
+        locationManager.distanceFilter = 99999
+        gpsStore?.flush()
     }
+
     func finishCollecting() -> Promise<Void> {
-        pauseCollecting();
-        isCollectingGps = false;
-        gpsStore = nil;
-        return DataStorageManager.sharedInstance.closeStore("gps");
+        pauseCollecting()
+        isCollectingGps = false
+        gpsStore = nil
+        return DataStorageManager.sharedInstance.closeStore("gps")
     }
 }
