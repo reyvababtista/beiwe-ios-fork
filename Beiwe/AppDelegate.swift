@@ -1,16 +1,15 @@
-import Sentry
-import UIKit
-import Fabric
-import Crashlytics
-import PromiseKit
 import CoreMotion
+import Crashlytics
+import EmitterKit
+import Fabric
+import Firebase
+import Foundation
+import PromiseKit
 import ReachabilitySwift
 import ResearchKit
+import Sentry
+import UIKit
 import XCGLogger
-import EmitterKit
-import Foundation
-import Firebase
-
 
 let log = XCGLogger(identifier: "advancedLogger", includeDefaultDestinations: false)
 
@@ -43,12 +42,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     // app state
     var isLoggedIn: Bool = false
     var timeEnteredBackground: Date?
-    
-    
+
     func setupLogging() {
         // Create a destination for the system console log (via NSLog), add the destination to the logger
         let systemLogDestination = AppleSystemLogDestination(owner: log, identifier: "advancedLogger.systemLogDestination")
-        systemLogDestination.outputLevel = debugEnabled ? .debug : .warning
+        systemLogDestination.outputLevel = self.debugEnabled ? .debug : .warning
         systemLogDestination.showLogIdentifier = true
         systemLogDestination.showFunctionName = true
         systemLogDestination.showThreadName = true
@@ -72,13 +70,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func initializeReachability() {
         do {
-            reachability = try Reachability()
-            try reachability!.startNotifier()
+            self.reachability = try Reachability()
+            try self.reachability!.startNotifier()
         } catch {
             print("Unable to create or start Reachability")
         }
     }
-    
+
     func printLoadedStudyInfo() {
         print("\n\n\n")
         print("patient id: '\(String(describing: ApiManager.sharedInstance.patientId))'")
@@ -93,16 +91,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     static func sharedInstance() -> AppDelegate {
         return UIApplication.shared.delegate as! AppDelegate
     }
-    
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // initialize Sentry IMMEDIATELY (this do-catch is required because every line can fail)
-        setupSentry()
-        setupLogging()
+        self.setupSentry()
+        self.setupLogging()
         // setupCrashLytics()  // not currently using crashlytics
         AppEventManager.sharedInstance.didLaunch(launchOptions: launchOptions)
         // appStartLog()  // this is very verbose
-        initializeReachability()
-        initializeUI()
+        self.initializeReachability()
+        self.initializeUI()
 
         // determine whether phone call bump is available (should be true ios 10+? or is there a permission you have to ask for?)
         self.canOpenTel = UIApplication.shared.canOpenURL(URL(string: "tel:6175551212")!)
@@ -130,40 +128,40 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             UNUserNotificationCenter.current().removeAllDeliveredNotifications()
             // transition to loaded app state
             self.transitionToLoadedAppState()
-        }.catch { err in
+        }.catch { _ in
             print("Database open failed, probably should just crash the app tbh")
         }
 
-        firebaseLoop()
+        self.firebaseLoop()
         return true
     }
-    
+
     func transitionToLoadedAppState() {
         self.transition_count += 1
-        print("transitionToLoadedAppState incremented to \(transition_count)")
+        print("transitionToLoadedAppState incremented to \(self.transition_count)")
 
         // anything that depends on app state at initialization time needs to go after this has run
         if let currentStudy = StudyManager.sharedInstance.currentStudy {
             if currentStudy.participantConsented {
                 StudyManager.sharedInstance.startStudyDataServices()
             }
-            if !isLoggedIn {
+            if !self.isLoggedIn {
                 // Load up the log in view
-                changeRootViewControllerWithIdentifier("login")
+                self.changeRootViewControllerWithIdentifier("login")
             } else {
                 // We are logged in, so if we've completed onboarding load main interface
                 // Otherwise continue onboarding.
                 if currentStudy.participantConsented {
-                    changeRootViewControllerWithIdentifier("mainView")
+                    self.changeRootViewControllerWithIdentifier("mainView")
                 } else {
-                    changeRootViewController(ConsentManager().consentViewController)
+                    self.changeRootViewController(ConsentManager().consentViewController)
                 }
             }
-            initializeFirebase() // this is safe to call
+            self.initializeFirebase() // this is safe to call
         } else {
             // If there is no study loaded, then it's obvious.  We need the onboarding flow
             // from the beginning.
-            changeRootViewController(OnboardingManager().onboardingViewController)
+            self.changeRootViewController(OnboardingManager().onboardingViewController)
         }
     }
 
@@ -171,7 +169,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         var storedPassword = PersistentPasswordManager.sharedInstance.passwordForStudy()!
         // print("incoming password: '\(password)'")
         // print("current password: '\(storedPassword)'")
-        
+
         // if there is somehow a situation where no stored password set, take the new password and set it.
         //  THIS EXISTS PURELY TO FIX A THEORETICAL BUG WHERE PASSWORDS WERE SOMEHOW RESET,
         //  BUT THE SOURCE OF THAT BUG WAS PROBABLY A CHANGE OF APP BUILD CREDENTIALS.
@@ -182,16 +180,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
         if password == storedPassword {
             ApiManager.sharedInstance.password = storedPassword
-            isLoggedIn = true
+            self.isLoggedIn = true
             return true
         }
         return false
     }
-    
+
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////// APPLICATION WILL X ///////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
     func applicationWillEnterForeground(_ application: UIApplication) {
         print("applicationWillEnterForeground")
         // Called as part of the transition from the background to the inactive (Eli does not know who wrote "inactive") state.
@@ -210,24 +208,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             let loginExpires = timeEnteredBackground.addingTimeInterval(Double(studySettings.secondsBeforeAutoLogout))
             if loginExpires.compare(Date()) == ComparisonResult.orderedAscending {
                 // expired.  Log 'em out
-                isLoggedIn = false
-                transitionToLoadedAppState()
+                self.isLoggedIn = false
+                self.transitionToLoadedAppState()
             }
         } else {
-            isLoggedIn = false
+            self.isLoggedIn = false
         }
     }
-    
+
     func application(_ application: UIApplication, willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         print("applicationWillFinishLaunchingWithOptions")
         return true
     }
-    
+
     func applicationWillTerminate(_ application: UIApplication) {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
         print("applicationWillTerminate")
         AppEventManager.sharedInstance.logAppEvent(event: "terminate", msg: "Application terminating")
-        
+
         let dispatchGroup = DispatchGroup()
         dispatchGroup.enter()
         StudyManager.sharedInstance.stop().done(on: DispatchQueue.global(qos: .default)) { _ in
@@ -238,7 +236,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         dispatchGroup.wait()
         print("applicationWillTerminate exiting")
     }
-    
+
     func applicationWillResignActive(_ application: UIApplication) {
         // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
         // Use this method to pause ongoing tasks, disable timers, and throttle down OpenGL ES frame rates. Games should use this method to pause the game.
@@ -248,7 +246,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////// APPLICATION DID X ////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
     func applicationDidBecomeActive(_ application: UIApplication) {
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
         print("applicationDidBecomeActive")
@@ -257,7 +255,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // Send FCM Token everytime the app launches
         if ApiManager.sharedInstance.patientId != "" /* && FirebaseApp.app() != nil*/ {
             if let token = Messaging.messaging().fcmToken {
-                sendFCMToken(fcmToken: token)
+                self.sendFCMToken(fcmToken: token)
             }
         }
     }
@@ -266,11 +264,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
         // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
         print("applicationDidEnterBackground")
-        timeEnteredBackground = Date()
+        self.timeEnteredBackground = Date()
         AppEventManager.sharedInstance.logAppEvent(event: "background", msg: "Application entered background")
     }
 
-    
     func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
         print("applicationDidReceiveMemoryWarning")
         AppEventManager.sharedInstance.logAppEvent(event: "memory_warn", msg: "Application received memory warning")
@@ -278,22 +275,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func applicationProtectedDataDidBecomeAvailable(_ application: UIApplication) {
         print("applicationProtectedDataDidBecomeAvailable")
-        lockEvent.emit(false)
+        self.lockEvent.emit(false)
         AppEventManager.sharedInstance.logAppEvent(event: "unlocked", msg: "Phone/keystore unlocked")
     }
 
     func applicationProtectedDataWillBecomeUnavailable(_ application: UIApplication) {
         print("applicationProtectedDataWillBecomeUnavailable")
-        lockEvent.emit(true)
+        self.lockEvent.emit(true)
         AppEventManager.sharedInstance.logAppEvent(event: "locked", msg: "Phone/keystore locked")
     }
 
-    
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////// PERMISSIONS //////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
-    
+
     // this function gets called when CLAuthorization status changes
     func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
         switch status {
@@ -303,31 +298,29 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             break
         case .authorizedWhenInUse:
             // If authorized when in use
-            locationPermission = false
+            self.locationPermission = false
             break
         case .authorizedAlways:
             // If always authorized
-            locationPermission = true
+            self.locationPermission = true
             break
         case .restricted:
             // If restricted by e.g. parental controls. User can't enable Location Services
-            locationPermission = false
+            self.locationPermission = false
             break
         case .denied:
             // If user denied your app access to Location Services, but can grant access from Settings.app
-            locationPermission = false
+            self.locationPermission = false
             break
         default:
             break
         }
     }
-    
-    
+
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////// REAL NOTIFICATION CODE ///////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
-    
+
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         print("Failed to register for notifications: \(error.localizedDescription)")
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Failed to register for notifications: \(error.localizedDescription)")
@@ -347,10 +340,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
         // if the notification is for a survey
         if userInfo["survey_ids"] != nil {
-            handleSurveyNotification(userInfo: userInfo)
+            self.handleSurveyNotification(userInfo: userInfo)
         }
     }
-    
+
     // called when receiving notification while app is in foreground
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
@@ -367,7 +360,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
         // if the notification is for a survey
         if userInfo["survey_ids"] != nil {
-            handleSurveyNotification(userInfo: userInfo)
+            self.handleSurveyNotification(userInfo: userInfo)
         }
 
         completionHandler(UIBackgroundFetchResult.newData)
@@ -376,18 +369,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////// MISC BEIWE STUFF /////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
     func handleSurveyNotification(userInfo: Dictionary<AnyHashable, Any>) {
         guard let surveyIdsString = userInfo["survey_ids"] else {
             print("no surveyIds found")
             return
         }
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Received notification while app was killed")
-        let surveyIds = jsonToSurveyIdArray(json: surveyIdsString as! String)
+        let surveyIds = self.jsonToSurveyIdArray(json: surveyIdsString as! String)
         if let sentTimeString = userInfo["sent_time"] as! String? {
-            downloadSurveys(surveyIds: surveyIds, sentTime: stringToTimeInterval(timeString: sentTimeString))
+            self.downloadSurveys(surveyIds: surveyIds, sentTime: self.stringToTimeInterval(timeString: sentTimeString))
         } else {
-            downloadSurveys(surveyIds: surveyIds)
+            self.downloadSurveys(surveyIds: surveyIds)
         }
     }
 
@@ -399,7 +392,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         let sentTime = dateFormatter.date(from: timeString)!
         return sentTime.timeIntervalSince1970
     }
-    
+
     // converts json string to an array of strings
     func jsonToSurveyIdArray(json: String) -> [String] {
         let surveyIds = try! JSONDecoder().decode([String].self, from: Data(json.utf8))
@@ -414,7 +407,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         }
         return surveyIds
     }
-    
+
     // downloads all of the surveys in the study
     func downloadSurveys(surveyIds: [String], sentTime: TimeInterval = 0) {
         guard let study = StudyManager.sharedInstance.currentStudy else {
@@ -474,7 +467,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////// Firebase STUFF ///////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
     func firebaseLoop() {
         // Thue app cannot register with firebase until it gets a token, which only occurs at registration time, and it needs access to the appIelegate
         // This must be called after FirebaseApp.configure(), so we dispatch it and wait until the app is initialized from RegistrationViewController...
@@ -497,7 +490,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             }
         }
     }
-    
+
     func sendFCMToken(fcmToken: String) {
         print("FCM Token: \(fcmToken)")
         if fcmToken != "" {
@@ -585,21 +578,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func initializeFirebase() {
         // safely checks whether to start firebase.
         if ApiManager.sharedInstance.patientId != "" && FirebaseApp.app() == nil {
-            checkFirebaseCredentials()
+            self.checkFirebaseCredentials()
             let token = Messaging.messaging().fcmToken
             AppDelegate.sharedInstance().sendFCMToken(fcmToken: token ?? "")
         }
     }
-    
+
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////// UI STUFF ///////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
+
     func initializeUI() {
         // some ui stuff
         let rkAppearance = UIView.appearance(whenContainedInInstancesOf: [ORKTaskViewController.self])
         rkAppearance.tintColor = AppColors.tintColor
-        storyboard = UIStoryboard(name: "Main", bundle: Bundle.main)
+        self.storyboard = UIStoryboard(name: "Main", bundle: Bundle.main)
         self.window = UIWindow(frame: UIScreen.main.bounds)
         self.window?.rootViewController = UIStoryboard(
             name: "LaunchScreen", bundle: Bundle.main).instantiateViewController(withIdentifier: "launchScreen")
@@ -607,16 +600,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     }
 
     func changeRootViewControllerWithIdentifier(_ identifier: String!) {
-        if identifier == currentRootView {
+        if identifier == self.currentRootView {
             return
         }
         let desiredViewController: UIViewController = (self.storyboard?.instantiateViewController(withIdentifier: identifier))!
 
-        changeRootViewController(desiredViewController, identifier: identifier)
+        self.changeRootViewController(desiredViewController, identifier: identifier)
     }
 
     func changeRootViewController(_ desiredViewController: UIViewController, identifier: String? = nil) {
-        currentRootView = identifier
+        self.currentRootView = identifier
 
         let snapshot: UIView = (self.window?.snapshotView(afterScreenUpdates: true))!
         desiredViewController.view.addSubview(snapshot)
@@ -627,7 +620,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             snapshot.layer.opacity = 0
             snapshot.layer.transform = CATransform3DMakeScale(1.5, 1.5, 1.5)
         }, completion: {
-            (value: Bool) in
+            (_: Bool) in
             snapshot.removeFromSuperview()
         })
     }
@@ -640,16 +633,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             view = "registerView"
         }
         self.window = UIWindow(frame: UIScreen.main.bounds)
-        self.window?.rootViewController = storyboard!.instantiateViewController(withIdentifier: view) as UIViewController?
+        self.window?.rootViewController = self.storyboard!.instantiateViewController(withIdentifier: view) as UIViewController?
         self.window!.makeKeyAndVisible()
     }
 
-    
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////// CRASHLYTICS STUFF ////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
-    
+
     func setupCrashLytics() {
         Fabric.with([Crashlytics.self])
         let crashlyticsLogDestination = XCGCrashlyticsLogDestination(owner: log, identifier: "advancedlogger.crashlyticsDestination")
@@ -661,24 +652,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         crashlyticsLogDestination.showFileName = true
         crashlyticsLogDestination.showLineNumber = true
         crashlyticsLogDestination.showDate = true
-        
+
         // Add the destination to the logger
         log.add(destination: crashlyticsLogDestination)
         log.logAppDetails()
     }
-    
+
     func setDebuggingUser(_ username: String) {
         // TODO: Use the current user's information
         // You can call any combination of these three methods
-        //Crashlytics.sharedInstance().setUserEmail("user@fabric.io")
-        //Crashlytics.sharedInstance().setUserIdentifier(username)
-        //Crashlytics.sharedInstance().setUserName("Test User")
+        // Crashlytics.sharedInstance().setUserEmail("user@fabric.io")
+        // Crashlytics.sharedInstance().setUserIdentifier(username)
+        // Crashlytics.sharedInstance().setUserName("Test User")
     }
-    
+
     func crash() {
         Crashlytics.sharedInstance().crash()
     }
-    
+
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////// SENTRY STUFF ////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -715,7 +706,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         // grab the survey ids, call if the notification is for a survey
         let userInfoDict: [AnyHashable: Any] = notificationRequest.content.userInfo
         if userInfoDict["survey_ids"] != nil {
-            handleSurveyNotification(userInfo: userInfoDict)
+            self.handleSurveyNotification(userInfo: userInfoDict)
         }
     }
 
@@ -726,8 +717,8 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     ) {
         print("Foreground push notification received in extension")
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Foreground push notification received")
-        printMessageInfo(notification.request)
-        handleAnySurveys(notification.request)
+        self.printMessageInfo(notification.request)
+        self.handleAnySurveys(notification.request)
         completionHandler([]) // Change to preferred presentation option
     }
 
@@ -737,13 +728,13 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     ) {
         print("Background push notification received in extension")
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Background push notification received")
-        printMessageInfo(response.notification.request)
-        handleAnySurveys(response.notification.request)
+        self.printMessageInfo(response.notification.request)
+        self.handleAnySurveys(response.notification.request)
         completionHandler()
     }
 }
-// [END ios_10_message_handling]
 
+// [END ios_10_message_handling]
 
 extension AppDelegate: MessagingDelegate {
     // [START firebase refresh_token]
@@ -760,6 +751,7 @@ extension AppDelegate: MessagingDelegate {
             self.sendFCMToken(fcmToken: fcmToken)
         }
     }
+
     // [END refresh_token]
 
     // [START ios_10_data_message]

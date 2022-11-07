@@ -23,10 +23,9 @@ struct BodyResponse: Mappable {
     init?(map: Map) {}
 
     mutating func mapping(map: Map) {
-        body <- map["body"]
+        self.body <- map["body"]
     }
 }
-
 
 class ApiManager {
     static let sharedInstance = ApiManager()
@@ -37,7 +36,7 @@ class ApiManager {
 
     var password: String {
         set {
-            hashedPassword = Crypto.sharedInstance.sha256Base64URL(newValue)
+            self.hashedPassword = Crypto.sharedInstance.sha256Base64URL(newValue)
         }
         get {
             return ""
@@ -48,7 +47,7 @@ class ApiManager {
     var patientId: String = ""
     var customApiUrl: String?
     var baseApiUrl: String {
-        return customApiUrl ?? defaultBaseApiUrl
+        return self.customApiUrl ?? self.defaultBaseApiUrl
     }
 
     func generateHeaders(_ password: String? = nil) -> [String: String] {
@@ -74,15 +73,14 @@ class ApiManager {
 
     func makePostRequest<T: ApiRequest>(_ requestObject: T, password: String? = nil) -> Promise<(T.ApiReturnType, Int)> where T: Mappable {
         var parameters = requestObject.toJSON()
-        parameters["password"] = (password == nil) ? hashedPassword : Crypto.sharedInstance.sha256Base64URL(password!)
+        parameters["password"] = (password == nil) ? self.hashedPassword : Crypto.sharedInstance.sha256Base64URL(password!)
         parameters["device_id"] = PersistentAppUUID.sharedInstance.uuid
-        parameters["patient_id"] = patientId
-        
-        
+        parameters["patient_id"] = self.patientId
+
         // parameters.removeValueForKey("password");
         // parameters.removeValueForKey("device_id");
         // parameters.removeValueForKey("patient_id");
-        let headers = generateHeaders(password)
+        let headers = self.generateHeaders(password)
 
         return Promise { seal in
             Alamofire.request(baseApiUrl + T.apiEndpoint, method: .post, parameters: parameters, headers: headers)
@@ -142,19 +140,18 @@ class ApiManager {
         }
     }
 
-
     func arrayPostRequest<T: ApiRequest>(_ requestObject: T) -> Promise<([T.ApiReturnType], Int)> where T: Mappable {
         var parameters = requestObject.toJSON()
         // credential parameters
-        parameters["password"] = hashedPassword
+        parameters["password"] = self.hashedPassword
         parameters["device_id"] = PersistentAppUUID.sharedInstance.uuid
-        parameters["patient_id"] = patientId
+        parameters["patient_id"] = self.patientId
         // tracking info
         parameters["version_code"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         // parameters["version_name"] =  // There isn't really anything to stick into this one for ios
         parameters["os_version"] = UIDevice.current.systemVersion
-        
-        let headers = generateHeaders()
+
+        let headers = self.generateHeaders()
         return Promise { seal in
             Alamofire.request(baseApiUrl + T.apiEndpoint, method: .post, parameters: parameters, headers: headers)
                 .responseString { response in
@@ -180,56 +177,56 @@ class ApiManager {
     }
 
     func makeMultipartUploadRequest<T: ApiRequest>(_ requestObject: T, file: URL) -> Promise<(T.ApiReturnType, Int)> where T: Mappable {
-        var parameters = requestObject.toJSON();
-        parameters["password"] = hashedPassword;
-        parameters["device_id"] = PersistentAppUUID.sharedInstance.uuid;
-        parameters["patient_id"] = patientId;
-        //parameters.removeValueForKey("password");
-        //parameters.removeValueForKey("device_id");
-        //parameters.removeValueForKey("patient_id");
+        var parameters = requestObject.toJSON()
+        parameters["password"] = self.hashedPassword
+        parameters["device_id"] = PersistentAppUUID.sharedInstance.uuid
+        parameters["patient_id"] = self.patientId
+        // parameters.removeValueForKey("password");
+        // parameters.removeValueForKey("device_id");
+        // parameters.removeValueForKey("patient_id");
 
-        let headers = generateHeaders()
-        let url = baseApiUrl + T.apiEndpoint
+        let headers = self.generateHeaders()
+        let url = self.baseApiUrl + T.apiEndpoint
         return Promise { seal in
             Alamofire.upload(multipartFormData: { multipartFormData in
-                 for (k, v) in parameters {
-                     multipartFormData.append(String(describing: v).data(using: .utf8)!, withName: k)
-                 }
-                 multipartFormData.append(file, withName: "file")
-             },
-             to: url,
-             method: .post,
-             headers: headers,
-             encodingCompletion: { encodingResult in
-                 switch encodingResult {
-                 case let .success(upload, _, _):
-                     upload.responseString { response in
-                         switch response.result {
-                         case let .failure(error):
-                             seal.reject(error)
-                         case .success:
-                             let statusCode = response.response?.statusCode
-                             if let statusCode = statusCode, statusCode < 200 || statusCode >= 400 {
-                                 seal.reject(ApiErrors.failedStatus(code: statusCode))
-                             } else {
-                                 var returnObject: T.ApiReturnType?
-                                 if T.ApiReturnType.self == BodyResponse.self {
-                                     returnObject = BodyResponse(body: response.result.value) as? T.ApiReturnType
-                                 } else {
-                                     returnObject = Mapper<T.ApiReturnType>().map(JSONString: response.result.value ?? "")
+                                 for (k, v) in parameters {
+                                     multipartFormData.append(String(describing: v).data(using: .utf8)!, withName: k)
                                  }
-                                 if let returnObject = returnObject {
-                                     seal.fulfill((returnObject, statusCode ?? 0))
-                                 } else {
-                                     seal.reject(ApiManager.serialErr())
+                                 multipartFormData.append(file, withName: "file")
+                             },
+                             to: url,
+                             method: .post,
+                             headers: headers,
+                             encodingCompletion: { encodingResult in
+                                 switch encodingResult {
+                                 case let .success(upload, _, _):
+                                     upload.responseString { response in
+                                         switch response.result {
+                                         case let .failure(error):
+                                             seal.reject(error)
+                                         case .success:
+                                             let statusCode = response.response?.statusCode
+                                             if let statusCode = statusCode, statusCode < 200 || statusCode >= 400 {
+                                                 seal.reject(ApiErrors.failedStatus(code: statusCode))
+                                             } else {
+                                                 var returnObject: T.ApiReturnType?
+                                                 if T.ApiReturnType.self == BodyResponse.self {
+                                                     returnObject = BodyResponse(body: response.result.value) as? T.ApiReturnType
+                                                 } else {
+                                                     returnObject = Mapper<T.ApiReturnType>().map(JSONString: response.result.value ?? "")
+                                                 }
+                                                 if let returnObject = returnObject {
+                                                     seal.fulfill((returnObject, statusCode ?? 0))
+                                                 } else {
+                                                     seal.reject(ApiManager.serialErr())
+                                                 }
+                                             }
+                                         }
+                                     }
+                                 case let .failure(encodingError):
+                                     seal.reject(encodingError)
                                  }
                              }
-                         }
-                     }
-                 case let .failure(encodingError):
-                     seal.reject(encodingError)
-                 }
-             }
             )
         }
     }

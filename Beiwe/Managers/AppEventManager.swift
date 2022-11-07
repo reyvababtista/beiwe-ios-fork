@@ -8,7 +8,7 @@ class AppEventManager: DataServiceProtocol {
     var launchTimestamp: Date = Date()
     var launchOptions: String = ""
     var launchId: String {
-        return String(Int64(launchTimestamp.timeIntervalSince1970 * 1000))
+        return String(Int64(self.launchTimestamp.timeIntervalSince1970 * 1000))
     }
 
     var seq = 0
@@ -19,12 +19,12 @@ class AppEventManager: DataServiceProtocol {
     var store: DataStorage?
     var listeners: [Listener] = []
     var isStoreOpen: Bool {
-        return store != nil
+        return self.store != nil
     }
 
     func didLaunch(launchOptions: [UIApplication.LaunchOptionsKey: Any]?) {
         self.launchOptions = ""
-        launchTimestamp = Date()
+        self.launchTimestamp = Date()
         if (launchOptions?.index(forKey: UIApplication.LaunchOptionsKey.location)) != nil {
             self.launchOptions = "location"
             /*
@@ -48,7 +48,7 @@ class AppEventManager: DataServiceProtocol {
              }
          }
           */
-        log.info("AppEvent didLaunch, launchId: \(launchId), options: \(self.launchOptions)")
+        log.info("AppEvent didLaunch, launchId: \(self.launchId), options: \(self.launchOptions)")
     }
 
     /*
@@ -86,13 +86,13 @@ class AppEventManager: DataServiceProtocol {
     }
 
     func logAppEvent(event: String, msg: String = "", d1: String = "", d2: String = "", d3: String = "", d4: String = "") {
-        if store == nil {
+        if self.store == nil {
             return
         }
         var data: [String] = []
         data.append(String(Int64(Date().timeIntervalSince1970 * 1000)))
-        data.append(launchId)
-        data.append(getMemory())
+        data.append(self.launchId)
+        data.append(self.getMemory())
         data.append(String(UIDevice.current.batteryLevel))
         data.append(event)
         data.append(msg)
@@ -100,47 +100,96 @@ class AppEventManager: DataServiceProtocol {
         data.append(d2)
         data.append(d3)
         // data.append(d4)
-        data.append(String(seq))
-        seq = seq + 1
+        data.append(String(self.seq))
+        self.seq = self.seq + 1
 
-        store?.store(data)
-        store?.flush()
+        self.store?.store(data)
+        self.store?.flush()
     }
 
     func initCollecting() -> Bool {
-        if store != nil {
+        if self.store != nil {
             return true
         }
-        store = DataStorageManager.sharedInstance.createStore(storeType, headers: headers)
-        if !didLogLaunch {
-            didLogLaunch = true
+        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: self.headers)
+        if !self.didLogLaunch {
+            self.didLogLaunch = true
             var appVersion = ""
             if let version = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
                 appVersion = version
             }
-            logAppEvent(event: "launch", msg: "Application launch", d1: launchOptions, d2: appVersion)
+            self.logAppEvent(event: "launch", msg: "Application launch", d1: self.launchOptions, d2: appVersion)
         }
         return true
     }
 
     func startCollecting() {
-        log.info("Turning \(storeType) collection on")
-        logAppEvent(event: "collecting", msg: "Collecting Data")
-        isCollecting = true
+        log.info("Turning \(self.storeType) collection on")
+        self.logAppEvent(event: "collecting", msg: "Collecting Data")
+        self.isCollecting = true
     }
 
     func pauseCollecting() {
-        isCollecting = false
-        log.info("Pausing \(storeType) collection")
-        listeners = []
-        store!.flush()
+        self.isCollecting = false
+        log.info("Pausing \(self.storeType) collection")
+        self.listeners = []
+        self.store!.flush()
     }
 
     func finishCollecting() -> Promise<Void> {
-        log.info("Finish collecting \(storeType) collection")
-        logAppEvent(event: "stop_collecting", msg: "Stop Collecting Data")
-        pauseCollecting()
-        store = nil
-        return DataStorageManager.sharedInstance.closeStore(storeType)
+        log.info("Finish \(self.storeType) collection")
+        self.logAppEvent(event: "stop_collecting", msg: "Stop Collecting Data")
+        self.pauseCollecting()
+        self.store = nil
+        return DataStorageManager.sharedInstance.closeStore(self.storeType)
     }
+}
+
+// class DevLogManager: DataServiceProtocol {
+//     static let sharedInstance = AppEventManager()
+//     var isCollecting: Bool
+//     let storeType = "dev_log"
+//     let headers = ["timestamp", "ET"]
+//     var store: DataStorage?
+//     var listeners: [Listener] = []
+//
+//     var isStoreOpen: Bool {
+//         return self.store != nil
+//     }
+//
+//     func logAppEvent(_ statement: String) {
+//         // literally the timestamp followed by the statement:
+//         let date = Date()
+//         self.store?.store(String(Int64(date.timeIntervalSince1970 * 1000)) + "," + date.ISO8601Format() + "," + statement)
+//     }
+//
+//     func initCollecting() -> Bool {
+//         if self.store != nil {
+//             return true
+//         }
+//         self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: self.headers)
+//         return true
+//     }
+//
+//     func startCollecting() {
+//         log.info("Turning \(self.storeType) collection on")
+//         self.logAppEvent("dev log start")
+//         self.isCollecting = true
+//     }
+//
+//     func pauseCollecting() {
+//         self.isCollecting = false
+//         log.info("Pausing \(self.storeType) collection")
+//         self.logAppEvent("dev log pause")
+//         self.listeners = []
+//         self.store!.flush()
+//     }
+//
+//     func finishCollecting() -> Promise<Void> {
+//         log.info("Finish \(self.storeType) collection")
+//         self.pauseCollecting()
+//         self.logAppEvent("dev log end")
+//         self.store = nil
+//         return DataStorageManager.sharedInstance.closeStore(self.storeType)
+//     }
 }
