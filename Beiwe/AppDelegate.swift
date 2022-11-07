@@ -256,9 +256,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
         // Send FCM Token everytime the app launches
         if ApiManager.sharedInstance.patientId != "" /* && FirebaseApp.app() != nil*/ {
-            let token = Messaging.messaging().fcmToken
-            if token != nil {
-                sendFCMToken(fcmToken: token ?? "")
+            if let token = Messaging.messaging().fcmToken {
+                sendFCMToken(fcmToken: token)
             }
         }
     }
