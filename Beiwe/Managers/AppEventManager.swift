@@ -192,4 +192,4 @@ class AppEventManager: DataServiceProtocol {
 //         self.store = nil
 //         return DataStorageManager.sharedInstance.closeStore(self.storeType)
 //     }
-}
+// }

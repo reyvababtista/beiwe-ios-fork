@@ -10,6 +10,8 @@ enum DataStorageErrors: Error {
 
 let DELIMITER = ","
 let KEYLENGTH = 128
+let RECUR_SLEEP_DURATION = 0.05 // 50 milliseconds
+let RECUR_DEPTH = 3
 
 // TODO: convert All fatalError calls to sentry error reports with real error information.
 
@@ -80,21 +82,23 @@ class EncryptedStorage {
         // log.info("write called on \(self.debug_shortname)...")
         return Promise().then(on: self.encryption_queue) { _ -> Promise<Int> in
             // log.info("write (promise) called on \(self.eventualFilename)...")
-            let len: Int = self.write_actual(data, writeLen: writeLen)
-            return .value(len)
+            .value(self.write_actual(data, writeLen: writeLen))
         }
     }
 
-    private func open_actual() {
+    private func open_actual(recur: Int = RECUR_DEPTH) {
         // open file
         if !self.fileManager.createFile(
             atPath: self.filename.path,
             contents: nil,
             attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none])
         {
+            if recur > 0 {
+                log.error("open_actual recur at \(recur).")
+                Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                return self.open_actual(recur: recur - 1)
+            }
             fatalError("could not create file?")
-        } else {
-            // log.info("Created a new encrypted file: \(self.filename)")
         }
         self.file_handle = try! FileHandle(forWritingTo: self.filename)
 
@@ -213,7 +217,7 @@ class DataStorage {
         self.reset() // properly creates mutables
     }
 
-    private func reset() {
+    private func reset(recur: Int = RECUR_DEPTH) {
         // called when max filesize is reached, inside flush when the file is empty
         // generally resets all object assets and creates a new filename.
         // log.info("DataStorage.reset called on \(self.name)...")
@@ -225,6 +229,11 @@ class DataStorage {
                 }
             } catch {
                 log.error("Error moving temp data \(self.filename) to \(self.realFilename)")
+                if recur > 0 {
+                    log.error("reset recur at \(recur).")
+                    Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                    return self.reset(recur: recur - 1)
+                }
                 fatalError("Error moving temp data \(self.filename) to \(self.realFilename)")
             }
         }
@@ -271,24 +280,11 @@ class DataStorage {
         }
     }
 
-    private func encrypted_write(_ line: String) {
-        self.ensure_file_exists()
-        let iv: Data = Crypto.sharedInstance.randomBytes(16)
-        let encrypted = Crypto.sharedInstance.aesEncrypt(iv, key: self.aesKey, plainText: line)!
-        let base64_data = (
-            Crypto.sharedInstance.base64ToBase64URL(iv.base64EncodedString(options: []))
-                + ":"
-                + Crypto.sharedInstance.base64ToBase64URL(encrypted.base64EncodedString(options: []))
-                + "\n"
-        ).data(using: String.Encoding.utf8)!
-        self.write_raw_to_end_of_file(base64_data)
-    }
-
     func check_file_exists() -> Bool {
         return FileManager.default.fileExists(atPath: self.filename.path)
     }
 
-    func ensure_file_exists() {
+    func ensure_file_exists(recur: Int = RECUR_DEPTH) {
         // if there is no file, create it with these permissions and no data
         if !self.check_file_exists() {
             let created = FileManager.default.createFile(
@@ -306,12 +302,30 @@ class DataStorage {
             self.conditionalApplog(event: "file_create", msg: message, d1: self.name, d2: self.errMsg)
             if !created {
                 // TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
+                if recur > 0 {
+                    log.error("ensure_file_exists recur at \(recur).")
+                    Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                    return self.ensure_file_exists(recur: recur - 1)
+                }
                 fatalError(message)
             }
         }
     }
 
-    func write_raw_to_end_of_file(_ data: Data) {
+    private func encrypted_write(_ line: String) {
+        self.ensure_file_exists()
+        let iv: Data = Crypto.sharedInstance.randomBytes(16)
+        let encrypted = Crypto.sharedInstance.aesEncrypt(iv, key: self.aesKey, plainText: line)!
+        let base64_data = (
+            Crypto.sharedInstance.base64ToBase64URL(iv.base64EncodedString(options: []))
+                + ":"
+                + Crypto.sharedInstance.base64ToBase64URL(encrypted.base64EncodedString(options: []))
+                + "\n"
+        ).data(using: String.Encoding.utf8)!
+        self.write_raw_to_end_of_file(base64_data)
+    }
+
+    private func write_raw_to_end_of_file(_ data: Data, recur: Int = RECUR_DEPTH) {
         self.ensure_file_exists()
         // if file handle instantiated (file open) append data (a line) to the end of the file.
         // it appears to be the case that lines are constructed ending with \n, so we don't handle that here.
@@ -319,23 +333,24 @@ class DataStorage {
             defer {
                 fileHandle.closeFile()
             }
-            let seekPos = fileHandle.seekToEndOfFile()
+            fileHandle.seekToEndOfFile()
             fileHandle.write(data)
             fileHandle.closeFile()
-
             // this data variable is a string of the full line in base64 including the iv. (i.e. it is encrypted)
-            // log.info("Appended data to file: \(filename), size: \(seekPos): \(data)")
-            if seekPos == 0 {
-                log.error("empty file write to \(self.filename): '\(data)'")
+            // print("write to \(self.filename), length: \(data.count), '\(String(data: data, encoding: String.Encoding.utf8))'")
+        } else {
+            // error opening file, reset and try again
+            if recur > 0 {
+                self.reset()
+                log.error("write_raw_to_end_of_file recur at \(recur).")
+                Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                return self.write_raw_to_end_of_file(data, recur: recur - 1)
             }
-        } else { // error opening file
+            // retry failed, time to crash :c
             self.hasError = true
             self.errMsg = "Error opening file for writing"
             log.error(self.errMsg)
-            self.conditionalApplog(
-                event: "file_err", msg: "Error writing to file", d1: self.name, d2: self.errMsg
-            )
-            // TODO: make this not crash the app...
+            self.conditionalApplog(event: "file_err", msg: "Error writing to file", d1: self.name, d2: self.errMsg)
             fatalError("unable to open file \(self.filename)")
         }
     }
@@ -356,15 +371,6 @@ class DataStorage {
         } else {
             sanitizedData = data
         }
-        // This code was originally written as follows (pseudocode)
-        //   ln[1]: self.do_actual_file_io_immediately(some_data)
-        //   ln[2]: self.flush()
-        // The problem is that flush function simply isn't a classic io-is-buffered-so-call-flush-to-be-sure call.
-        // Instead the code [used to, I'm trying to remove it] implemented a caching mechanism, and flush would flush the cache.
-        // This function explicitly bypassed the cache, and would write to the file before other cached/buffered file io executed.
-        // If the initial write operation of a file, the RSA-encrypted decryption key, was in the cache (it would be) then that
-        // line would occur after `some_data` was written, breaking the expected format of the data.
-        // Until we make all io immediate (in progress) the order needs to be reversed.
         self.encrypted_write(sanitizedData.joined(separator: DELIMITER))
     }
 
@@ -404,7 +410,7 @@ class DataStorageManager {
         return URL(fileURLWithPath: cacheDir).appendingPathComponent("uploaddata")
     }
 
-    func createDirectories() {
+    func createDirectories(recur: Int = RECUR_DEPTH) {
         do {
             try FileManager.default.createDirectory(
                 atPath: DataStorageManager.currentDataDirectory().path,
@@ -417,6 +423,11 @@ class DataStorageManager {
                 attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
             )
         } catch {
+            if recur > 0 {
+                log.error("create_directories recur at \(recur).")
+                Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                return self.createDirectories(recur: recur - 1)
+            }
             log.error("Failed to create directories.")
             fatalError("Failed to create directories.")
         }
@@ -447,38 +458,9 @@ class DataStorageManager {
         }
         return self.storageTypes[type]!
     }
-
-    // This was the first result of removing then re-adding the promise, but I don't think it works as desired
-//    func closeStore(_ type: String) -> Promise<Void> {
-//        // has to return a promise due to conformance to a Protocol
-//        let the_queue = DispatchQueue(label: "com.rocketfarm.beiwe.dataqueue." + type, attributes: [])
-//        return Promise().then(on: the_queue) { _ -> Promise<Void> in
-//            if let storage = self.storageTypes[type] {
-//                self.storageTypes.removeValue(forKey: type)
-//                storage.flush(false)
-//            }
-//            return Promise()
-//        }
-//    }
-
-//    This is the original function
-//    func closeStore(_ type: String) -> Promise<Void> {
-//        // has to return a promise due to conformance to a Protocol
-//        if let storage = storageTypes[type] {
-//            self.storageTypes.removeValue(forKey: type)
-//            return storage.flush(false)
-//        }
-//        return Promise()
-//    }
-
-    // OK, I think this is the best solution.
-    // Keep the above commented code until actually sure about what this code... is for?
+    
     func closeStore(_ type: String) -> Promise<Void> {
-        // has to return a promise due to conformance to a Protocol
-        if let storage = storageTypes[type] {
-            self.storageTypes.removeValue(forKey: type)
-            storage.flush(false)
-        }
+        self.storageTypes.removeValue(forKey: type)
         return Promise()
     }
 
@@ -488,21 +470,13 @@ class DataStorageManager {
             storage.flush(true)
         }
     }
-
-//    func _flushAll_old() -> Promise<Void> {
-//        // calls flush for all files
-//        var promises: [Promise<Void>] = []
-//        for (_, storage) in storageTypes {
-//            promises.append(storage.flush(true))
-//        }
-//        return when(fulfilled: promises)
-//    }
-
+    
     func isUploadFile(_ filename: String) -> Bool {
         return filename.hasSuffix(DataStorageManager.dataFileSuffix) || filename.hasSuffix(".mp4") || filename.hasSuffix(".wav")
     }
 
     private func _moveFile(_ src: URL, dst: URL) {
+        // TODO: is this not-moving case safe?  need to understand upload logic to answer
         do {
             try FileManager.default.moveItem(at: src, to: dst)
             // log.info("moved \(src) to \(dst)")
@@ -522,14 +496,13 @@ class DataStorageManager {
     private func prepareForUpload_actual() {
         // TODO: this is a really dangerous general solution to ensuring files are getting uploaded...
         let prepQ = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default)
-//        let prepQ = DispatchQueue.global(qos: DispatchQoS.QoSClass.utility)  // this is the fix for the warning, not changing atm.
-        var filesToUpload: [String] = []
+        // let prepQ = DispatchQueue.global(qos: DispatchQoS.QoSClass.utility)  // this is the fix for the warning, not changing atm.
 
-        /* Flush once to get all of the files currently processing */
+        // Flush once to get all of the files currently processing, record names
+        var filesToUpload: [String] = []
         self._flushAll()
-        /* And record their names */
-        let path = DataStorageManager.currentDataDirectory().path
-        if let enumerator = FileManager.default.enumerator(atPath: path) {
+        
+        if let enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path) {
             while let filename = enumerator.nextObject() as? String {
                 if self.isUploadFile(filename) {
                     filesToUpload.append(filename)
@@ -539,12 +512,6 @@ class DataStorageManager {
             }
         }
 
-        // TODO: This next section is almost definitely garbage
-//        /* Need to flush again, because there is (very slim) one of those files was created after the flush */
-//        /** This line is the best candidate for corrupted files. */
-//        self._flushAll()
-//        return
-        // and move files
         for filename in filesToUpload {
             self._moveFile(DataStorageManager.currentDataDirectory().appendingPathComponent(filename),
                            dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
