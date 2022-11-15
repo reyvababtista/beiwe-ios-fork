@@ -22,13 +22,13 @@ class GyroManager: DataServiceProtocol {
         // ug, currentstudy and study settings are optional so can't rely on the default gyroFrequency, have to hardcode it
         let frequency_base = StudyManager.sharedInstance.currentStudy?.studySettings?.gyroFrequency ?? 10
         motionManager.gyroUpdateInterval = 1.0 / Double(frequency_base)
-        print("gyroUpdateInterval: \(motionManager.gyroUpdateInterval)")
+        // print("gyroUpdateInterval: \(motionManager.gyroUpdateInterval)")
         return true
     }
 
     func startCollecting() {
         log.info("Turning \(storeType) collection on")
-        print("gyroUpdateInterval: \(motionManager.gyroUpdateInterval)")
+        // print("gyroUpdateInterval: \(motionManager.gyroUpdateInterval)")
         let queue = OperationQueue()
         motionManager.startGyroUpdates(to: queue) {
             gyroData, error in

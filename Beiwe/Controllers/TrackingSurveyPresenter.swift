@@ -265,17 +265,17 @@ class TrackingSurveyPresenter : NSObject, ORKTaskViewControllerDelegate {
     }
 
     // stores survey answers on the DataStorage
-    func finalizeSurveyAnswers() -> Bool {
+    func finalizeSurveyAnswers() {
         guard let activeSurvey = activeSurvey, let survey = activeSurvey.survey, let surveyId = surveyId, let patientId = StudyManager.sharedInstance.currentStudy?.patientId, let publicKey = StudyManager.sharedInstance.currentStudy?.studySettings?.clientPublicKey else {
-            return false;
+            return
         }
         guard  let stepOrder = activeSurvey.stepOrder, survey.questions.count > 0 else {
-            return false;
+            return
         }
 
         guard activeSurvey.bwAnswers.count > 0 else {
             log.info("No questions answered, not submitting.");
-            return false;
+            return
         }
 
         let name = TrackingSurveyPresenter.surveyDataType + "_" + surveyId;
@@ -284,7 +284,7 @@ class TrackingSurveyPresenter : NSObject, ORKTaskViewControllerDelegate {
 
         let numQuestions = survey.randomize ? min(survey.questions.count, survey.numberOfRandomQuestions ?? 999) : survey.questions.count;
         if (numQuestions == 0) {
-            return false;
+            return
         }
 
         //     static let headers = ["question id", "question type", "question text", "question answer options","answer"];
@@ -300,8 +300,6 @@ class TrackingSurveyPresenter : NSObject, ORKTaskViewControllerDelegate {
             dataFile.store(data);
         }
         dataFile.flush(true);
-        return !dataFile.hasError;
-        
     }
 
     static func addTimingsEvent(_ surveyId: String, event: String) {

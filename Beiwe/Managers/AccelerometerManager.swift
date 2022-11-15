@@ -20,13 +20,13 @@ class AccelerometerManager: DataServiceProtocol {
         store = DataStorageManager.sharedInstance.createStore(storeType, headers: headers)
         let frequency_base = StudyManager.sharedInstance.currentStudy?.studySettings?.accelerometerFrequency ?? 10
         motionManager.accelerometerUpdateInterval = 1.0 / Double(frequency_base)
-        print("accelerometerUpdateInterval: \(motionManager.accelerometerUpdateInterval)")
+        // print("accelerometerUpdateInterval: \(motionManager.accelerometerUpdateInterval)")
         return true
     }
 
     func startCollecting() {
         log.info("Turning \(storeType) collection on")
-        print("accelerometerUpdateInterval: \(motionManager.accelerometerUpdateInterval)")
+        // print("accelerometerUpdateInterval: \(motionManager.accelerometerUpdateInterval)")
         let queue = OperationQueue()
         motionManager.startAccelerometerUpdates(to: queue) {
             accelData, error in

@@ -193,8 +193,6 @@ class DataStorage {
     var filename: URL
     var realFilename: URL
     var patientId: String
-    var hasError = false // This is used as a return value from io operations in other parts of the codebase
-    var errMsg: String = ""
     var sanitize = false
     let moveOnClose: Bool
     var name = ""
@@ -237,8 +235,6 @@ class DataStorage {
                 fatalError("Error moving temp data \(self.filename) to \(self.realFilename)")
             }
         }
-        self.errMsg = ""
-        self.hasError = false
         // set new name, filenames
         self.name = self.patientId + "_" + self.type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
         self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
@@ -299,7 +295,7 @@ class DataStorage {
                 message = "Could not create new data file"
             }
             // log.error("\(message): \(filename)")
-            self.conditionalApplog(event: "file_create", msg: message, d1: self.name, d2: self.errMsg)
+            self.conditionalApplog(event: "file_create", msg: message, d1: self.name)
             if !created {
                 // TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
                 if recur > 0 {
@@ -347,10 +343,8 @@ class DataStorage {
                 return self.write_raw_to_end_of_file(data, recur: recur - 1)
             }
             // retry failed, time to crash :c
-            self.hasError = true
-            self.errMsg = "Error opening file for writing"
-            log.error(self.errMsg)
-            self.conditionalApplog(event: "file_err", msg: "Error writing to file", d1: self.name, d2: self.errMsg)
+            log.error("Error opening file for writing")
+            self.conditionalApplog(event: "file_err", msg: "Error writing to file", d1: self.name, d2: "Error opening file for writing")
             fatalError("unable to open file \(self.filename)")
         }
     }
