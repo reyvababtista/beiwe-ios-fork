@@ -28,14 +28,14 @@ class AppEventManager: DataServiceProtocol {
         if (launchOptions?.index(forKey: UIApplication.LaunchOptionsKey.location)) != nil {
             self.launchOptions = "location"
             /*
-             let localNotif = UILocalNotification();
-             //localNotif.fireDate = currentDate;
+             let localNotif = UILocalNotification()
+             //localNotif.fireDate = currentDate
 
-             let body: String = "Beiwe was Launched in the background";
+             let body: String = "Beiwe was Launched in the background"
 
-             localNotif.alertBody = body;
-             localNotif.soundName = UILocalNotificationDefaultSoundName;
-             UIApplication.shared.scheduleLocalNotification(localNotif);
+             localNotif.alertBody = body
+             localNotif.soundName = UILocalNotificationDefaultSoundName
+             UIApplication.shared.scheduleLocalNotification(localNotif)
               */
         }
         /*
@@ -53,15 +53,15 @@ class AppEventManager: DataServiceProtocol {
 
     /*
      func didLockUnlock(_ isLocked: Bool) {
-         log.info("Lock state data changed: \(isLocked)");
-         var data: [String] = [ ];
-         data.append(String(Int64(Date().timeIntervalSince1970 * 1000)));
-         let state: String = isLocked ? "Locked" : "Unlocked";
-         data.append(state);
-         data.append(String(UIDevice.current.batteryLevel));
+         log.info("Lock state data changed: \(isLocked)")
+         var data: [String] = [ ]
+         data.append(String(Int64(Date().timeIntervalSince1970 * 1000)))
+         let state: String = isLocked ? "Locked" : "Unlocked"
+         data.append(state)
+         data.append(String(UIDevice.current.batteryLevel))
 
-         self.store?.store(data);
-         self.store?.flush();
+         self.store?.store(data)
+         self.store?.flush()
 
      }
       */
