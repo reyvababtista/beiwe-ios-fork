@@ -126,8 +126,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             }
             // okay we currently are removing notifications, not ideal.
             UNUserNotificationCenter.current().removeAllDeliveredNotifications()
-            // transition to loaded app state
-            self.transitionToLoadedAppState()
+            self.transitionToLoadedAppState()  // transition to loaded app state
         }.catch { _ in
             print("Database open failed, probably should just crash the app tbh")
         }
@@ -149,8 +148,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                 // Load up the log in view
                 self.changeRootViewControllerWithIdentifier("login")
             } else {
-                // We are logged in, so if we've completed onboarding load main interface
-                // Otherwise continue onboarding.
+                // We are logged in, so if we've completed onboarding load main interface, Otherwise continue onboarding.
                 if currentStudy.participantConsented {
                     self.changeRootViewControllerWithIdentifier("mainView")
                 } else {
@@ -159,25 +157,30 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             }
             self.initializeFirebase() // this is safe to call
         } else {
-            // If there is no study loaded, then it's obvious.  We need the onboarding flow
-            // from the beginning.
+            // If there is no study loaded, then it's obvious.  We need the onboarding flow from the beginning.
             self.changeRootViewController(OnboardingManager().onboardingViewController)
         }
     }
 
+    /// Compares password to the stored password, but also sets password if there is no password due a bug where
+    /// the app (or keychain?) up and forgets the password. This app doesn't actually have any data to show the user,
+    /// the password is for show/getting the app through the original IRB/participant security theater.
     func checkPasswordAndLogin(_ password: String) -> Bool {
-        var storedPassword = PersistentPasswordManager.sharedInstance.passwordForStudy()!
+        // 2.2.1: there was a bug where access of passwordForStudy using the optional-force operoter (then line 169), e.g.
+        //    PersistentPasswordManager.sharedInstance.passwordForStudy()!
+        // would error as null. Using the optional coalescing operator should fix it
+        var storedPassword: String = PersistentPasswordManager.sharedInstance.passwordForStudy() ?? ""
         // print("incoming password: '\(password)'")
         // print("current password: '\(storedPassword)'")
 
-        // if there is somehow a situation where no stored password set, take the new password and set it.
+        // If there is somehow a situation where no stored password is set, take the new password and set it.
         //  THIS EXISTS PURELY TO FIX A THEORETICAL BUG WHERE PASSWORDS WERE SOMEHOW RESET,
         //  BUT THE SOURCE OF THAT BUG WAS PROBABLY A CHANGE OF APP BUILD CREDENTIALS.
-        if storedPassword.count == 0 {
-            ApiManager.sharedInstance.password = storedPassword
+        if storedPassword.isEmpty {
+            PersistentPasswordManager.sharedInstance.storePassword(password)
             storedPassword = PersistentPasswordManager.sharedInstance.passwordForStudy()!
         }
-
+        
         if password == storedPassword {
             ApiManager.sharedInstance.password = storedPassword
             self.isLoggedIn = true
