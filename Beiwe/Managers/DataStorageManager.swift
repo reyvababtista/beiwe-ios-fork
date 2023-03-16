@@ -378,7 +378,7 @@ class DataStorage {
 
     private func conditionalApplog(event: String, msg: String = "", d1: String = "", d2: String = "", d3: String = "", d4: String = "") {
         if self.type != "ios_log" {
-            AppEventManager.sharedInstance.logAppEvent(event: event, msg: msg, d1: d1, d2: d2, d3: d3, d4: d4)
+            AppEventManager.sharedInstance.logAppEvent(event: event, msg: msg, d1: d1, d2: d2, d3: d3)
         }
     }
 }
@@ -435,7 +435,7 @@ class DataStorageManager {
         }
     }
 
-    // TODO: WHYY IS THIS RETURN OPTIONAL
+    /// instantiates your DataStorage object
     func createStore(_ type: String, headers: [String]) -> DataStorage {
         if self.storageTypes[type] == nil {
             if let publicKey = publicKey, let patientId = study?.patientId {

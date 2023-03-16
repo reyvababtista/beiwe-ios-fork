@@ -34,6 +34,7 @@ class ApiManager {
 
     fileprivate var hashedPassword = ""
 
+    // setter hashes the password
     var password: String {
         set {
             self.hashedPassword = Crypto.sharedInstance.sha256Base64URL(newValue)

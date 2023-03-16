@@ -3,28 +3,6 @@ import Darwin
 import Foundation
 import PromiseKit
 
-protocol DataServiceProtocol {
-    func initCollecting() -> Bool
-    func startCollecting()
-    func pauseCollecting()
-    func finishCollecting() -> Promise<Void>
-}
-
-class DataServiceStatus {
-    let onDurationSeconds: Double
-    let offDurationSeconds: Double
-    var currentlyOn: Bool
-    var nextToggleTime: Date?
-    let handler: DataServiceProtocol
-
-    init(onDurationSeconds: Int, offDurationSeconds: Int, handler: DataServiceProtocol) {
-        self.onDurationSeconds = Double(onDurationSeconds)
-        self.offDurationSeconds = Double(offDurationSeconds)
-        self.handler = handler
-        self.currentlyOn = false
-        self.nextToggleTime = Date()
-    }
-}
 
 class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
     let locationManager = CLLocationManager()

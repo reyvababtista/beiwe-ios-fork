@@ -6,7 +6,7 @@ PODS:
   - Crashlytics (3.14.0):
     - Fabric (~> 1.10.2)
   - EmitterKit (5.2.2)
-  - Eureka (5.3.4)
+  - Eureka (5.3.6)
   - Fabric (1.10.2)
   - Firebase/Analytics (6.34.0):
     - Firebase/Core
@@ -94,17 +94,17 @@ PODS:
   - ObjcExceptionBridging/ObjcExceptionBridging (1.0.1)
   - ObjectMapper (4.2.0)
   - PKHUD (4.2.3)
-  - PromiseKit (6.15.3):
-    - PromiseKit/CorePromise (= 6.15.3)
-    - PromiseKit/Foundation (= 6.15.3)
-    - PromiseKit/UIKit (= 6.15.3)
-  - PromiseKit/CorePromise (6.15.3)
-  - PromiseKit/Foundation (6.15.3):
+  - PromiseKit (6.17.1):
+    - PromiseKit/CorePromise (= 6.17.1)
+    - PromiseKit/Foundation (= 6.17.1)
+    - PromiseKit/UIKit (= 6.17.1)
+  - PromiseKit/CorePromise (6.17.1)
+  - PromiseKit/Foundation (6.17.1):
     - PromiseKit/CorePromise
-  - PromiseKit/UIKit (6.15.3):
+  - PromiseKit/UIKit (6.17.1):
     - PromiseKit/CorePromise
   - PromisesObjC (1.2.12)
-  - Protobuf (3.19.1)
+  - Protobuf (3.21.1)
   - ReachabilitySwift (3)
   - ResearchKit (2.1.0-beta)
   - Sentry (4.5.0):
@@ -214,7 +214,7 @@ SPEC CHECKSUMS:
   couchbase-lite-ios: 6b586fca2c8a59c85e31df89a2528c92c40fc4dc
   Crashlytics: 9220f5bc89e7a618df411b4f639389dbfb0e03d2
   EmitterKit: e7a27b37118823d8ad413b8396f75e40d59f8cba
-  Eureka: 60cf058f86a8fb3ed26165ba5292b9850361b0a6
+  Eureka: 28ad9dec6286cd7cd601fdf8e8df39bb7356a8f4
   Fabric: ea977e3cd9c20425516d3dafd3bf8c941c51223f
   Firebase: c23a36d9e4cdf7877dfcba8dd0c58add66358999
   FirebaseAnalytics: 3bb096873ee0d7fa4b6c70f5e9166b6da413cc7f
@@ -233,9 +233,9 @@ SPEC CHECKSUMS:
   ObjcExceptionBridging: c30e00eb3700467e695faeea30e26e18bd445001
   ObjectMapper: 5a6c9f063ef67e7fc0d7eb8958919e3121396a96
   PKHUD: 351011b853e6b942e7ee8ad335864cc84c787241
-  PromiseKit: 3b2b6995e51a954c46dbc550ce3da44fbfb563c5
+  PromiseKit: ee485df3d4dc570594d7e7aecae6352697dc6a4c
   PromisesObjC: 3113f7f76903778cf4a0586bd1ab89329a0b7b97
-  Protobuf: 3724efa50cb2846d7ccebc8691c574e85fd74471
+  Protobuf: 9e88c1e667d75aa2491d211f26ccddde4e8ad4cf
   ReachabilitySwift: f5b9bb30a0777fac8f09ce8b067e32faeb29bb64
   ResearchKit: b948fcbadd4454d6b835d2b64471980a467a96a7
   Sentry: ab6c209f23700d1460691dbc90e19ed0a05d496b
@@ -245,4 +245,4 @@ SPEC CHECKSUMS:
 
 PODFILE CHECKSUM: 85b1f2fdba5d4215327efc6039d3cc14e84a1f95
 
-COCOAPODS: 1.11.3
+COCOAPODS: 1.11.2

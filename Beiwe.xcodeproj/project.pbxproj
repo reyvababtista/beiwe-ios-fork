@@ -83,6 +83,7 @@
 		83FDCFD81CBC8E4700AFF716 /* TrackingSurveyPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83FDCFD71CBC8E4700AFF716 /* TrackingSurveyPresenter.swift */; };
 		83FDCFDA1CBCB6D300AFF716 /* ChangePasswordViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83FDCFD91CBCB6D300AFF716 /* ChangePasswordViewController.swift */; };
 		84CACB8E2835A44B00663065 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 84CACB8D2835A44B00663065 /* GoogleService-Info.plist */; };
+		AA63EFB729C2E0FE0074F735 /* DataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA63EFB629C2E0FE0074F735 /* DataService.swift */; };
 		ED3081F77ECC8C876F5EF53A /* Pods_Beiwe.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A42DC84D7FED35C57E1B1EE0 /* Pods_Beiwe.framework */; };
 /* End PBXBuildFile section */
 
@@ -186,6 +187,7 @@
 		83FDCFD91CBCB6D300AFF716 /* ChangePasswordViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChangePasswordViewController.swift; sourceTree = "<group>"; };
 		84CACB8D2835A44B00663065 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		A42DC84D7FED35C57E1B1EE0 /* Pods_Beiwe.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Beiwe.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA63EFB629C2E0FE0074F735 /* DataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataService.swift; sourceTree = "<group>"; };
 		B58A34E5862CE908C83EB133 /* Pods-Beiwe.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Beiwe.release.xcconfig"; path = "Target Support Files/Pods-Beiwe/Pods-Beiwe.release.xcconfig"; sourceTree = "<group>"; };
 		C222DB6B2786C1ED00ACB3EC /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		E949EF7428480E59009E183F /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Main.strings; sourceTree = "<group>"; };
@@ -366,6 +368,7 @@
 				83AF042A1CAF7F7F00A37225 /* ProximityManager.swift */,
 				83AF04341CB0E2BB00A37225 /* ReachabilityManager.swift */,
 				83AF04121CAADE6200A37225 /* StudyManager.swift */,
+				AA63EFB629C2E0FE0074F735 /* DataService.swift */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -679,6 +682,7 @@
 				83AF20DA1CA310B100D3DF02 /* EurekaSwiftValidatorComponents.swift in Sources */,
 				831CC5801F79AF6400CDEFB0 /* AppEventManager.swift in Sources */,
 				83B4D6721CA8DBB2001BF283 /* Study.swift in Sources */,
+				AA63EFB729C2E0FE0074F735 /* DataService.swift in Sources */,
 				833482F71CA2EF7E00A37B35 /* RegisterViewController.swift in Sources */,
 				83C7D3891CB5F43400BC7285 /* TaskListViewController.swift in Sources */,
 				83914CAD1D00DA1100B01C82 /* ForgotPasswordHeaderView.swift in Sources */,
