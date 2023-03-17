@@ -478,8 +478,8 @@ class DataStorageManager {
             log.error("Error moving \(src) to \(dst)")
         }
     }
-
-    func prepareForUpload() -> Promise<Void> {
+    
+    func prepareForUpload() -> Promise<Void> {  // I don't think this return value is used anywhere
         let prepQ = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default)
         return Promise().then(on: prepQ) { _ -> Promise<Void> in
             self.prepareForUpload_actual()

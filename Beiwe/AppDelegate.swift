@@ -34,7 +34,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     // app capability stuff
     let motionManager = CMMotionManager()
-    var reachability: Reachability?
+    var reachability: Reachability?  // tells us about our network access
     var canOpenTel = false
     var locationPermission = false
     let locManager: CLLocationManager = CLLocationManager()

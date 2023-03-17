@@ -3,6 +3,12 @@ import Darwin
 import Foundation
 import PromiseKit
 
+/// For some unfathomable, incomprehensible reason, all logic for all sensors leads to the GPS manager.
+// It may be the case that the GPS updates are how the app stays open (there is disabled logic to record when the app vas opened that checks
+// for the presense of some location service *stuff* over in AppEventManager), in which case the best guess for this pile of CS nightmares
+// is that Keary thought he would need to hook everything into those GPS details.
+
+// TODO: what happens if GPS is disabled on a study? does that matter? we need to test that.  
 
 class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
     let locationManager = CLLocationManager()
@@ -185,6 +191,7 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
         }
     }
 
+    // the core function that enables every sensor manager (DataServiceProtocols)
     func addDataService(_ on: Int, off: Int, handler: DataServiceProtocol) {
         let dataServiceStatus = DataServiceStatus(onDurationSeconds: on, offDurationSeconds: off, handler: handler)
         if handler.initCollecting() {
