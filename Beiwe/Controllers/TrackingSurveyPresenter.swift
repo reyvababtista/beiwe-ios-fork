@@ -286,7 +286,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
             data.append(answersString)
             dataFile.store(data)
         }
-        dataFile.flush(true)
+        dataFile.reset()
     }
 
     static func addTimingsEvent(_ surveyId: String, event: String) {

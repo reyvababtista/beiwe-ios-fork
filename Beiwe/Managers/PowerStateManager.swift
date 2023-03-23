@@ -36,7 +36,6 @@ class PowerStateManager : DataServiceProtocol {
         data.append(String(UIDevice.current.batteryLevel));
 
         self.store?.store(data);
-        self.store?.flush();
     }
 
     func didLockUnlock(_ isLocked: Bool) {
@@ -48,8 +47,6 @@ class PowerStateManager : DataServiceProtocol {
         data.append(String(UIDevice.current.batteryLevel));
 
         self.store?.store(data);
-        self.store?.flush();
-
     }
 
     func initCollecting() -> Bool {
@@ -73,7 +70,6 @@ class PowerStateManager : DataServiceProtocol {
         NotificationCenter.default.removeObserver(self, name: UIDevice.batteryStateDidChangeNotification, object:nil)
         NotificationCenter.default.removeObserver(self, name: UIDevice.batteryLevelDidChangeNotification, object:nil)
         listeners = [ ];
-        store!.flush();
         AppEventManager.sharedInstance.logAppEvent(event: "powerstate_off", msg: "PowerState collection off")
     }
     func finishCollecting() -> Promise<Void> {

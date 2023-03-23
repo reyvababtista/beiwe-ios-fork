@@ -22,7 +22,6 @@ class ProximityManager : DataServiceProtocol {
         data.append(UIDevice.current.proximityState ? "NearUser" : "NotNearUser");
 
         self.store?.store(data);
-        self.store?.flush();
     }
 
     func initCollecting() -> Bool {
@@ -39,7 +38,6 @@ class ProximityManager : DataServiceProtocol {
     func pauseCollecting() {
         log.info("Pausing \(storeType) collection");
         NotificationCenter.default.removeObserver(self, name: UIDevice.proximityStateDidChangeNotification, object:nil)
-        store!.flush();
         AppEventManager.sharedInstance.logAppEvent(event: "proximity_off", msg: "Proximity collection off")
     }
     func finishCollecting() -> Promise<Void> {

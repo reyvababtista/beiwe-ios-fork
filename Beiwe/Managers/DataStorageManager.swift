@@ -93,10 +93,10 @@ class DataStorageManager {
         return Promise()
     }
 
-    func _flushAll() {
+    func flushAll() {
         // calls flush for all files
         for (_, storage) in self.storageTypes {
-            storage.flush(true)
+            storage.reset()
         }
     }
 
@@ -128,9 +128,8 @@ class DataStorageManager {
         // let prepQ = DispatchQueue.global(qos: DispatchQoS.QoSClass.utility)  // this is the fix for the warning, not changing atm.
 
         // Flush once to get all of the files currently processing, record names
+        self.flushAll()
         var filesToUpload: [String] = []
-        self._flushAll()
-
         if let enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path) {
             while let filename = enumerator.nextObject() as? String {
                 if self.isUploadFile(filename) {
@@ -204,7 +203,7 @@ class DataStorage {
         self.type = type
         self.patientId = patientId
         self.publicKey = publicKey
-
+        //
         self.headers = headers
         self.moveOnClose = moveOnClose
         self.secKeyRef = keyRef
@@ -216,8 +215,8 @@ class DataStorage {
 
         self.reset() // properly creates mutables
     }
-
-    private func reset(recur: Int = RECUR_DEPTH) {
+    
+    func reset(recur: Int = RECUR_DEPTH) {
         // called when max filesize is reached, inside flush when the file is empty
         // generally resets all object assets and creates a new filename.
         // log.info("DataStorage.reset called on \(self.name)...")
@@ -368,14 +367,6 @@ class DataStorage {
             sanitizedData = data
         }
         self.encrypted_write(sanitizedData.joined(separator: DELIMITER))
-    }
-
-    func flush(_ do_reset: Bool = false) {
-        // This flush call currently exists to allow conditional calls to reset, I guess.
-        if do_reset {
-            // conditionally call reset
-            self.reset()
-        }
     }
 
     private func conditionalApplog(event: String, msg: String = "", d1: String = "", d2: String = "", d3: String = "", d4: String = "") {

@@ -62,7 +62,6 @@ class MagnetometerManager : DataServiceProtocol {
     func pauseCollecting() {
         log.info("Pausing \(storeType) collection");
         motionManager.stopMagnetometerUpdates()
-        store?.flush();
         AppEventManager.sharedInstance.logAppEvent(event: "magnetometer_off", msg: "Magnetometer collection off")
     }
     func finishCollecting() -> Promise<Void> {

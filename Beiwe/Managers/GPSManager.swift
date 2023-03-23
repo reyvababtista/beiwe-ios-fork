@@ -229,7 +229,6 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
         self.isCollectingGps = false
         self.locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
         self.locationManager.distanceFilter = 99999
-        self.gpsStore?.flush()
     }
 
     func finishCollecting() -> Promise<Void> {

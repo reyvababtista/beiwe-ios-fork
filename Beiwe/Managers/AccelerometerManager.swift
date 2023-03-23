@@ -46,7 +46,6 @@ class AccelerometerManager: DataServiceProtocol {
     func pauseCollecting() {
         log.info("Pausing \(storeType) collection")
         motionManager.stopAccelerometerUpdates()
-        store?.flush()
         AppEventManager.sharedInstance.logAppEvent(event: "accel_off", msg: "Accel collection off")
     }
 
