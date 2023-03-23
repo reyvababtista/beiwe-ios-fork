@@ -495,7 +495,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     }
 
     func sendFCMToken(fcmToken: String) {
-        print("FCM Token: \(fcmToken)")
+        // print("FCM Token: \(fcmToken)")
         if fcmToken != "" {
             let fcmTokenRequest = FCMTokenRequest(fcmToken: fcmToken)
             ApiManager.sharedInstance.makePostRequest(fcmTokenRequest).catch {
@@ -660,7 +660,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         log.add(destination: crashlyticsLogDestination)
         log.logAppDetails()
     }
-
+    
+    // completely disabled, does nothing
     func setDebuggingUser(_ username: String) {
         // TODO: Use the current user's information
         // You can call any combination of these three methods
