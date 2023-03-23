@@ -5,93 +5,88 @@ import Foundation
 import PromiseKit
 import ReachabilitySwift
 
-class StudyManager {
-    static let sharedInstance = StudyManager()
-    static var real_study_loaded = false
 
-    let MAX_UPLOAD_DATA: Int64 = 250 * (1024 * 1024)
+/// Contains all sorts of miiscellaneous study related functionality - This is badly factored
+class StudyManager {
+    static let sharedInstance = StudyManager()  // singleton reference
+    
+    // General code assets
     let appDelegate = UIApplication.shared.delegate as! AppDelegate
     let calendar = Calendar.current
-    var keyRef: SecKey?
-
+    
+    // Really critical app components
     var currentStudy: Study?
-    var gpsManager: GPSManager?
+    var gpsManager: GPSManager?  // for some reason gpsManager is used to test if the study is ~initialized
+    var keyRef: SecKey?  // the study's security key
+    
+    // State tracking variables
     var isUploading = false
     let surveysUpdatedEvent: Event<Int> = Event<Int>()
+    static var real_study_loaded = false
     var isStudyLoaded: Bool {
         return self.currentStudy != nil
     }
-
+    
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////// Setup and UnSetup ///////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    /// sets (but also clear?) the current study, and the gpsManager, sets real_study_loaded to true
     func loadDefaultStudy() -> Promise<Bool> {
         self.currentStudy = nil
         self.gpsManager = nil
+        
+        // mostly sets real_study_loaded to true...
         return firstly { () -> Promise<[Study]> in
-            Recline.shared.queryAll()
+            Recline.shared.queryAll()  // fixme: document what this is, I've forgotten...
         }.then { (studies: [Study]) -> Promise<Bool> in
+            // if there is more than one study, log a warning? this is pointless
             if studies.count > 1 {
-                log.error("Multiple Studies: \(studies)")
-                // Crashlytics.sharedInstance().recordError(NSError(domain: "com.rf.beiwe.studies", code: 1, userInfo: nil))
+                log.warning("Multiple Studies: \(studies)")
             }
+            // grab the first study and the first study only, set the patient id (but not), real_study_loaded to true
             if studies.count > 0 {
                 self.currentStudy = studies[0]
-                AppDelegate.sharedInstance().setDebuggingUser(self.currentStudy?.patientId ?? "unknown")
+                AppDelegate.sharedInstance().setDebuggingUser(self.currentStudy?.patientId ?? "unknown")  // this doesn't do anything...
                 StudyManager.real_study_loaded = true
             }
             return .value(true)
         }
     }
-
-    func setApiCredentials() {
-        guard let currentStudy = currentStudy, gpsManager == nil else {
-            return
-        }
-        var pkey: SecKey?
-        /* Setup APIManager's security */
-        ApiManager.sharedInstance.password = PersistentPasswordManager.sharedInstance.passwordForStudy() ?? ""
-        ApiManager.sharedInstance.customApiUrl = currentStudy.customApiUrl
-        if let patientId = currentStudy.patientId {
-            ApiManager.sharedInstance.patientId = patientId
-            if let clientPublicKey = currentStudy.studySettings?.clientPublicKey {
-                do {
-                    let pkey = try PersistentPasswordManager.sharedInstance.storePublicKeyForStudy(clientPublicKey, patientId: patientId)
-                    self.keyRef = pkey
-                } catch {
-                    log.error("Failed to store RSA key in keychain.")
-                }
-            } else {
-                log.error("No public key found.  Can't store")
-            }
-        }
-    }
-
+    
+    /// pretty much an initializer for data services, for some reason gpsManager is the test if we are already initialized
     func startStudyDataServices() {
         if self.gpsManager != nil {
             return
         }
         self.setApiCredentials()
         DataStorageManager.sharedInstance.setCurrentStudy(self.currentStudy!, secKeyRef: self.keyRef)
-        self.prepareDataServices()
+        self.prepareDataServices()  // okay prepareDataServices is 90% of the function body
         NotificationCenter.default.addObserver(self, selector: #selector(self.reachabilityChanged), name: ReachabilityChangedNotification, object: nil)
     }
-
-    func prepareDataServices() {
-        guard let studySettings = currentStudy?.studySettings else {
+    
+    /// ACTUAL initialization - initializes the weirdly complex self.gpsManager and everything else
+    private func prepareDataServices() {
+        // current study and study settings are null of course
+        guard let studySettings: StudySettings = currentStudy?.studySettings else {
             return
         }
-
         log.info("prepareDataServices")
-
+        
         DataStorageManager.sharedInstance.createDirectories()
-        /* Move non current files out.  Probably not necessary, would happen later anyway */
-        DataStorageManager.sharedInstance.prepareForUpload()
+        // Move non current files out.  (Probably unnecessary, would happen later anyway)
+        _ = DataStorageManager.sharedInstance.prepareForUpload()
+        
+        // GPS, Check if gps fuzzing is enabled for currentStudy
         self.gpsManager = GPSManager()
-
-        // Check if gps fuzzing is enabled for currentStudy
         self.gpsManager?.enableGpsFuzzing = studySettings.fuzzGps ? true : false
         self.gpsManager?.fuzzGpsLatitudeOffset = (self.currentStudy?.fuzzGpsLatitudeOffset)!
         self.gpsManager?.fuzzGpsLongitudeOffset = (self.currentStudy?.fuzzGpsLongitudeOffset)!
-
+        
+        // iOS Log (app events)
         self.gpsManager!.addDataService(AppEventManager.sharedInstance)
+        
+        // every sensor, which for unfathomable reasons are contained inside the gps manager, activate them
         if studySettings.gps && studySettings.gpsOnDurationSeconds > 0 {
             self.gpsManager!.addDataService(studySettings.gpsOnDurationSeconds, off: studySettings.gpsOffDurationSeconds, handler: self.gpsManager!)
         }
@@ -116,177 +111,76 @@ class StudyManager {
         if studySettings.motion && studySettings.motionOnDurationSeconds > 0 {
             self.gpsManager!.addDataService(studySettings.motionOnDurationSeconds, off: studySettings.motionOffDurationSeconds, handler: DeviceMotionManager())
         }
-        self.gpsManager!.startGpsAndTimer()
+        _ = self.gpsManager!.startGpsAndTimer()
     }
-
+    
+    /// sets the study as consented, sets api credentials
     func setConsented() -> Promise<Bool> {
+        // fail if current study or study settings are null
         guard let study = currentStudy, let studySettings = study.studySettings else {
             return .value(false)
         }
+        // api setup
         self.setApiCredentials()
         let currentTime: Int64 = Int64(Date().timeIntervalSince1970)
+        // kick off survey timers
         study.nextUploadCheck = currentTime + Int64(studySettings.uploadDataFileFrequencySeconds)
         study.nextSurveyCheck = currentTime + Int64(studySettings.checkForNewSurveysFreqSeconds)
-
+        // set consented to true (checked over in AppDelegate)
         study.participantConsented = true
+        // some io stuff
         DataStorageManager.sharedInstance.setCurrentStudy(study, secKeyRef: self.keyRef)
         DataStorageManager.sharedInstance.createDirectories()
+        // update study stuff?
         return Recline.shared.save(study).then { _ -> Promise<Bool> in
             self.checkSurveys()
         }
     }
-
-    func purgeStudies() -> Promise<Bool> {
-        return firstly { () -> Promise<[Study]> in
-            Recline.shared.queryAll()
-        }.then { (studies: [Study]) -> Promise<Bool> in
-            var promise = Promise<Bool>.value(true)
-            for study in studies {
-                promise = promise.then { _ in
-                    Recline.shared.purge(study)
-                }
-            }
-            return promise
-        }
-    }
-
-    func stop() -> Promise<Bool> {
-        var promise: Promise<Void>
-        if self.gpsManager != nil {
-            promise = self.gpsManager!.stopAndClear()
-        } else {
-            promise = Promise()
-        }
-
-        return promise.then(on: DispatchQueue.global(qos: .default)) { _ -> Promise<Bool> in
-            // self.gpsManager = nil;
-            self.currentStudy = nil
-            StudyManager.real_study_loaded = false
-            return .value(true)
-        }
-        // catch is not needed since we are just assigning
-//        .catch(on: DispatchQueue.global(qos: .default)) {_ in
-//                print("Caught err")
-//        }
-    }
-
-    func leaveStudy() -> Promise<Bool> {
-        /*
-         guard let study = currentStudy else {
-             return Promise(true);
-         }
-         */
-
-        NotificationCenter.default.removeObserver(self, name: ReachabilityChangedNotification, object: nil)
-
-        var promise: Promise<Void>
-        if self.gpsManager != nil {
-            promise = self.gpsManager!.stopAndClear()
-        } else {
-            promise = Promise()
-        }
-
-        UIApplication.shared.cancelAllLocalNotifications()
-        return promise.then { _ -> Promise<Bool> in
-            self.gpsManager = nil
-            return self.purgeStudies().then { _ -> Promise<Bool> in
-                let fileManager = FileManager.default
-                var enumerator = fileManager.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)
-
-                if let enumerator = enumerator {
-                    while let filename = enumerator.nextObject() as? String {
-                        if true /* filename.hasSuffix(DataStorageManager.dataFileSuffix) */ {
-                            let filePath = DataStorageManager.uploadDataDirectory().appendingPathComponent(filename)
-                            try fileManager.removeItem(at: filePath)
-                        }
-                    }
-                }
-
-                enumerator = fileManager.enumerator(atPath: DataStorageManager.currentDataDirectory().path)
-
-                if let enumerator = enumerator {
-                    while let filename = enumerator.nextObject() as? String {
-                        if true /* filename.hasSuffix(DataStorageManager.dataFileSuffix) */ {
-                            let filePath = DataStorageManager.currentDataDirectory().appendingPathComponent(filename)
-                            try fileManager.removeItem(at: filePath)
-                        }
-                    }
-                }
-
-                self.currentStudy = nil
-                ApiManager.sharedInstance.patientId = ""
-                let instance = InstanceID.instanceID()
-                instance.deleteID { error in
-                    print(error.debugDescription)
-                    log.error(error.debugDescription)
-                }
-
-                return .value(true)
-            }
-        }
-    }
-
-    @objc func reachabilityChanged(_ notification: Notification) {
-        Promise().done { _ in
-            log.info("Reachability changed, running periodic.")
-            self.periodicNetworkTransfers()
-        }
-    }
-
-    func periodicNetworkTransfers() {
-        guard let currentStudy = currentStudy, let studySettings = currentStudy.studySettings else {
+    
+    // FIXME: This function has 4 unacceptable failure modes -- called only from setConsented (study registration) and startStudyDataServices
+    /// Sets up the password (api) credential for backend calls
+    func setApiCredentials() {
+        // guard - if these fail, return without doing anything (currentStudy is optional)
+        guard let currentStudy: Study = self.currentStudy, self.gpsManager == nil else {
             return
         }
-
-        let reachable = studySettings.uploadOverCellular ? self.appDelegate.reachability!.isReachable : self.appDelegate.reachability!.isReachableViaWiFi
-
-        // Good time to compact the database
-        let currentTime: Int64 = Int64(Date().timeIntervalSince1970)
-        let nextSurvey = currentStudy.nextSurveyCheck ?? 0
-        let nextUpload = currentStudy.nextUploadCheck ?? 0
-        if currentTime > nextSurvey || (reachable && currentStudy.missedSurveyCheck) {
-            /* This will be saved because setNextUpload saves the study */
-            currentStudy.missedSurveyCheck = !reachable
-            self.setNextSurveyTime().done { _ in
-                if reachable {
-                    self.checkSurveys()
+        // Setup APIManager's security
+        // Why is this EVER allowed to be the empty string? that's silent failure FOREVER
+        ApiManager.sharedInstance.password = PersistentPasswordManager.sharedInstance.passwordForStudy() ?? ""
+        ApiManager.sharedInstance.customApiUrl = currentStudy.customApiUrl
+        if let patientId = currentStudy.patientId {  // again WHY is this even allowed to happen on a null participant id
+            ApiManager.sharedInstance.patientId = patientId
+            if let clientPublicKey = currentStudy.studySettings?.clientPublicKey {
+                do {
+                    // failure means a null key
+                    self.keyRef = try PersistentPasswordManager.sharedInstance.storePublicKeyForStudy(clientPublicKey, patientId: patientId)
+                } catch {
+                    log.error("Failed to store RSA key in keychain.")  // why are we not crashing...
                 }
-            }.catch { _ in
-                log.error("Error checking for surveys")
-            }
-        } else if currentTime > nextUpload || (reachable && currentStudy.missedUploadCheck) {
-            /* This will be saved because setNextUpload saves the study */
-            currentStudy.missedUploadCheck = !reachable
-            self.setNextUploadTime().done { _ in
-                self.upload(!reachable)
-            }.catch { _ in
-                log.error("Error checking for uploads")
+            } else {
+                log.error("No public key found.  Can't store")  // why are we not crashing...
             }
         }
     }
-
-    func cleanupSurvey(_ activeSurvey: ActiveSurvey) {
-//        removeNotificationForSurvey(activeSurvey);
-        if let surveyId = activeSurvey.survey?.surveyId {
-            let timingsName = TrackingSurveyPresenter.timingDataType + "_" + surveyId
-            DataStorageManager.sharedInstance.closeStore(timingsName)
-        }
-    }
-
+    
+    /// takes a(n active) survey and creates the suvey answers file
     func submitSurvey(_ activeSurvey: ActiveSurvey, surveyPresenter: TrackingSurveyPresenter? = nil) {
+        // only run if this stuff exists and it is a TrackingSurvey, but then later there is checking of the survey type so maybe not.
         if let survey = activeSurvey.survey, let surveyId = survey.surveyId, let surveyType = survey.surveyType, surveyType == .TrackingSurvey {
+            // get the survey data and write it out
             var trackingSurvey: TrackingSurveyPresenter
             if surveyPresenter == nil {
+                // expiration logic? what is "expired?"
                 trackingSurvey = TrackingSurveyPresenter(surveyId: surveyId, activeSurvey: activeSurvey, survey: survey)
                 trackingSurvey.addTimingsEvent("expired", question: nil)
             } else {
-                trackingSurvey = surveyPresenter!
+                trackingSurvey = surveyPresenter!  // current survey I think?
             }
-            trackingSurvey.finalizeSurveyAnswers()
-
+            trackingSurvey.finalizeSurveyAnswers()  // its done, do the its-done thing
+            
             // increment number of submitted surveys
             if activeSurvey.bwAnswers.count > 0 {
-                if let surveyType = survey.surveyType {
+                if let surveyType = survey.surveyType {  // ... isn't this already instantiated?
                     switch surveyType {
                     case .AudioSurvey:
                         self.currentStudy?.submittedAudioSurveys = (self.currentStudy?.submittedAudioSurveys ?? 0) + 1
@@ -296,38 +190,50 @@ class StudyManager {
                 }
             }
         }
-
-        self.cleanupSurvey(activeSurvey)
+        self.cleanupSurvey(activeSurvey)  // call cleanup
     }
-
+    
+    /// miniscule portion of finishing a survey answefrs file creation, finalizes file sorta; also called in audio surveys
+    func cleanupSurvey(_ activeSurvey: ActiveSurvey) {
+        // removeNotificationForSurvey(activeSurvey)  // I don't know why we don't call this, but we don't.
+        if let surveyId = activeSurvey.survey?.surveyId {
+            let timingsName = TrackingSurveyPresenter.timingDataType + "_" + surveyId
+            _ = DataStorageManager.sharedInstance.closeStore(timingsName)
+        }
+    }
+    
+    ///
+    /// Survey checking logic
+    ///
+    
+    /// updates the list of surveys in the app ui based on the study timers,
+    /// updates the badge count, submits completed surveys, and updates the relevant survey timer.
+    /// (this is a mess, it should be broken down some, but it does all need to happen at this time)
     func updateActiveSurveys(_ forceSave: Bool = false) -> TimeInterval {
         log.info("Updating active surveys...")
         let currentDate = Date()
         let currentTime = currentDate.timeIntervalSince1970
         let currentDay = (calendar as NSCalendar).component(.weekday, from: currentDate) - 1
-        var nowDateComponents = (calendar as NSCalendar).components([NSCalendar.Unit.day, NSCalendar.Unit.year, NSCalendar.Unit.month, NSCalendar.Unit.timeZone], from: currentDate)
+        var nowDateComponents: DateComponents = (calendar as NSCalendar).components(
+            [NSCalendar.Unit.day, NSCalendar.Unit.year, NSCalendar.Unit.month, NSCalendar.Unit.timeZone], from: currentDate
+        )
         nowDateComponents.hour = 0
         nowDateComponents.minute = 0
         nowDateComponents.second = 0
-
-        var closestNextSurveyTime: TimeInterval = currentTime + (60.0 * 60.0 * 24.0 * 7)
-
-        guard let study = currentStudy, let dayBegin = calendar.date(from: nowDateComponents) else {
+        // if for some reason we don't have a current study, returne 15 minutes (presumably this tells something to wait 15 minutes)
+        guard let study = currentStudy else {
             return Date().addingTimeInterval(15.0 * 60.0).timeIntervalSince1970
         }
-
+        
+        // For all active surveys that aren't complete, but have expired, submit them
         var surveyDataModified = false
-
-        /* For all active surveys that aren't complete, but have expired, submit them */
         for (id, activeSurvey) in study.activeSurveys {
-            // THIS is basically the same thing as the else if statement below, EXCEPT we are resetting the survey.
-            // this is so that we reset the state for a permananent survey. If we do not have this,
-            // the survey stays at the "done" stage after you have completed the survey and does not allow
-            // you to go back and retake a survey.  also, every time you load the survey to the done page,
-            // it resaves a new version of the data in a file.
+            // almost the same as the else-if statement below, except we are resetting the survey, so that we reset the state for a permananent
+            // survey. If we don't the survey stays in the "done" stage after it is completed and you can't retake it.  It loads the survey to
+            // the done page, which will resave a new version of the data in a file.
             if activeSurvey.survey?.alwaysAvailable ?? false && activeSurvey.isComplete {
                 log.info("ActiveSurvey \(id) expired.")
-//                activeSurvey.isComplete = true;
+                // activeSurvey.isComplete = true  //
                 surveyDataModified = true
                 //  adding submitSurvey creates a new file; therefore we get 2 files of data- one when you
                 //  hit the confirm button and one when this code executes. we DO NOT KNOW why this is in the else if statement
@@ -336,29 +242,30 @@ class StudyManager {
                 activeSurvey.reset(activeSurvey.survey)
             }
             // TODO: we need to determine the correct exclusion logic, currently this submits ALL permanent surveys when ANY permanent survey loads.
-            // This function gets called whenever you try to display the home page, thus it happens at a very odd time.
+            // This function gets called whenever you try to display the home page, which is a very odd time.
             // If the survey has not been completed, but it is time for the next survey
             else if !activeSurvey.isComplete /* && activeSurvey.nextScheduledTime > 0 && activeSurvey.nextScheduledTime <= currentTime */ {
                 log.info("ActiveSurvey \(id) expired.")
-//                activeSurvey.isComplete = true;
+                // activeSurvey.isComplete = true;
                 surveyDataModified = true
                 self.submitSurvey(activeSurvey)
             }
         }
-
+        
+        // for each survey from the server, check on the scheduling
         var allSurveyIds: [String] = []
-        /* Now for each survey from the server, check on the scheduling */
         for survey in study.surveys {
             if let id = survey.surveyId {
                 allSurveyIds.append(id)
-                /* If we don't know about this survey already, add it in there for TRIGGERONFIRSTDOWNLOAD surverys*/
+                // If we don't know about this survey already, add it in there for TRIGGERONFIRSTDOWNLOAD surverys
                 if study.activeSurveys[id] == nil && (survey.triggerOnFirstDownload /* || next > 0 */ ) {
                     log.info("Adding survey  \(id) to active surveys")
                     let newActiveSurvey = ActiveSurvey(survey: survey)
                     study.activeSurveys[id] = newActiveSurvey
                     surveyDataModified = true
                 }
-                /* We want to display permanent surveys as active, and expect to change some details below (currently identical to the actions we take on a regular active survey) */
+                // We want to display permanent surveys as active, and expect to change some details below (currently
+                // identical to the actions we take on a regular active survey) */
                 else if study.activeSurveys[id] == nil && (survey.alwaysAvailable) {
                     log.info("Adding survey  \(id) to active surveys")
                     let newActiveSurvey = ActiveSurvey(survey: survey)
@@ -367,7 +274,7 @@ class StudyManager {
                 }
             }
         }
-
+        
         /* Set the badge, and remove surveys no longer on server from our active surveys list */
         var badgeCnt = 0
         for (id, activeSurvey) in study.activeSurveys {
@@ -376,193 +283,186 @@ class StudyManager {
                 study.activeSurveys.removeValue(forKey: id)
                 surveyDataModified = true
             } else if !activeSurvey.isComplete {
-//                if (activeSurvey.nextScheduledTime > 0) {
-//                    closestNextSurveyTime = min(closestNextSurveyTime, activeSurvey.nextScheduledTime);
-//                }
+                // if (activeSurvey.nextScheduledTime > 0) {
+                //     closestNextSurveyTime = min(closestNextSurveyTime, activeSurvey.nextScheduledTime);
+                // }
                 badgeCnt += 1
             }
         }
-        log.info("Badge Cnt: \(badgeCnt)")
+        log.info("Badge Count: \(badgeCnt)")
         UIApplication.shared.applicationIconBadgeNumber = badgeCnt
-
+        
+        // save surveyy data
         if surveyDataModified || forceSave {
             self.surveysUpdatedEvent.emit(0)
             Recline.shared.save(study).catch { _ in
                 log.error("Failed to save study after processing surveys")
             }
         }
+        
+        // calculate the next survey time for use and return it
+        var closestNextSurveyTime: TimeInterval = currentTime + (60.0 * 60.0 * 24.0 * 7)
         if let gpsManager = gpsManager {
             gpsManager.resetNextSurveyUpdate(closestNextSurveyTime)
         }
         return closestNextSurveyTime
     }
-
-    func checkSurveys() -> Promise<Bool> {
-        guard let study = currentStudy, let studySettings = study.studySettings else {
-            return .value(false)
-        }
-        log.info("Checking for surveys...")
-        return Recline.shared.save(study).then { _ -> Promise<([Survey], Int)> in
-            let surveyRequest = GetSurveysRequest()
-            return ApiManager.sharedInstance.arrayPostRequest(surveyRequest)
-        }.then { surveys, _ -> Promise<Void> in
-            log.info("Surveys: \(surveys)")
-            study.surveys = surveys
-            return Recline.shared.save(study).asVoid()
-        }.then { _ -> Promise<Bool> in
-            self.updateActiveSurveys()
-            return .value(true)
-        }.recover { _ -> Promise<Bool> in
-            .value(false)
-        }
-    }
-
+    
+    ///
+    /// Timers! They do what they say and aren't even complicated! Holy !#*&$@#*!
+    ///
+    
     func setNextUploadTime() -> Promise<Bool> {
         guard let study = currentStudy, let studySettings = study.studySettings else {
             return .value(true)
         }
-
         study.nextUploadCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.uploadDataFileFrequencySeconds)
         return Recline.shared.save(study).then { _ -> Promise<Bool> in
-            .value(true)
+                .value(true)
         }
     }
-
+    
     func setNextSurveyTime() -> Promise<Bool> {
-        guard let study = currentStudy, let studySettings = study.studySettings else { return .value(true)
+        guard let study = currentStudy, let studySettings = study.studySettings else {
+            return .value(true)
         }
-
         study.nextSurveyCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.checkForNewSurveysFreqSeconds)
         return Recline.shared.save(study).then { _ -> Promise<Bool> in
-            .value(true)
+                .value(true)
         }
     }
-
-    func parseFilename(_ filename: String) -> (type: String, timestamp: Int64, ext: String) {
-        let url = URL(fileURLWithPath: filename)
-        let pathExtention = url.pathExtension
-        let pathPrefix = url.deletingPathExtension().lastPathComponent
-
-        var type = ""
-
-        let pieces = pathPrefix.split(separator: "_")
-        var timestamp: Int64 = 0
-        if pieces.count > 2 {
-            type = String(pieces[1])
-            timestamp = Int64(String(pieces[pieces.count - 1])) ?? 0
+    
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////// Network Operations ////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    /// some kind of reachability thing, calls periodicNetworkTransfers in a promise (of course it does)
+    @objc func reachabilityChanged(_ notification: Notification) {
+        Promise().done { _ in
+            log.info("Reachability changed, running periodic.")
+            self.periodicNetworkTransfers()
         }
-
-        return (type: type, timestamp: timestamp, ext: pathExtention ?? "")
     }
-
-    func purgeUploadData(_ fileList: [String: Int64], currentStorageUse: Int64) -> Promise<Void> {
-        var used = currentStorageUse
-        return Promise().then(on: DispatchQueue.global(qos: .default)) { _ -> Promise<Void> in
-            log.error("EXCESSIVE STORAGE USED, used: \(currentStorageUse), WifiAvailable: \(self.appDelegate.reachability!.isReachableViaWiFi)")
-            log.error("Last success: \(self.currentStudy?.lastUploadSuccess)")
-            for (filename, len) in fileList {
-                log.error("file: \(filename), size: \(len)")
-            }
-            let keys = fileList.keys.sorted { a, b in
-                let fileA = self.parseFilename(a)
-                let fileB = self.parseFilename(b)
-                return fileA.timestamp < fileB.timestamp
-            }
-
-            for file in keys {
-                let attrs = self.parseFilename(file)
-                if attrs.ext != "csv" || attrs.type.hasPrefix("survey") {
-                    log.info("Skipping deletion: \(file)")
-                    continue
+    
+    /// called from self.setConsented, periodicNetworkTasks, and a debug menu button (I think)
+    /// THE RETURN VALUE IS NOT USED BECAUSE OF COURSE NOT
+    func checkSurveys() -> Promise<Bool> {
+        // return early if there is no study or no study settings (retaining studysettings check for safety)
+        guard let study = currentStudy, let _ = study.studySettings else {
+            return .value(false)
+        }
+        log.info("Checking for surveys...")
+        
+        // save the study (whatever that means), and then....
+        return Recline.shared.save(study).then { _ -> Promise<([Survey], Int)> in
+            // do the survey request (its json into a ~mappable)
+            let surveyRequest = GetSurveysRequest()
+            return ApiManager.sharedInstance.arrayPostRequest(surveyRequest)
+        }.then { surveys, _ -> Promise<Void> in
+            // then... we receive the surveys from the api manager request possibly?
+            // (This is another reason why promises are bad, they pointless obscure critical information)
+            log.info("Surveys: \(surveys)")
+            study.surveys = surveys
+            return Recline.shared.save(study).asVoid()
+        }.then { _ -> Promise<Bool> in
+            // then update the active surveys because the surveys may have just changed
+            self.updateActiveSurveys()
+            return .value(true)
+        }.recover { _ -> Promise<Bool> in
+            // and if anything went wron return false  --  IT IS NEVER USED
+                .value(false)
+        }
+    }
+    
+    /// runs network operations inside of promises
+    func periodicNetworkTransfers() {
+        // fail early logic.
+        guard let currentStudy = currentStudy, let studySettings = currentStudy.studySettings else {
+            return
+        }
+        // check the uploadOverCellular study detail.
+        let reachable = studySettings.uploadOverCellular ? self.appDelegate.reachability!.isReachable : self.appDelegate.reachability!.isReachableViaWiFi
+        // Good time to compact the database
+        let currentTime: Int64 = Int64(Date().timeIntervalSince1970)
+        let nextSurvey = currentStudy.nextSurveyCheck ?? 0
+        let nextUpload = currentStudy.nextUploadCheck ?? 0
+        
+        // logic for checking for studion and runnning the data upload code
+        if currentTime > nextSurvey || (reachable && currentStudy.missedSurveyCheck) {
+            // This (missedSurveyCheck?) will be saved because setNextUpload saves the study
+            currentStudy.missedSurveyCheck = !reachable  // whut?
+            self.setNextSurveyTime().done { _ in
+                if reachable {
+                    self.checkSurveys()
                 }
-                let filePath = DataStorageManager.uploadDataDirectory().appendingPathComponent(file)
-                do {
-                    log.warning("Removing file: \(filePath)")
-                    try FileManager.default.removeItem(at: filePath)
-                    used = used - fileList[file]!
-                } catch {
-                    log.error("Error removing file: \(filePath)")
-                }
-                
-                if used < self.MAX_UPLOAD_DATA {
-                    break
-                }
+            }.catch { _ in
+                log.error("Error checking for surveys")
             }
-            // we don't use crashlytics
-            // Crashlytics.sharedInstance().recordError(NSError(domain: "com.rf.beiwe.studies.excessive", code: 2, userInfo: nil))
-
-            return Promise()
+        } else if currentTime > nextUpload || (reachable && currentStudy.missedUploadCheck) {
+            // This (missedUploadCheck?) will be saved because setNextUpload saves the study
+            currentStudy.missedUploadCheck = !reachable
+            self.setNextUploadTime().done { _ in
+                self.upload(!reachable)
+            }.catch { _ in
+                log.error("Error checking for uploads")  // this is kindof unnecessary
+            }
         }
     }
-
-    func clearTempFiles() -> Promise<Void> {
-        return Promise().then(on: DispatchQueue.global(qos: .default)) { _ -> Promise<Void> in
-            do {
-                let alamoTmpDir = NSURL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("com.alamofire.manager")!.appendingPathComponent("multipart.form.data")
-                try FileManager.default.removeItem(at: alamoTmpDir)
-            } catch {
-                // log.error("Error removing tmp files: \(error)")
-            }
-            return Promise()
-        }
-    }
-
+    
+    /// business logic of the upload, except it isn't because we use PromiseKit and can't have nice things.
     func upload(_ processOnly: Bool) -> Promise<Void> {
+        log.info("Checking for uploads...")
+        // return immediately if already uploading
         if self.isUploading {
             return Promise()
         }
-        log.info("Checking for uploads...")
+        
+        // state tracking variables
         self.isUploading = true
-
-        var promiseChain: Promise<Bool>
-
-        promiseChain = Recline.shared.compact().then { _ -> Promise<Bool> in
+        var numFiles = 0
+        
+        // oh good a promiseChain...
+        let promiseChain: Promise<Bool> = Recline.shared.compact().then { _ -> Promise<Bool> in
+            // run prepare for upload
             DataStorageManager.sharedInstance.prepareForUpload().then { _ -> Promise<Bool> in
                 log.info("prepareForUpload finished")
                 return .value(true)
             }
         }
-
-        var numFiles = 0
-        var size: Int64 = 0
-        var storageInUse: Int64 = 0
-        let q = DispatchQueue.global(qos: .default)
-
-        var filesToProcess: [String: Int64] = [:]
-        return promiseChain.then(on: q) { (_: Bool) -> Promise<Bool> in
-            let fileManager = FileManager.default
-            let enumerator = fileManager.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)
-//            var uploadChain = Promise<Bool>(value: true)
-            var uploadChain = Promise<Bool>.value(true)
-            if let enumerator = enumerator {
-                while let filename = enumerator.nextObject() as? String {
-                    if DataStorageManager.sharedInstance.isUploadFile(filename) {
-                        let filePath = DataStorageManager.uploadDataDirectory().appendingPathComponent(filename)
-                        let attr = try FileManager.default.attributesOfItem(atPath: filePath.path)
-                        let fileSize = (attr[FileAttributeKey.size]! as AnyObject).longLongValue
-                        filesToProcess[filename] = fileSize
-                        size = size + fileSize!
-                        // promises.append(promise);
-                    }
+        
+        // most of the function is after the return statement, duh.
+        return promiseChain.then(on: DispatchQueue.global(qos: .default)) { (_: Bool) -> Promise<Bool> in
+            // if we can't enumerate files, that's insane, crash.
+            let fileEnumerator: FileManager.DirectoryEnumerator = FileManager.default.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)!
+            var filesToProcess: [String] = []
+            
+            // loop over all and check if each file can be uploaded, assemble the list.
+            while let filename = fileEnumerator.nextObject() as? String {
+                if DataStorageManager.sharedInstance.isUploadFile(filename) {
+                    filesToProcess.append(filename)
                 }
             }
-            storageInUse = size
+            
+            // we call with processOnly=true when we have no network access
             if !processOnly {
-                for (filename, len) in filesToProcess {
+                var uploadChain = Promise<Bool>.value(true)  // iinstantiate the start (end? yeah its the end) of the promise chain
+                for filename in filesToProcess {
                     let filePath = DataStorageManager.uploadDataDirectory().appendingPathComponent(filename)
                     let uploadRequest = UploadRequest(fileName: filename, filePath: filePath.path)
+                    
+                    // add the upload operation to the upload chain
                     uploadChain = uploadChain.then { _ -> Promise<Bool> in
-                        log.info("Uploading: \(filename)")
+                        // do an upload
                         return ApiManager.sharedInstance.makeMultipartUploadRequest(uploadRequest, file: filePath).then { _ -> Promise<Bool> in
-                            log.info("Finished uploading: \(filename), removing.")
+                            log.warning("Finished uploading: \(filename), deleting.")
                             AppEventManager.sharedInstance.logAppEvent(event: "uploaded", msg: "Uploaded data file", d1: filename)
                             numFiles = numFiles + 1
-                            try fileManager.removeItem(at: filePath)
-                            storageInUse = storageInUse - len
-                            filesToProcess.removeValue(forKey: filename)
+                            try FileManager.default.removeItem(at: filePath)  // ok I guess this can fail...?
                             return .value(true)
                         }
                     }.recover { _ -> Promise<Bool> in
+                        // in case of errors...
+                        log.warning("upload failed: \(filename)")
                         AppEventManager.sharedInstance.logAppEvent(event: "upload_file_failed", msg: "Failed Uploaded data file", d1: filename)
                         return .value(true)
                     }
@@ -572,9 +472,10 @@ class StudyManager {
                 log.info("Skipping upload, processing only")
                 return .value(true)
             }
+            // the rest of this is logging and then marking isUploading as false using ensure
         }.then { (results: Bool) -> Promise<Void> in
-            log.info("OK uploading \(numFiles). \(results)")
-            log.info("Total Size of uploads: \(size)")
+            // does this happen first? why are we using promises......
+            log.verbose("OK uploading \(numFiles). \(results)")
             AppEventManager.sharedInstance.logAppEvent(event: "upload_complete", msg: "Upload Complete", d1: String(numFiles))
             if let study = self.currentStudy {
                 study.lastUploadSuccess = Int64(NSDate().timeIntervalSince1970)
@@ -583,21 +484,121 @@ class StudyManager {
                 return Promise()
             }
         }.recover { _ in
-            log.info("Recover")
-            AppEventManager.sharedInstance.logAppEvent(event: "upload_incomplete", msg: "Upload Incomplete", d1: String(storageInUse))
-        }.then { () -> Promise<Void> in
-            log.info("Size left after upload: \(storageInUse)")
-            if storageInUse > self.MAX_UPLOAD_DATA {
-                AppEventManager.sharedInstance.logAppEvent(event: "purge", msg: "Purging too large data files", d1: String(storageInUse))
-                return self.purgeUploadData(filesToProcess, currentStorageUse: storageInUse)
-            } else {
-                return Promise()
-            }
-        }.then {
-            self.clearTempFiles()
-        }.always {
+            log.verbose("Upload Recover")
+            AppEventManager.sharedInstance.logAppEvent(event: "upload_incomplete", msg: "Upload Incomplete")
+        }.ensure {
             self.isUploading = false
-            log.info("Always")
+        }
+    }
+    
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////// The Leave Study Code //////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    /// the bulk of the leave study feature.
+    func leaveStudy() -> Promise<Bool> {
+        var promise: Promise<Void> = Promise()
+        
+        // clear gps? this doesn't look like it disables sensors?
+        if self.gpsManager != nil {
+            promise = self.gpsManager!.stopAndClear()
+        }
+        
+        // kill notifications
+        NotificationCenter.default.removeObserver(self, name: ReachabilityChangedNotification, object: nil)
+        UIApplication.shared.cancelAllLocalNotifications()
+        
+        // and then alllll code is located after return statement because Promises are totally meant to be used like this. hooray!
+        return promise.then { _ -> Promise<Bool> in
+            self.gpsManager = nil  // does this clear all the other sensors at deallocation?
+            
+            // call purge studies and insert a _second_ return statement 🙄
+            return self.purgeStudies().then { _ -> Promise<Bool> in
+                // delete upload diirectory using ugly code
+                var enumerator = FileManager.default.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)
+                if let enumerator = enumerator {
+                    while let filename = enumerator.nextObject() as? String {
+                        if true /* filename.hasSuffix(DataStorageManager.dataFileSuffix) */ {
+                            let filePath = DataStorageManager.uploadDataDirectory().appendingPathComponent(filename)
+                            try FileManager.default.removeItem(at: filePath)
+                        }
+                    }
+                }
+                // delete data directory using ugly code
+                enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path)
+                if let enumerator = enumerator {
+                    while let filename = enumerator.nextObject() as? String {
+                        if true /* filename.hasSuffix(DataStorageManager.dataFileSuffix) */ {
+                            let filePath = DataStorageManager.currentDataDirectory().appendingPathComponent(filename)
+                            try FileManager.default.removeItem(at: filePath)
+                        }
+                    }
+                }
+                // clear the study, patient id
+                self.currentStudy = nil
+                ApiManager.sharedInstance.patientId = ""
+                
+                // I don't know what this is and I don't think it matters.
+                let instance = InstanceID.instanceID()
+                instance.deleteID { error in
+                    print(error.debugDescription)
+                    log.error(error.debugDescription)
+                }
+                return .value(true)  // ohey a third return statement
+            }
+        }
+    }
+    
+    /// deletes all studies - ok? - used in registration for some reason
+    func purgeStudies() -> Promise<Bool> {
+        // fairly certain that Recline.queryAll needs to be called to enable RecLine
+        return firstly { () -> Promise<[Study]> in
+            Recline.shared.queryAll()
+        }.then { (studies: [Study]) -> Promise<Bool> in
+            // delete all the studies
+            var promise = Promise<Bool>.value(true)
+            for study in studies {
+                promise = promise.then { _ in
+                    Recline.shared.purge(study)
+                }
+            }
+            return promise
+        }
+    }
+    
+    ///
+    /// Miscellaneous utility functions
+    ///
+    
+    /// returns a tuple of the filetype (data stream name?), the timestamp, and the file extension
+    func parseFilename(_ filename: String) -> (type: String, timestamp: Int64, ext: String) {
+        // I can't tell if this code has extra variables, or if deletingPathExtension mutates the url maybe?
+        let url = URL(fileURLWithPath: filename)
+        let pathExtention = url.pathExtension
+        let pathPrefix = url.deletingPathExtension().lastPathComponent
+        let pieces = pathPrefix.split(separator: "_")
+        var type = ""
+        var timestamp: Int64 = 0
+        if pieces.count > 2 {
+            type = String(pieces[1])
+            timestamp = Int64(String(pieces[pieces.count - 1])) ?? 0
+        }
+        return (type: type, timestamp: timestamp, ext: pathExtention)
+    }
+    
+    /// only called from AppDelegate.applicationWillTerminate
+    func stop() -> Promise<Bool> {
+        // stop gps (might stop other sensors but doesn't look like it)
+        var promise: Promise<Void> = Promise()
+        if self.gpsManager != nil {
+            promise = self.gpsManager!.stopAndClear()
+        }
+        // clear currentStudy
+        return promise.then(on: DispatchQueue.global(qos: .default)) { _ -> Promise<Bool> in
+            // self.gpsManager = nil  // I guess this is unnecessary?
+            self.currentStudy = nil
+            StudyManager.real_study_loaded = false
+            return .value(true)
         }
     }
 }
