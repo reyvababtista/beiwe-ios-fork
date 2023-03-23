@@ -15,176 +15,178 @@ let RECUR_DEPTH = 3
 
 // TODO: convert All fatalError calls to sentry error reports with real error information.
 
-// EncryptedStorage Originally included a buffered write pattern in AudioQuestionViewController.
-// orig comment: only write multiples of 3, since we are base64 encoding and would otherwise end up with padding
-//    if (isFlush)
-//        evenLength = self.currentData.length
-//    else
-//        evenLength = (self.currentData.length / 3) * 3
-//    self._write(new_data, len: new_data.length)
-//    self.currentData.replaceBytes(in: NSRange(0..<self.currentData.length), withBytes: nil, length: 0)
-class EncryptedStorage {
-    // (Binary, mostly for audio files) Encrypted Storage
-    // files
-    var filename: URL
-    var eventualFilename: URL
-    var debug_shortname: String
-    let fileManager = FileManager.default
-    var file_handle: FileHandle?
-    // encryption
-    var publicKey: String
-    var aesKey: Data
-    var iv: Data
-    var secKeyRef: SecKey
-    // machinery
-    let encryption_queue: DispatchQueue
-    var stream_cryptor: StreamCryptor
+//////////////////////////////////////////////////////////// DataStorage Manager //////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////// DataStorage Manager //////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////// DataStorage Manager //////////////////////////////////////////////////////
+class DataStorageManager {
+    static let sharedInstance = DataStorageManager()
+    static let dataFileSuffix = ".csv"
 
-    init(data_stream_type: String, suffix: String, patientId: String, publicKey: String, keyRef: SecKey?) {
-        // queue name
-        self.encryption_queue = DispatchQueue(label: "beiwe.dataqueue." + data_stream_type, attributes: [])
-        // file names
-        self.debug_shortname = patientId + "_" + data_stream_type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
-        self.eventualFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.debug_shortname + suffix)
-        self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.debug_shortname + suffix)
-        // encryption setup
-        self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
-        self.iv = Crypto.sharedInstance.randomBytes(16)
-        self.publicKey = publicKey
-        self.secKeyRef = keyRef!
-        let data_for_key = (aesKey as NSData).bytes.bindMemory(to: UInt8.self, capacity: self.aesKey.count)
-        let data_for_iv = (iv as NSData).bytes.bindMemory(to: UInt8.self, capacity: self.iv.count)
-        self.stream_cryptor = StreamCryptor(
-            operation: .encrypt,
-            algorithm: .aes,
-            options: .PKCS7Padding,
-            key: Array(UnsafeBufferPointer(start: data_for_key, count: self.aesKey.count)),
-            iv: Array(UnsafeBufferPointer(start: data_for_iv, count: self.iv.count))
+    var publicKey: String?
+    var storageTypes: [String: DataStorage] = [:]
+    var study: Study?
+    var secKeyRef: SecKey?
+
+    /// instantiates your DataStorage object - called in every manager
+    func createStore(_ type: String, headers: [String]) -> DataStorage {
+        if self.storageTypes[type] == nil {
+            if let publicKey = publicKey, let patientId = study?.patientId {
+                self.storageTypes[type] = DataStorage(
+                    type: type,
+                    headers: headers,
+                    patientId: patientId,
+                    publicKey: publicKey,
+                    keyRef: self.secKeyRef
+                )
+            } else {
+                fatalError("No public key found! Can't store data")
+            }
+        }
+        return self.storageTypes[type]!
+    }
+
+    // TODO: we are using the cache directory, we should be using applicationSupportDirectory (Library/Application support/)
+    // https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html
+    static func currentDataDirectory() -> URL {
+        let cacheDir = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true)[0]
+        return URL(fileURLWithPath: cacheDir).appendingPathComponent("currentdata")
+    }
+
+    static func uploadDataDirectory() -> URL {
+        let cacheDir = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true)[0]
+        return URL(fileURLWithPath: cacheDir).appendingPathComponent("uploaddata")
+    }
+
+    func createDirectories(recur: Int = RECUR_DEPTH) {
+        do {
+            try FileManager.default.createDirectory(
+                atPath: DataStorageManager.currentDataDirectory().path,
+                withIntermediateDirectories: true,
+                attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
+            )
+            try FileManager.default.createDirectory(
+                atPath: DataStorageManager.uploadDataDirectory().path,
+                withIntermediateDirectories: true,
+                attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
+            )
+        } catch {
+            if recur > 0 {
+                log.error("create_directories recur at \(recur).")
+                Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                return self.createDirectories(recur: recur - 1)
+            }
+            log.error("Failed to create directories.")
+            fatalError("Failed to create directories.")
+        }
+    }
+
+    func setCurrentStudy(_ study: Study, secKeyRef: SecKey?) {
+        self.study = study
+        self.secKeyRef = secKeyRef
+        if let publicKey = study.studySettings?.clientPublicKey {
+            self.publicKey = publicKey
+        }
+    }
+
+    func closeStore(_ type: String) -> Promise<Void> {
+        self.storageTypes.removeValue(forKey: type)
+        return Promise()
+    }
+
+    func _flushAll() {
+        // calls flush for all files
+        for (_, storage) in self.storageTypes {
+            storage.flush(true)
+        }
+    }
+
+    func isUploadFile(_ filename: String) -> Bool {
+        return filename.hasSuffix(DataStorageManager.dataFileSuffix) || filename.hasSuffix(".mp4") || filename.hasSuffix(".wav")
+    }
+
+    private func moveFile(_ src: URL, dst: URL) {
+        // TODO: is this not-moving case safe?  need to understand upload logic to answer
+        do {
+            try FileManager.default.moveItem(at: src, to: dst)
+            // log.info("moved \(src) to \(dst)")
+        } catch {
+            log.error("Error moving \(src) to \(dst)")
+        }
+    }
+
+    func prepareForUpload() -> Promise<Void> {
+        let prepQ = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default)
+        return Promise().then(on: prepQ) { _ -> Promise<Void> in
+            self.prepareForUpload_actual()
+            return Promise()
+        }
+    }
+
+    private func prepareForUpload_actual() {
+        // TODO: this is a really dangerous general solution to ensuring files are getting uploaded...
+        let prepQ = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default)
+        // let prepQ = DispatchQueue.global(qos: DispatchQoS.QoSClass.utility)  // this is the fix for the warning, not changing atm.
+
+        // Flush once to get all of the files currently processing, record names
+        var filesToUpload: [String] = []
+        self._flushAll()
+
+        if let enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path) {
+            while let filename = enumerator.nextObject() as? String {
+                if self.isUploadFile(filename) {
+                    filesToUpload.append(filename)
+                } else {
+                    log.warning("Non upload file sitting in directory: \(filename)")
+                }
+            }
+        }
+
+        for filename in filesToUpload {
+            self.moveFile(DataStorageManager.currentDataDirectory().appendingPathComponent(filename),
+                          dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
+        }
+    }
+
+    func createEncryptedFile(type: String, suffix: String) -> EncryptedStorage {
+        return EncryptedStorage(
+            data_stream_type: type,
+            suffix: suffix,
+            patientId: self.study!.patientId!,
+            publicKey: PersistentPasswordManager.sharedInstance.publicKeyName(self.study!.patientId!),
+            keyRef: self.secKeyRef
         )
     }
 
-    func open() -> Promise<Void> {
-        return Promise().then(on: self.encryption_queue) { _ -> Promise<Void> in
-            self.open_actual()
-            return Promise()
-        }
-    }
-
-    func close() -> Promise<Void> {
-        return Promise().then(on: self.encryption_queue) { _ -> Promise<Void> in
-            self.close_actual()
-            return Promise()
-        }
-    }
-
-    func write(_ data: NSData?, writeLen: Int) -> Promise<Int> {
-        // This is called directly in audio file code
-        // log.info("write called on \(self.debug_shortname)...")
-        return Promise().then(on: self.encryption_queue) { _ -> Promise<Int> in
-            // log.info("write (promise) called on \(self.eventualFilename)...")
-            .value(self.write_actual(data, writeLen: writeLen))
-        }
-    }
-
-    private func open_actual(recur: Int = RECUR_DEPTH) {
-        // open file
-        if !self.fileManager.createFile(
-            atPath: self.filename.path,
-            contents: nil,
-            attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none])
-        {
-            if recur > 0 {
-                log.error("open_actual recur at \(recur).")
-                Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
-                return self.open_actual(recur: recur - 1)
-            }
-            fatalError("could not create file?")
-        }
-        self.file_handle = try! FileHandle(forWritingTo: self.filename)
-
-        // write the rsa line and iv immediately
-        let rsaLine: String = try! Crypto.sharedInstance.base64ToBase64URL(
-            SwiftyRSA.encryptString(
-                Crypto.sharedInstance.base64ToBase64URL(self.aesKey.base64EncodedString()),
-                publicKey: self.secKeyRef,
-                padding: []
-            )
-        ) + "\n"
-        let ivHeader = Crypto.sharedInstance.base64ToBase64URL(self.iv.base64EncodedString()) + ":"
-        self.file_handle?.write(rsaLine.data(using: String.Encoding.utf8)!)
-        self.file_handle?.write(ivHeader.data(using: String.Encoding.utf8)!)
-    }
-
-    private func close_actual() {
-        self.file_handle?.closeFile()
-        self.file_handle = nil
-        try! FileManager.default.moveItem(at: self.filename, to: self.eventualFilename)
-        // log.info("moved temp data file \(self.filename) to \(self.eventualFilename)")
-    }
-
-    private func write_actual(_ data: NSData?, writeLen: Int) -> Int {
-        // core write function, as much as anything here can be said to "write"
-        // log.info("write_actual called on \(self.eventualFilename)...")
-        let new_data: NSMutableData = NSMutableData()
-
-        // setup to write - this case should be impossible
-        if data != nil && writeLen != 0 {
-            // log.info("write_actual case 1")
-            // Need to encrypt data
-            let encryptLen = self.stream_cryptor.getOutputLength(inputByteCount: writeLen)
-            let bufferOut = UnsafeMutablePointer<Void>.allocate(capacity: encryptLen)
-            var byteCount: Int = 0
-            let bufferIn = UnsafeMutableRawPointer(mutating: data!.bytes)
-            self.stream_cryptor.update(
-                bufferIn: bufferIn,
-                byteCountIn: writeLen,
-                bufferOut: bufferOut,
-                byteCapacityOut: encryptLen,
-                byteCountOut: &byteCount
-            )
-            new_data.append(NSData(bytesNoCopy: bufferOut, length: byteCount) as Data)
-        }
-
-        // again, this case should be impossible
-        let encryptLen = self.stream_cryptor.getOutputLength(inputByteCount: 0, isFinal: true)
-        if encryptLen > 0 {
-            // log.info("write_actual case 2")
-            // mostly setup of these obscure pointers to an array of data (there must be a better way to do this...)
-            let bufferOut = UnsafeMutablePointer<Void>.allocate(capacity: encryptLen)
-            var byteCount: Int = 0
-            self.stream_cryptor.final(bufferOut: bufferOut, byteCapacityOut: encryptLen, byteCountOut: &byteCount)
-            // setup to write an array of appropriate length
-            let finalData = NSData(bytesNoCopy: bufferOut, length: byteCount)
-            var array = [UInt8](repeating: 0, count: finalData.length / MemoryLayout<UInt8>.size)
-            // copy bytes into array (its an array of bytes, length is just length), append to new_data
-            finalData.getBytes(&array, length: finalData.length)
-            new_data.append(finalData as Data)
-        }
-
-        // this was formerly the _write function
-        if new_data.length != 0 {
-            // log.info("write_actual case 3")
-            let dataToWriteBuffer = UnsafeMutableRawPointer(mutating: new_data.bytes)
-            let dataToWrite = NSData(bytesNoCopy: dataToWriteBuffer, length: new_data.length, freeWhenDone: false)
-            let encodedData: String = Crypto.sharedInstance.base64ToBase64URL(dataToWrite.base64EncodedString(options: []))
-            self.file_handle?.write(encodedData.data(using: String.Encoding.utf8)!)
-        }
-        // log.info("write_actual finished")
-        return new_data.length
-    }
-
-    deinit {
-        if self.file_handle != nil {
-            self.file_handle?.closeFile()
-            self.file_handle = nil
-        }
-    }
+    // func _printFileInfo(_ file: URL) {
+    //     // debugging function - unused
+    //     let path = file.path
+    //     var seekPos: UInt64 = 0
+    //     var firstLine: String = ""
+    //
+    //     log.info("infoBeginForFile: \(path)")
+    //     if let fileHandle = try? FileHandle(forReadingFrom: file) {
+    //         defer {
+    //             fileHandle.closeFile()
+    //         }
+    //         let dataString = String(data: fileHandle.readData(ofLength: 2048), encoding: String.Encoding.utf8)
+    //         let dataArray = dataString?.split { $0 == "\n" }.map(String.init)
+    //         if let dataArray = dataArray, dataArray.count > 0 {
+    //             firstLine = dataArray[0]
+    //         } else {
+    //             log.warning("No first line found!!")
+    //         }
+    //         seekPos = fileHandle.seekToEndOfFile()
+    //         fileHandle.closeFile()
+    //     } else {
+    //         log.error("Error opening file: \(path) for info")
+    //     }
+    //     log.info("infoForFile: len: \(seekPos), line: \(firstLine), filename: \(path)")
+    // }
 }
 
-/*
- Data Storage
- */
-
+////////////////////////////////////////////////////// Data Storage ///////////////////////////////////////////////////////
+////////////////////////////////////////////////////// Data Storage ///////////////////////////////////////////////////////
+////////////////////////////////////////////////////// Data Storage ///////////////////////////////////////////////////////
 class DataStorage {
     var headers: [String]
     var type: String
@@ -383,168 +385,172 @@ class DataStorage {
     }
 }
 
-class DataStorageManager {
-    static let sharedInstance = DataStorageManager()
-    static let dataFileSuffix = ".csv"
+/////////////////////////////////////////////////////// EncryptedStorage /////////////////////////////////////////////////////
+/////////////////////////////////////////////////////// EncryptedStorage /////////////////////////////////////////////////////
+/////////////////////////////////////////////////////// EncryptedStorage /////////////////////////////////////////////////////
 
-    var publicKey: String?
-    var storageTypes: [String: DataStorage] = [:]
-    var study: Study?
-    var secKeyRef: SecKey?
+// EncryptedStorage Originally included a buffered write pattern in AudioQuestionViewController.
+// orig comment: only write multiples of 3, since we are base64 encoding and would otherwise end up with padding
+//    if (isFlush)
+//        evenLength = self.currentData.length
+//    else
+//        evenLength = (self.currentData.length / 3) * 3
+//    self._write(new_data, len: new_data.length)
+//    self.currentData.replaceBytes(in: NSRange(0..<self.currentData.length), withBytes: nil, length: 0)
+class EncryptedStorage {
+    // (Binary, mostly for audio files) Encrypted Storage
+    // files
+    var filename: URL
+    var eventualFilename: URL
+    var debug_shortname: String
+    let fileManager = FileManager.default
+    var file_handle: FileHandle?
+    // encryption
+    var publicKey: String
+    var aesKey: Data
+    var iv: Data
+    var secKeyRef: SecKey
+    // machinery
+    let encryption_queue: DispatchQueue
+    var stream_cryptor: StreamCryptor
 
-    // TODO: we are using the cache directory, we should be using applicationSupportDirectory (Library/Application support/)
-    // https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html
-    static func currentDataDirectory() -> URL {
-        let cacheDir = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true)[0]
-        return URL(fileURLWithPath: cacheDir).appendingPathComponent("currentdata")
-    }
-
-    static func uploadDataDirectory() -> URL {
-        let cacheDir = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true)[0]
-        return URL(fileURLWithPath: cacheDir).appendingPathComponent("uploaddata")
-    }
-
-    func createDirectories(recur: Int = RECUR_DEPTH) {
-        do {
-            try FileManager.default.createDirectory(
-                atPath: DataStorageManager.currentDataDirectory().path,
-                withIntermediateDirectories: true,
-                attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
-            )
-            try FileManager.default.createDirectory(
-                atPath: DataStorageManager.uploadDataDirectory().path,
-                withIntermediateDirectories: true,
-                attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
-            )
-        } catch {
-            if recur > 0 {
-                log.error("create_directories recur at \(recur).")
-                Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
-                return self.createDirectories(recur: recur - 1)
-            }
-            log.error("Failed to create directories.")
-            fatalError("Failed to create directories.")
-        }
-    }
-
-    func setCurrentStudy(_ study: Study, secKeyRef: SecKey?) {
-        self.study = study
-        self.secKeyRef = secKeyRef
-        if let publicKey = study.studySettings?.clientPublicKey {
-            self.publicKey = publicKey
-        }
-    }
-
-    /// instantiates your DataStorage object
-    func createStore(_ type: String, headers: [String]) -> DataStorage {
-        if self.storageTypes[type] == nil {
-            if let publicKey = publicKey, let patientId = study?.patientId {
-                self.storageTypes[type] = DataStorage(
-                    type: type,
-                    headers: headers,
-                    patientId: patientId,
-                    publicKey: publicKey,
-                    keyRef: self.secKeyRef
-                )
-            } else {
-                fatalError("No public key found! Can't store data")
-            }
-        }
-        return self.storageTypes[type]!
-    }
-    
-    func closeStore(_ type: String) -> Promise<Void> {
-        self.storageTypes.removeValue(forKey: type)
-        return Promise()
+    init(data_stream_type: String, suffix: String, patientId: String, publicKey: String, keyRef: SecKey?) {
+        // queue name
+        self.encryption_queue = DispatchQueue(label: "beiwe.dataqueue." + data_stream_type, attributes: [])
+        // file names
+        self.debug_shortname = patientId + "_" + data_stream_type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
+        self.eventualFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.debug_shortname + suffix)
+        self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.debug_shortname + suffix)
+        // encryption setup
+        self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
+        self.iv = Crypto.sharedInstance.randomBytes(16)
+        self.publicKey = publicKey
+        self.secKeyRef = keyRef!
+        let data_for_key = (aesKey as NSData).bytes.bindMemory(to: UInt8.self, capacity: self.aesKey.count)
+        let data_for_iv = (iv as NSData).bytes.bindMemory(to: UInt8.self, capacity: self.iv.count)
+        self.stream_cryptor = StreamCryptor(
+            operation: .encrypt,
+            algorithm: .aes,
+            options: .PKCS7Padding,
+            key: Array(UnsafeBufferPointer(start: data_for_key, count: self.aesKey.count)),
+            iv: Array(UnsafeBufferPointer(start: data_for_iv, count: self.iv.count))
+        )
     }
 
-    func _flushAll() {
-        // calls flush for all files
-        for (_, storage) in self.storageTypes {
-            storage.flush(true)
-        }
-    }
-    
-    func isUploadFile(_ filename: String) -> Bool {
-        return filename.hasSuffix(DataStorageManager.dataFileSuffix) || filename.hasSuffix(".mp4") || filename.hasSuffix(".wav")
-    }
-
-    private func _moveFile(_ src: URL, dst: URL) {
-        // TODO: is this not-moving case safe?  need to understand upload logic to answer
-        do {
-            try FileManager.default.moveItem(at: src, to: dst)
-            // log.info("moved \(src) to \(dst)")
-        } catch {
-            log.error("Error moving \(src) to \(dst)")
-        }
-    }
-    
-    func prepareForUpload() -> Promise<Void> {
-        let prepQ = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default)
-        return Promise().then(on: prepQ) { _ -> Promise<Void> in
-            self.prepareForUpload_actual()
+    func open() -> Promise<Void> {
+        return Promise().then(on: self.encryption_queue) { _ -> Promise<Void> in
+            self.open_actual()
             return Promise()
         }
     }
 
-    private func prepareForUpload_actual() {
-        // TODO: this is a really dangerous general solution to ensuring files are getting uploaded...
-        let prepQ = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default)
-        // let prepQ = DispatchQueue.global(qos: DispatchQoS.QoSClass.utility)  // this is the fix for the warning, not changing atm.
-
-        // Flush once to get all of the files currently processing, record names
-        var filesToUpload: [String] = []
-        self._flushAll()
-        
-        if let enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path) {
-            while let filename = enumerator.nextObject() as? String {
-                if self.isUploadFile(filename) {
-                    filesToUpload.append(filename)
-                } else {
-                    log.warning("Non upload file sitting in directory: \(filename)")
-                }
-            }
-        }
-
-        for filename in filesToUpload {
-            self._moveFile(DataStorageManager.currentDataDirectory().appendingPathComponent(filename),
-                           dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
+    func close() -> Promise<Void> {
+        return Promise().then(on: self.encryption_queue) { _ -> Promise<Void> in
+            self.close_actual()
+            return Promise()
         }
     }
 
-    func createEncryptedFile(type: String, suffix: String) -> EncryptedStorage {
-        return EncryptedStorage(
-            data_stream_type: type,
-            suffix: suffix,
-            patientId: self.study!.patientId!,
-            publicKey: PersistentPasswordManager.sharedInstance.publicKeyName(self.study!.patientId!),
-            keyRef: self.secKeyRef
-        )
+    func write(_ data: NSData?, writeLen: Int) -> Promise<Int> {
+        // This is called directly in audio file code
+        // log.info("write called on \(self.debug_shortname)...")
+        return Promise().then(on: self.encryption_queue) { _ -> Promise<Int> in
+            // log.info("write (promise) called on \(self.eventualFilename)...")
+            .value(self.write_actual(data, writeLen: writeLen))
+        }
     }
 
-    func _printFileInfo(_ file: URL) {
-        // debugging function - unused
-        let path = file.path
-        var seekPos: UInt64 = 0
-        var firstLine: String = ""
-
-        log.info("infoBeginForFile: \(path)")
-        if let fileHandle = try? FileHandle(forReadingFrom: file) {
-            defer {
-                fileHandle.closeFile()
+    private func open_actual(recur: Int = RECUR_DEPTH) {
+        // open file
+        if !self.fileManager.createFile(
+            atPath: self.filename.path,
+            contents: nil,
+            attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none])
+        {
+            if recur > 0 {
+                log.error("open_actual recur at \(recur).")
+                Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                return self.open_actual(recur: recur - 1)
             }
-            let dataString = String(data: fileHandle.readData(ofLength: 2048), encoding: String.Encoding.utf8)
-            let dataArray = dataString?.split { $0 == "\n" }.map(String.init)
-            if let dataArray = dataArray, dataArray.count > 0 {
-                firstLine = dataArray[0]
-            } else {
-                log.warning("No first line found!!")
-            }
-            seekPos = fileHandle.seekToEndOfFile()
-            fileHandle.closeFile()
-        } else {
-            log.error("Error opening file: \(path) for info")
+            fatalError("could not create file?")
         }
-        log.info("infoForFile: len: \(seekPos), line: \(firstLine), filename: \(path)")
+        self.file_handle = try! FileHandle(forWritingTo: self.filename)
+
+        // write the rsa line and iv immediately
+        let rsaLine: String = try! Crypto.sharedInstance.base64ToBase64URL(
+            SwiftyRSA.encryptString(
+                Crypto.sharedInstance.base64ToBase64URL(self.aesKey.base64EncodedString()),
+                publicKey: self.secKeyRef,
+                padding: []
+            )
+        ) + "\n"
+        let ivHeader = Crypto.sharedInstance.base64ToBase64URL(self.iv.base64EncodedString()) + ":"
+        self.file_handle?.write(rsaLine.data(using: String.Encoding.utf8)!)
+        self.file_handle?.write(ivHeader.data(using: String.Encoding.utf8)!)
+    }
+
+    private func close_actual() {
+        self.file_handle?.closeFile()
+        self.file_handle = nil
+        try! FileManager.default.moveItem(at: self.filename, to: self.eventualFilename)
+        // log.info("moved temp data file \(self.filename) to \(self.eventualFilename)")
+    }
+
+    private func write_actual(_ data: NSData?, writeLen: Int) -> Int {
+        // core write function, as much as anything here can be said to "write"
+        // log.info("write_actual called on \(self.eventualFilename)...")
+        let new_data: NSMutableData = NSMutableData()
+
+        // setup to write - this case should be impossible
+        if data != nil && writeLen != 0 {
+            // log.info("write_actual case 1")
+            // Need to encrypt data
+            let encryptLen = self.stream_cryptor.getOutputLength(inputByteCount: writeLen)
+            let bufferOut = UnsafeMutablePointer<Void>.allocate(capacity: encryptLen)
+            var byteCount: Int = 0
+            let bufferIn = UnsafeMutableRawPointer(mutating: data!.bytes)
+            self.stream_cryptor.update(
+                bufferIn: bufferIn,
+                byteCountIn: writeLen,
+                bufferOut: bufferOut,
+                byteCapacityOut: encryptLen,
+                byteCountOut: &byteCount
+            )
+            new_data.append(NSData(bytesNoCopy: bufferOut, length: byteCount) as Data)
+        }
+
+        // again, this case should be impossible
+        let encryptLen = self.stream_cryptor.getOutputLength(inputByteCount: 0, isFinal: true)
+        if encryptLen > 0 {
+            // log.info("write_actual case 2")
+            // mostly setup of these obscure pointers to an array of data (there must be a better way to do this...)
+            let bufferOut = UnsafeMutablePointer<Void>.allocate(capacity: encryptLen)
+            var byteCount: Int = 0
+            self.stream_cryptor.final(bufferOut: bufferOut, byteCapacityOut: encryptLen, byteCountOut: &byteCount)
+            // setup to write an array of appropriate length
+            let finalData = NSData(bytesNoCopy: bufferOut, length: byteCount)
+            var array = [UInt8](repeating: 0, count: finalData.length / MemoryLayout<UInt8>.size)
+            // copy bytes into array (its an array of bytes, length is just length), append to new_data
+            finalData.getBytes(&array, length: finalData.length)
+            new_data.append(finalData as Data)
+        }
+
+        // this was formerly the _write function
+        if new_data.length != 0 {
+            // log.info("write_actual case 3")
+            let dataToWriteBuffer = UnsafeMutableRawPointer(mutating: new_data.bytes)
+            let dataToWrite = NSData(bytesNoCopy: dataToWriteBuffer, length: new_data.length, freeWhenDone: false)
+            let encodedData: String = Crypto.sharedInstance.base64ToBase64URL(dataToWrite.base64EncodedString(options: []))
+            self.file_handle?.write(encodedData.data(using: String.Encoding.utf8)!)
+        }
+        // log.info("write_actual finished")
+        return new_data.length
+    }
+
+    deinit {
+        if self.file_handle != nil {
+            self.file_handle?.closeFile()
+            self.file_handle = nil
+        }
     }
 }
