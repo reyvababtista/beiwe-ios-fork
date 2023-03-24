@@ -38,7 +38,7 @@ class StudyManager {
         
         // mostly sets real_study_loaded to true...
         return firstly { () -> Promise<[Study]> in
-            Recline.shared.queryAll()  // fixme: document what this is, I've forgotten...
+            Recline.shared.queryAll()  // this returns a list of all studies as a parameter to the next promise.
         }.then { (studies: [Study]) -> Promise<Bool> in
             // if there is more than one study, log a warning? this is pointless
             if studies.count > 1 {
@@ -551,9 +551,9 @@ class StudyManager {
     
     /// deletes all studies - ok? - used in registration for some reason
     func purgeStudies() -> Promise<Bool> {
-        // fairly certain that Recline.queryAll needs to be called to enable RecLine
+        /// reaches into the database, removes the study, no clue what the queryall does
         return firstly { () -> Promise<[Study]> in
-            Recline.shared.queryAll()
+            Recline.shared.queryAll()  // this returns a list of all studies as a parameter to the next promise.
         }.then { (studies: [Study]) -> Promise<Bool> in
             // delete all the studies
             var promise = Promise<Bool>.value(true)
