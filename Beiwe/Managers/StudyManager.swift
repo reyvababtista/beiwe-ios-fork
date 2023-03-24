@@ -88,10 +88,10 @@ class StudyManager {
         
         // every sensor, which for unfathomable reasons are contained inside the gps manager, activate them
         if studySettings.gps && studySettings.gpsOnDurationSeconds > 0 {
-            self.gpsManager!.addDataService(studySettings.gpsOnDurationSeconds, off: studySettings.gpsOffDurationSeconds, handler: self.gpsManager!)
+            self.gpsManager!.addDataService(on_duration: studySettings.gpsOnDurationSeconds, off_duration: studySettings.gpsOffDurationSeconds, handler: self.gpsManager!)
         }
         if studySettings.accelerometer && studySettings.gpsOnDurationSeconds > 0 {
-            self.gpsManager!.addDataService(studySettings.accelerometerOnDurationSeconds, off: studySettings.accelerometerOffDurationSeconds, handler: AccelerometerManager())
+            self.gpsManager!.addDataService(on_duration: studySettings.accelerometerOnDurationSeconds, off_duration: studySettings.accelerometerOffDurationSeconds, handler: AccelerometerManager())
         }
         if studySettings.powerState {
             self.gpsManager!.addDataService(PowerStateManager())
@@ -103,15 +103,15 @@ class StudyManager {
             self.gpsManager!.addDataService(ReachabilityManager())
         }
         if studySettings.gyro {
-            self.gpsManager!.addDataService(studySettings.gyroOnDurationSeconds, off: studySettings.gyroOffDurationSeconds, handler: GyroManager())
+            self.gpsManager!.addDataService(on_duration: studySettings.gyroOnDurationSeconds, off_duration: studySettings.gyroOffDurationSeconds, handler: GyroManager())
         }
         if studySettings.magnetometer && studySettings.magnetometerOnDurationSeconds > 0 {
-            self.gpsManager!.addDataService(studySettings.magnetometerOnDurationSeconds, off: studySettings.magnetometerOffDurationSeconds, handler: MagnetometerManager())
+            self.gpsManager!.addDataService(on_duration: studySettings.magnetometerOnDurationSeconds, off_duration: studySettings.magnetometerOffDurationSeconds, handler: MagnetometerManager())
         }
         if studySettings.motion && studySettings.motionOnDurationSeconds > 0 {
-            self.gpsManager!.addDataService(studySettings.motionOnDurationSeconds, off: studySettings.motionOffDurationSeconds, handler: DeviceMotionManager())
+            self.gpsManager!.addDataService(on_duration: studySettings.motionOnDurationSeconds, off_duration: studySettings.motionOffDurationSeconds, handler: DeviceMotionManager())
         }
-        _ = self.gpsManager!.startGpsAndTimer()
+        self.gpsManager!.startGpsAndTimer()
     }
     
     /// sets the study as consented, sets api credentials
@@ -208,7 +208,9 @@ class StudyManager {
     
     /// updates the list of surveys in the app ui based on the study timers,
     /// updates the badge count, submits completed surveys, and updates the relevant survey timer.
-    /// (this is a mess, it should be broken down some, but it does all need to happen at this time)
+    /// (this is a mess, it should be broken down some, but it does all that needs to happen at this time)
+    /// Called from GpsManager.pollServices, AudioQuestionsViewController.saveButtonPressed, StudyManager.checkSurveys,
+    ///  and inside TrackingSurveyPresenter when the survey is completed.
     func updateActiveSurveys(_ forceSave: Bool = false) -> TimeInterval {
         log.info("Updating active surveys...")
         let currentDate = Date()
@@ -233,7 +235,7 @@ class StudyManager {
             // the done page, which will resave a new version of the data in a file.
             if activeSurvey.survey?.alwaysAvailable ?? false && activeSurvey.isComplete {
                 log.info("ActiveSurvey \(id) expired.")
-                // activeSurvey.isComplete = true  //
+                // activeSurvey.isComplete = true
                 surveyDataModified = true
                 //  adding submitSurvey creates a new file; therefore we get 2 files of data- one when you
                 //  hit the confirm button and one when this code executes. we DO NOT KNOW why this is in the else if statement

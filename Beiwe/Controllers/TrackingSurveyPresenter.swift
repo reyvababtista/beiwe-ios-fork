@@ -302,7 +302,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         data.append("")
         data.append("")
         data.append(event)
-        print("TimingsEvent: \(data.joined(separator: ","))")
+        // print("TimingsEvent: \(data.joined(separator: ","))")  // don't need to know
         timingsStore?.store(data)
     }
 
@@ -323,7 +323,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
             data.append(forcedValue != nil ? forcedValue! : "")
         }
         data.append(event)
-        print("TimingsEvent: \(data.joined(separator: ","))")
+        // print("TimingsEvent: \(data.joined(separator: ","))")  // we don't need to see every timings event
         self.timingsStore?.store(data)
     }
 
