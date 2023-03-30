@@ -1,60 +1,69 @@
 import Foundation
-import ReachabilitySwift
 import PromiseKit
+import ReachabilitySwift
 
 let reachability_headers = [
     "timestamp",
     "event",
 ]
 
-class ReachabilityManager : DataServiceProtocol {
+/// Reachability - uses a delegate pattern
+class ReachabilityManager: DataServiceProtocol {
+    // tHe basics
+    let storeType = "reachability"
+    var store: DataStorage?
 
-    let storeType = "reachability";
-    
-    var store: DataStorage?;
-
-    @objc func reachabilityChanged(_ notification: Notification){
+    @objc func reachabilityChanged(_ notification: Notification) {
+        // give up early logic
         guard let reachability = AppDelegate.sharedInstance().reachability else {
-            return;
+            return
         }
-        var reachState: String;
+        // the state
+        var reachState: String
         if reachability.isReachable {
             if reachability.isReachableViaWiFi {
-                reachState = "wifi";
+                reachState = "wifi"
             } else {
-                reachState = "cellular";
+                reachState = "cellular"
             }
         } else {
-            reachState = "unreachable";
+            reachState = "unreachable"
         }
-
-        var data: [String] = [ ];
-        data.append(String(Int64(Date().timeIntervalSince1970 * 1000)));
-        data.append(reachState);
-
-        self.store?.store(data);
+        
+        // the data...
+        var data: [String] = []
+        data.append(String(Int64(Date().timeIntervalSince1970 * 1000)))
+        data.append(reachState)
+        self.store?.store(data)
     }
 
+    /// protocol function
     func initCollecting() -> Bool {
-        store = DataStorageManager.sharedInstance.createStore(storeType, headers: reachability_headers);
-        return true;
+        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: reachability_headers)
+        return true
     }
 
+    /// protocol function
     func startCollecting() {
-        log.info("Turning \(storeType) collection on");
+        log.info("Turning \(self.storeType) collection on")
+        // register as the delegate
         NotificationCenter.default.addObserver(self, selector: #selector(self.reachabilityChanged), name: ReachabilityChangedNotification, object: nil)
         AppEventManager.sharedInstance.logAppEvent(event: "reachability_on", msg: "Reachability collection on")
-
     }
+
+    /// protocol function
     func pauseCollecting() {
-        log.info("Pausing \(storeType) collection");
-        NotificationCenter.default.removeObserver(self, name: ReachabilityChangedNotification, object:nil)
+        log.info("Pausing \(self.storeType) collection")
+        // unregister the delegate
+        NotificationCenter.default.removeObserver(self, name: ReachabilityChangedNotification, object: nil)
         AppEventManager.sharedInstance.logAppEvent(event: "reachability_off", msg: "Reachability collection off")
     }
+
+    /// protocol function
     func finishCollecting() -> Promise<Void> {
-        log.info("Finish collecting \(storeType) collection");
-        pauseCollecting();
-        store = nil;
-        return DataStorageManager.sharedInstance.closeStore(storeType);
+        log.info("Finish collecting \(self.storeType) collection")
+        self.pauseCollecting()
+        self.store = nil
+        return DataStorageManager.sharedInstance.closeStore(self.storeType)
     }
 }
