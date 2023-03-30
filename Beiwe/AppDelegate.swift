@@ -25,7 +25,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     // constants
     let gcmMessageIDKey = "gcm.message_id"
-    let lockEvent = EmitterKit.Event<Bool>()
 
     // ui stuff
     var window: UIWindow?
@@ -44,6 +43,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     var isLoggedIn: Bool = false
     var timeEnteredBackground: Date?
 
+    // this is a weird location for an object, its used in powerstatemanager, unclear why this is here.
+    let lockEvent = EmitterKit.Event<Bool>()
+    
     func setupLogging() {
         // Create a destination for the system console log (via NSLog), add the destination to the logger
         let systemLogDestination = AppleSystemLogDestination(owner: log, identifier: "advancedLogger.systemLogDestination")
