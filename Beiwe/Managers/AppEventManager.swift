@@ -2,6 +2,18 @@ import EmitterKit
 import Foundation
 import PromiseKit
 
+let app_event_headers = [
+    "timestamp",
+    "launchId",
+    "memory",
+    "battery",
+    "event",
+    "msg",
+    "d1",
+    "d2",
+    "d3",
+    "d4",
+]
 
 /// The iOS Log Datamanager
 class AppEventManager: DataServiceProtocol {
@@ -9,7 +21,6 @@ class AppEventManager: DataServiceProtocol {
     
     // iOS Log stuff
     let storeType = "ios_log"
-    let headers = ["timestamp", "launchId", "memory", "battery", "event", "msg", "d1", "d2", "d3", "d4"]
     var store: DataStorage?
     
     // basics
@@ -17,7 +28,7 @@ class AppEventManager: DataServiceProtocol {
     
     // manager state
     var launchTimestamp: Date = Date()  // briefly wrong at application start? before AppDelegate.application() is called
-    var launchOptions: String = ""  // these appear to be the App's launch options but it is never actually populated.
+    var launchOptions: String = ""  // these appear to be the App's launch options but it is never actually populated other than an empty string or "location". sure. whatever.
     var eventCount = 0  // incremented whenever an event is logged
     var didLogLaunch: Bool = false
     
@@ -30,11 +41,11 @@ class AppEventManager: DataServiceProtocol {
     func didLaunch(launchOptions: [UIApplication.LaunchOptionsKey: Any]?) {
         self.launchOptions = ""
         self.launchTimestamp = Date()
+        // do nothing for... 18 lines of code
         if (launchOptions?.index(forKey: UIApplication.LaunchOptionsKey.location)) != nil {
             self.launchOptions = "location"
             // it looks like this indicates whether the app started in the background, apparently by a location event of some kind
-            /*
-             let localNotif = UILocalNotification()
+            /* let localNotif = UILocalNotification()
              // localNotif.fireDate = currentDate
              let body: String = "Beiwe was Launched in the background"
              localNotif.alertBody = body
@@ -58,7 +69,7 @@ class AppEventManager: DataServiceProtocol {
         if self.store == nil { // data storage is not instantiated, give up early.
             return
         }
-        // create our string list content objects
+        // our string list of data
         var data: [String] = []
         data.append(String(Int64(Date().timeIntervalSince1970 * 1000)))
         data.append(self.launchId)
@@ -70,7 +81,7 @@ class AppEventManager: DataServiceProtocol {
         data.append(d2)
         data.append(d3)
         data.append(String(self.eventCount))
-        self.store!.store(data)  // This has been updated to a force optional unwrap.  If it crashes we are Losing Data.
+        self.store?.store(data)
         self.eventCount += 1  // update state
     }
 
@@ -80,7 +91,7 @@ class AppEventManager: DataServiceProtocol {
             return true
         }
         // instantiate the DataStorage object
-        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: self.headers)
+        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: app_event_headers)
         
         // log that a recording session has started - why? legacy I guess.
         if !self.didLogLaunch {
