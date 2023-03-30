@@ -350,12 +350,11 @@ class DataStorage {
         }
     }
 
+    ///This is the main write function for most app datastreams
     func store(_ data: [String]) {
-        // This appears to be the main write function for most app datastreams
         var sanitizedData: [String]
-
         if self.sanitize {
-            // survey answers and survey timings files have a (naive) comma replacement behavior.
+            // TODO: survey answers and survey timings files have a (naive) comma replacement behavior. This Should Be Moved out of datastorage before the write operation (this factoring is..,.. horrible. this is So Bad. I cannot even. who with a brain in their head thought this was a good idea.)
             sanitizedData = []
             for line in data {
                 sanitizedData.append(
