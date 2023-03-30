@@ -2,7 +2,7 @@ import CoreMotion
 import Foundation
 import PromiseKit
 
-let gyro_headers = [
+let headers = [
     "timestamp",
     "x",
     "y",
@@ -10,37 +10,42 @@ let gyro_headers = [
 ]
 
 class GyroManager: DataServiceProtocol {
-    let motionManager = AppDelegate.sharedInstance().motionManager
+    let motionManager = AppDelegate.sharedInstance().motionManager  // weird singleton instance attached to appdelegate
 
+    // the basics
     let storeType = "gyro"
-    var store: DataStorage?  // TODO: make this non-optional (breaks protocol I think)
-    var offset: Double = 0
+    var store: DataStorage? // TODO: make this non-optional (breaks protocol I think)
+    
+    // we need an offset for time calculations
+    var offset_since_1970: Double = 0
 
+    /// protocol instruction - sets up custom interval
     func initCollecting() -> Bool {
-        guard motionManager.isGyroAvailable else {
+        guard self.motionManager.isGyroAvailable else {
             log.info("Gyro not available.  Not initializing collection")
             return false
         }
-        // NSTimeInterval of uptime i.e. the delta: now - bootTime = boottime as unix timestamp
-        self.offset = Date().timeIntervalSince1970 - ProcessInfo.processInfo.systemUptime
-        store = DataStorageManager.sharedInstance.createStore(storeType, headers: gyro_headers)
-        
+        // TimeInterval of uptime, boottime as unix timestamp
+        self.offset_since_1970 = Date().timeIntervalSince1970 - ProcessInfo.processInfo.systemUptime
+        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: headers)
+
         // ug, currentstudy and study settings are optional so can't rely on the default gyroFrequency, have to hardcode it
         let frequency_base = StudyManager.sharedInstance.currentStudy?.studySettings?.gyroFrequency ?? 10
-        motionManager.gyroUpdateInterval = 1.0 / Double(frequency_base)
+        self.motionManager.gyroUpdateInterval = 1.0 / Double(frequency_base)
         // print("gyroUpdateInterval: \(motionManager.gyroUpdateInterval)")
         return true
     }
 
+    /// protocol instruction - sets the delegate(?) function
     func startCollecting() {
-        log.info("Turning \(storeType) collection on")
+        log.info("Turning \(self.storeType) collection on")
         // print("gyroUpdateInterval: \(motionManager.gyroUpdateInterval)")
         let queue = OperationQueue()
-        motionManager.startGyroUpdates(to: queue) {
-            gyroData, error in
+        // set the closure as the delegate function
+        self.motionManager.startGyroUpdates(to: queue) { (gyroData: CMGyroData?, _: Error?) in
             if let gyroData = gyroData {
                 var data: [String] = []
-                data.append(String(Int64((gyroData.timestamp + self.offset) * 1000)))
+                data.append(String(Int64((gyroData.timestamp + self.offset_since_1970) * 1000)))
                 data.append(String(gyroData.rotationRate.x))
                 data.append(String(gyroData.rotationRate.y))
                 data.append(String(gyroData.rotationRate.z))
@@ -49,17 +54,19 @@ class GyroManager: DataServiceProtocol {
         }
         AppEventManager.sharedInstance.logAppEvent(event: "gyro_on", msg: "Gyro collection on")
     }
-    
+
+    /// protocol instruction
     func pauseCollecting() {
-        log.info("Pausing \(storeType) collection")
-        motionManager.stopGyroUpdates()
+        log.info("Pausing \(self.storeType) collection")
+        self.motionManager.stopGyroUpdates()
         AppEventManager.sharedInstance.logAppEvent(event: "gyro_off", msg: "Gyro collection off")
     }
 
+    /// protocol instruction
     func finishCollecting() -> Promise<Void> {
-        print("Finishing \(storeType) collecting")
-        pauseCollecting()
-        store = nil
-        return DataStorageManager.sharedInstance.closeStore(storeType)
+        print("Finishing \(self.storeType) collecting")
+        self.pauseCollecting()
+        self.store = nil
+        return DataStorageManager.sharedInstance.closeStore(self.storeType)
     }
 }
