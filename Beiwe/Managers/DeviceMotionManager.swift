@@ -2,7 +2,7 @@ import CoreMotion
 import Foundation
 import PromiseKit
 
-let headers = [
+let device_motion_headers = [
     "timestamp",
     "roll",
     "pitch",
@@ -23,8 +23,7 @@ let headers = [
 ]
 
 class DeviceMotionManager: DataServiceProtocol {
-    // singleton reference? but different from all the others for undocumented reasons? why does app delegate have this object?
-    let motionManager = AppDelegate.sharedInstance().motionManager
+    let motionManager = AppDelegate.sharedInstance().motionManager  // weird singleton reference attached to AppDelegate
 
     // the basics
     let storeType = "devicemotion"
@@ -41,7 +40,7 @@ class DeviceMotionManager: DataServiceProtocol {
             return false
         }
 
-        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: headers)
+        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: device_motion_headers)
         // Get TimeInterval of uptime i.e. the delta: now - bootTime
         self.offset_since_1970 = Date().timeIntervalSince1970 - ProcessInfo.processInfo.systemUptime // Now since 1970
         self.motionManager.deviceMotionUpdateInterval = 0.1

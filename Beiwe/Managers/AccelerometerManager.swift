@@ -2,10 +2,17 @@ import CoreMotion
 import Foundation
 import PromiseKit
 
+let accelerometer_headers = [
+    "timestamp",
+    "accuracy",
+    "x",
+    "y",
+    "z",
+]
+
 class AccelerometerManager: DataServiceProtocol {
     let motionManager = AppDelegate.sharedInstance().motionManager
-
-    let headers = ["timestamp", "accuracy", "x", "y", "z"]
+    
     let storeType = "accel"
     var store: DataStorage?
     var offset: Double = 0
@@ -17,7 +24,7 @@ class AccelerometerManager: DataServiceProtocol {
         }
         // NSTimeInterval of uptime i.e. the delta: now - bootTime = boottime as unix timestamp
         offset = Date().timeIntervalSince1970 - ProcessInfo.processInfo.systemUptime
-        store = DataStorageManager.sharedInstance.createStore(storeType, headers: headers)
+        store = DataStorageManager.sharedInstance.createStore(storeType, headers: accelerometer_headers)
         let frequency_base = StudyManager.sharedInstance.currentStudy?.studySettings?.accelerometerFrequency ?? 10
         motionManager.accelerometerUpdateInterval = 1.0 / Double(frequency_base)
         // print("accelerometerUpdateInterval: \(motionManager.accelerometerUpdateInterval)")

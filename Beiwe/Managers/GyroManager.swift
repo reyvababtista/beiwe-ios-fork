@@ -2,10 +2,16 @@ import CoreMotion
 import Foundation
 import PromiseKit
 
+let gyro_headers = [
+    "timestamp",
+    "x",
+    "y",
+    "z",
+]
+
 class GyroManager: DataServiceProtocol {
     let motionManager = AppDelegate.sharedInstance().motionManager
 
-    let headers = ["timestamp", "x", "y", "z"]
     let storeType = "gyro"
     var store: DataStorage?  // TODO: make this non-optional (breaks protocol I think)
     var offset: Double = 0
@@ -17,7 +23,7 @@ class GyroManager: DataServiceProtocol {
         }
         // NSTimeInterval of uptime i.e. the delta: now - bootTime = boottime as unix timestamp
         self.offset = Date().timeIntervalSince1970 - ProcessInfo.processInfo.systemUptime
-        store = DataStorageManager.sharedInstance.createStore(storeType, headers: headers)
+        store = DataStorageManager.sharedInstance.createStore(storeType, headers: gyro_headers)
         
         // ug, currentstudy and study settings are optional so can't rely on the default gyroFrequency, have to hardcode it
         let frequency_base = StudyManager.sharedInstance.currentStudy?.studySettings?.gyroFrequency ?? 10

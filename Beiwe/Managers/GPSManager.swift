@@ -3,6 +3,15 @@ import Darwin
 import Foundation
 import PromiseKit
 
+let gps_headers = [
+    "timestamp",
+    "latitude",
+    "longitude",
+    "altitude",
+    "accuracy",
+]
+
+
 /// For some unfathomable, incomprehensible reason, all logic for all sensors leads to the GPS manager.
 // It may be the case that the GPS updates are how the app stays open (there is disabled logic to record when the app vas opened that checks
 // for the presense of some location service *stuff* over in AppEventManager), in which case the best guess for this pile of CS nightmares
@@ -11,9 +20,6 @@ import PromiseKit
 // TODO: what happens if GPS is disabled on a study? does that matter? we need to test that.
 
 class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
-    // csv data stream headers
-    static let headers = ["timestamp", "latitude", "longitude", "altitude", "accuracy"]
-
     // Location
     let locationManager = CLLocationManager()
     var lastLocations: [CLLocation]?
@@ -255,7 +261,7 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
             log.error("GPS not enabled.  Not initializing collection")
             return false
         }
-        self.gpsStore = DataStorageManager.sharedInstance.createStore("gps", headers: GPSManager.headers)
+        self.gpsStore = DataStorageManager.sharedInstance.createStore("gps", headers: gps_headers)
         self.isCollectingGps = false
         return true
     }

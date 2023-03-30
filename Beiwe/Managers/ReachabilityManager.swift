@@ -1,19 +1,16 @@
-//
-//  ReachabilityManager.swift
-//  Beiwe
-//
-//  Created by Keary Griffin on 4/3/16.
-//  Copyright © 2016 Rocketfarm Studios. All rights reserved.
-//
-
 import Foundation
 import ReachabilitySwift
 import PromiseKit
 
+let reachability_headers = [
+    "timestamp",
+    "event",
+]
+
 class ReachabilityManager : DataServiceProtocol {
 
     let storeType = "reachability";
-    let headers = ["timestamp", "event"]
+    
     var store: DataStorage?;
 
     @objc func reachabilityChanged(_ notification: Notification){
@@ -39,7 +36,7 @@ class ReachabilityManager : DataServiceProtocol {
     }
 
     func initCollecting() -> Bool {
-        store = DataStorageManager.sharedInstance.createStore(storeType, headers: headers);
+        store = DataStorageManager.sharedInstance.createStore(storeType, headers: reachability_headers);
         return true;
     }
 

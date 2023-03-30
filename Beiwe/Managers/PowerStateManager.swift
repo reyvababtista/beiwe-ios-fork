@@ -1,19 +1,16 @@
-//
-//  PowerStateManager.swift
-//  Beiwe
-//
-//  Created by Keary Griffin on 4/1/16.
-//  Copyright © 2016 Rocketfarm Studios. All rights reserved.
-//
-
 import Foundation
 import PromiseKit
 import EmitterKit
 
+let power_state_headers = [
+    "timestamp",
+    "event",
+    "level",
+]
+
 class PowerStateManager : DataServiceProtocol {
 
     let storeType = "powerState";
-    let headers = ["timestamp", "event", "level"]
     var store: DataStorage?;
     var listeners: [Listener] = [];
 
@@ -50,7 +47,7 @@ class PowerStateManager : DataServiceProtocol {
     }
 
     func initCollecting() -> Bool {
-        store = DataStorageManager.sharedInstance.createStore(storeType, headers: headers);
+        store = DataStorageManager.sharedInstance.createStore(storeType, headers: power_state_headers);
         return true;
     }
 
