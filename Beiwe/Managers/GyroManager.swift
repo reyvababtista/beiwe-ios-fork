@@ -10,7 +10,7 @@ let headers = [
 ]
 
 class GyroManager: DataServiceProtocol {
-    let motionManager = AppDelegate.sharedInstance().motionManager  // weird singleton instance attached to appdelegate
+    let motionManager = AppDelegate.sharedInstance().motionManager  // weird singleton instance attached to appdelegate - ah, shares with accelerometer
 
     // the basics
     let storeType = "gyro"
