@@ -33,7 +33,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     var currentRootView: String? = "launchScreen"
 
     // app capability stuff
-    let motionManager = CMMotionManager()
+    let motionManager = CMMotionManager()  // why does this need to be here? at all?
     var reachability: Reachability?  // tells us about our network access
     var canOpenTel = false
     var locationPermission = false

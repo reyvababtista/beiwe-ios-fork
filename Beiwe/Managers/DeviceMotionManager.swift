@@ -1,58 +1,66 @@
-//
-//  DeviceMotionManager.swift
-//  Beiwe
-//
-//  Created by Keary Griffin on 4/3/16.
-//  Copyright © 2016 Rocketfarm Studios. All rights reserved.
-//
-
-import Foundation
 import CoreMotion
+import Foundation
 import PromiseKit
 
-class DeviceMotionManager : DataServiceProtocol {
-    let motionManager = AppDelegate.sharedInstance().motionManager;
+let headers = [
+    "timestamp",
+    "roll",
+    "pitch",
+    "yaw",
+    "rotation_rate_x",
+    "rotation_rate_y",
+    "rotation_rate_z",
+    "gravity_x",
+    "gravity_y",
+    "gravity_z",
+    "user_accel_x",
+    "user_accel_y",
+    "user_accel_z",
+    "magnetic_field_calibration_accuracy",
+    "magnetic_field_x",
+    "magnetic_field_y",
+    "magnetic_field_z",
+]
 
-    let headers = ["timestamp", "roll", "pitch", "yaw",
-                   "rotation_rate_x", "rotation_rate_y", "rotation_rate_z",
-                   "gravity_x", "gravity_y", "gravity_z",
-                   "user_accel_x", "user_accel_y", "user_accel_z",
-                   "magnetic_field_calibration_accuracy", "magnetic_field_x", "magnetic_field_y", "magnetic_field_z"
-                   ]
-    let storeType = "devicemotion";
-    var store: DataStorage?;
-    var offset: Double = 0;
+class DeviceMotionManager: DataServiceProtocol {
+    // singleton reference? but different from all the others for undocumented reasons? why does app delegate have this object?
+    let motionManager = AppDelegate.sharedInstance().motionManager
 
+    // the basics
+    let storeType = "devicemotion"
+    var store: DataStorage?
+
+    // we need an offset timestamp for timecode calculations
+    var offset_since_1970: Double = 0
+
+    /// protocol funciton
     func initCollecting() -> Bool {
-        guard  motionManager.isDeviceMotionAvailable else {
-            log.info("DeviceMotion not available.  Not initializing collection");
-            return false;
+        // give up early logic
+        guard self.motionManager.isDeviceMotionAvailable else {
+            log.info("DeviceMotion not available.  Not initializing collection")
+            return false
         }
 
-        store = DataStorageManager.sharedInstance.createStore(storeType, headers: headers);
-        // Get NSTimeInterval of uptime i.e. the delta: now - bootTime
-        let uptime: TimeInterval = ProcessInfo.processInfo.systemUptime;
-        // Now since 1970
-        let nowTimeIntervalSince1970: TimeInterval  = Date().timeIntervalSince1970;
-        // Voila our offset
-        self.offset = nowTimeIntervalSince1970 - uptime;
-        motionManager.deviceMotionUpdateInterval = 0.1;
-        return true;
+        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: headers)
+        // Get TimeInterval of uptime i.e. the delta: now - bootTime
+        self.offset_since_1970 = Date().timeIntervalSince1970 - ProcessInfo.processInfo.systemUptime // Now since 1970
+        self.motionManager.deviceMotionUpdateInterval = 0.1
+        return true
     }
 
+    /// protocol function
     func startCollecting() {
-        log.info("Turning \(storeType) collection on");
+        log.info("Turning \(self.storeType) collection on")
+
         let queue = OperationQueue()
-
-
-        motionManager.startDeviceMotionUpdates(using: CMAttitudeReferenceFrame.xArbitraryZVertical, to: queue) {
-            (motionData, error) in
-
+        self.motionManager.startDeviceMotionUpdates(using: CMAttitudeReferenceFrame.xArbitraryZVertical, to: queue) {
+            (motionData: CMDeviceMotion?, _: Error?) in
+            
             if let motionData = motionData {
-                var data: [String] = [ ];
-                let timestamp: Double = motionData.timestamp + self.offset;
-                data.append(String(Int64(timestamp * 1000)));
-                //data.append(AppDelegate.sharedInstance().modelVersionId);
+                var data: [String] = []
+                let timestamp: Double = motionData.timestamp + self.offset_since_1970
+                data.append(String(Int64(timestamp * 1000)))
+                // data.append(AppDelegate.sharedInstance().modelVersionId)  // random abandoned datapoint
                 data.append(String(motionData.attitude.roll))
                 data.append(String(motionData.attitude.pitch))
                 data.append(String(motionData.attitude.yaw))
@@ -65,8 +73,9 @@ class DeviceMotionManager : DataServiceProtocol {
                 data.append(String(motionData.userAcceleration.x))
                 data.append(String(motionData.userAcceleration.y))
                 data.append(String(motionData.userAcceleration.z))
-                var fieldAccuracy: String;
-                switch(motionData.magneticField.accuracy) {
+                // get a string for the accuracy
+                var fieldAccuracy: String
+                switch motionData.magneticField.accuracy {
                 case .uncalibrated:
                     fieldAccuracy = "uncalibrated"
                 case .low:
@@ -83,20 +92,22 @@ class DeviceMotionManager : DataServiceProtocol {
                 data.append(String(motionData.magneticField.field.y))
                 data.append(String(motionData.magneticField.field.z))
 
-                self.store?.store(data);
+                self.store?.store(data)
             }
         }
         AppEventManager.sharedInstance.logAppEvent(event: "devicemotion_on", msg: "DeviceMotion collection on")
     }
+
     func pauseCollecting() {
-        log.info("Pausing \(storeType) collection");
-        motionManager.stopDeviceMotionUpdates();
+        log.info("Pausing \(self.storeType) collection")
+        self.motionManager.stopDeviceMotionUpdates()
         AppEventManager.sharedInstance.logAppEvent(event: "devicemotion_off", msg: "DeviceMotion collection off")
     }
+
     func finishCollecting() -> Promise<Void> {
-        print ("Finishing \(storeType) collecting");
-        pauseCollecting();
-        store = nil;
-        return DataStorageManager.sharedInstance.closeStore(storeType);
+        print("Finishing \(self.storeType) collecting")
+        self.pauseCollecting()
+        self.store = nil
+        return DataStorageManager.sharedInstance.closeStore(self.storeType)
     }
 }
