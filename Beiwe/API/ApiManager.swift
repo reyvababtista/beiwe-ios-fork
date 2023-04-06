@@ -15,12 +15,10 @@ enum ApiErrors: Error {
 
 struct BodyResponse: Mappable {
     var body: String?
-
+    init?(map: Map) {}
     init(body: String?) {
         self.body = body
     }
-
-    init?(map: Map) {}
 
     mutating func mapping(map: Map) {
         self.body <- map["body"]
