@@ -8,7 +8,7 @@ protocol DataServiceProtocol {
     func finishCollecting() -> Promise<Void>
 }
 
-// defined class that is only used in GPSManager
+// defined class that is only used in TimerManager
 class DataServiceStatus {
     let onDurationSeconds: Double
     let offDurationSeconds: Double

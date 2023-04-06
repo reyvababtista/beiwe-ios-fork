@@ -6,7 +6,7 @@ import PromiseKit
 import ReachabilitySwift
 
 
-/// Contains all sorts of miiscellaneous study related functionality - This is badly factored
+/// Contains all sorts of miiscellaneous study related functionality - this is badly factored and should be defactored into classes that contain their own well-defirned things
 class StudyManager {
     static let sharedInstance = StudyManager()  // singleton reference
     
@@ -16,14 +16,16 @@ class StudyManager {
     
     // Really critical app components
     var currentStudy: Study?
-    var gpsManager: GPSManager?  // for some reason gpsManager is used to test if the study is ~initialized
+    var timerManager: TimerManager = TimerManager()
+    var gpsManager: GPSManager?  // gps manager is slightly special because we use it to keep the app open in the background
     var keyRef: SecKey?  // the study's security key
     
     // State tracking variables
     var isUploading = false
     let surveysUpdatedEvent: Event<Int> = Event<Int>()
     static var real_study_loaded = false
-    var isStudyLoaded: Bool {
+    
+    var isStudyLoaded: Bool {  // returns true if self.currentStudy is populated
         return self.currentStudy != nil
     }
     
@@ -31,7 +33,7 @@ class StudyManager {
     ///////////////////////////////////////////////////// Setup and UnSetup ///////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
-    /// sets (but also clear?) the current study, and the gpsManager, sets real_study_loaded to true
+    /// sets (but also clears?) the current study, and the gpsManager, sets real_study_loaded to true
     func loadDefaultStudy() -> Promise<Bool> {
         self.currentStudy = nil
         self.gpsManager = nil
@@ -47,6 +49,7 @@ class StudyManager {
             // grab the first study and the first study only, set the patient id (but not), real_study_loaded to true
             if studies.count > 0 {
                 self.currentStudy = studies[0]
+                print("self.currentStudy.patientId: \(self.currentStudy?.patientId)")
                 AppDelegate.sharedInstance().setDebuggingUser(self.currentStudy?.patientId ?? "unknown")  // this doesn't do anything...
                 StudyManager.real_study_loaded = true
             }
@@ -56,7 +59,8 @@ class StudyManager {
     
     /// pretty much an initializer for data services, for some reason gpsManager is the test if we are already initialized
     func startStudyDataServices() {
-        if self.gpsManager != nil {
+        // if there is no study return immediately (this should probably throw an error, such an app state is too invalid to support)
+        if !self.isStudyLoaded {
             return
         }
         self.setApiCredentials()
@@ -84,34 +88,35 @@ class StudyManager {
         self.gpsManager?.fuzzGpsLongitudeOffset = (self.currentStudy?.fuzzGpsLongitudeOffset)!
         
         // iOS Log (app events)
-        self.gpsManager!.addDataService(AppEventManager.sharedInstance)
+        self.timerManager.addDataService(AppEventManager.sharedInstance)
         
         // every sensor, which for unfathomable reasons are contained inside the gps manager, activate them
         if studySettings.gps && studySettings.gpsOnDurationSeconds > 0 {
-            self.gpsManager!.addDataService(on_duration: studySettings.gpsOnDurationSeconds, off_duration: studySettings.gpsOffDurationSeconds, handler: self.gpsManager!)
+            self.timerManager.addDataService(on_duration: studySettings.gpsOnDurationSeconds, off_duration: studySettings.gpsOffDurationSeconds, handler: self.gpsManager!)
         }
         if studySettings.accelerometer && studySettings.gpsOnDurationSeconds > 0 {
-            self.gpsManager!.addDataService(on_duration: studySettings.accelerometerOnDurationSeconds, off_duration: studySettings.accelerometerOffDurationSeconds, handler: AccelerometerManager())
+            self.timerManager.addDataService(on_duration: studySettings.accelerometerOnDurationSeconds, off_duration: studySettings.accelerometerOffDurationSeconds, handler: AccelerometerManager())
         }
         if studySettings.powerState {
-            self.gpsManager!.addDataService(PowerStateManager())
+            self.timerManager.addDataService(PowerStateManager())
         }
         if studySettings.proximity {
-            self.gpsManager!.addDataService(ProximityManager())
+            self.timerManager.addDataService(ProximityManager())
         }
         if studySettings.reachability {
-            self.gpsManager!.addDataService(ReachabilityManager())
+            self.timerManager.addDataService(ReachabilityManager())
         }
         if studySettings.gyro {
-            self.gpsManager!.addDataService(on_duration: studySettings.gyroOnDurationSeconds, off_duration: studySettings.gyroOffDurationSeconds, handler: GyroManager())
+            self.timerManager.addDataService(on_duration: studySettings.gyroOnDurationSeconds, off_duration: studySettings.gyroOffDurationSeconds, handler: GyroManager())
         }
         if studySettings.magnetometer && studySettings.magnetometerOnDurationSeconds > 0 {
-            self.gpsManager!.addDataService(on_duration: studySettings.magnetometerOnDurationSeconds, off_duration: studySettings.magnetometerOffDurationSeconds, handler: MagnetometerManager())
+            self.timerManager.addDataService(on_duration: studySettings.magnetometerOnDurationSeconds, off_duration: studySettings.magnetometerOffDurationSeconds, handler: MagnetometerManager())
         }
         if studySettings.motion && studySettings.motionOnDurationSeconds > 0 {
-            self.gpsManager!.addDataService(on_duration: studySettings.motionOnDurationSeconds, off_duration: studySettings.motionOffDurationSeconds, handler: DeviceMotionManager())
+            self.timerManager.addDataService(on_duration: studySettings.motionOnDurationSeconds, off_duration: studySettings.motionOffDurationSeconds, handler: DeviceMotionManager())
         }
-        self.gpsManager!.startGpsAndTimer()
+        self.gpsManager!.startGps()
+        timerManager.start()
     }
     
     /// sets the study as consented, sets api credentials
@@ -132,7 +137,7 @@ class StudyManager {
         DataStorageManager.sharedInstance.setCurrentStudy(study, secKeyRef: self.keyRef)
         DataStorageManager.sharedInstance.createDirectories()
         // update study stuff?
-        return Recline.shared.save(study).then { _ -> Promise<Bool> in
+        return Recline.shared.save(study).then { (_: Study) -> Promise<Bool> in
             self.checkSurveys()
         }
     }
@@ -140,8 +145,8 @@ class StudyManager {
     // FIXME: This function has 4 unacceptable failure modes -- called only from setConsented (study registration) and startStudyDataServices
     /// Sets up the password (api) credential for backend calls
     func setApiCredentials() {
-        // guard - if these fail, return without doing anything (currentStudy is optional)
-        guard let currentStudy: Study = self.currentStudy, self.gpsManager == nil else {
+        // if there is no study.... don't do this.
+        guard let currentStudy: Study = self.currentStudy else {
             return
         }
         // Setup APIManager's security
@@ -303,10 +308,8 @@ class StudyManager {
         }
         
         // calculate the next survey time for use and return it
-        var closestNextSurveyTime: TimeInterval = currentTime + (60.0 * 60.0 * 24.0 * 7)
-        if let gpsManager = gpsManager {
-            gpsManager.resetNextSurveyUpdate(closestNextSurveyTime)
-        }
+        let closestNextSurveyTime: TimeInterval = currentTime + (60.0 * 60.0 * 24.0 * 7)
+        timerManager.resetNextSurveyUpdate(closestNextSurveyTime)
         return closestNextSurveyTime
     }
     
@@ -319,7 +322,7 @@ class StudyManager {
             return .value(true)
         }
         study.nextUploadCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.uploadDataFileFrequencySeconds)
-        return Recline.shared.save(study).then { _ -> Promise<Bool> in
+        return Recline.shared.save(study).then { (_: Study) -> Promise<Bool> in
                 .value(true)
         }
     }
@@ -329,7 +332,7 @@ class StudyManager {
             return .value(true)
         }
         study.nextSurveyCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.checkForNewSurveysFreqSeconds)
-        return Recline.shared.save(study).then { _ -> Promise<Bool> in
+        return Recline.shared.save(study).then { (_: Study) -> Promise<Bool> in
                 .value(true)
         }
     }
@@ -340,7 +343,7 @@ class StudyManager {
     
     /// some kind of reachability thing, calls periodicNetworkTransfers in a promise (of course it does)
     @objc func reachabilityChanged(_ notification: Notification) {
-        Promise().done { _ in
+        _ = Promise().done { _ in
             log.info("Reachability changed, running periodic.")
             self.periodicNetworkTransfers()
         }
@@ -356,7 +359,7 @@ class StudyManager {
         log.info("Checking for surveys...")
         
         // save the study (whatever that means), and then....
-        return Recline.shared.save(study).then { _ -> Promise<([Survey], Int)> in
+        return Recline.shared.save(study).then { (_: Study) -> Promise<([Survey], Int)> in
             // do the survey request (its json into a ~mappable)
             let surveyRequest = GetSurveysRequest()
             return ApiManager.sharedInstance.arrayPostRequest(surveyRequest)
@@ -366,11 +369,11 @@ class StudyManager {
             log.info("Surveys: \(surveys)")
             study.surveys = surveys
             return Recline.shared.save(study).asVoid()
-        }.then { _ -> Promise<Bool> in
+        }.then { _ -> Promise<Bool> in  // its an error type
             // then update the active surveys because the surveys may have just changed
-            self.updateActiveSurveys()
+            _ = self.updateActiveSurveys()
             return .value(true)
-        }.recover { _ -> Promise<Bool> in
+        }.recover { _ -> Promise<Bool> in  // _ is of some error type
             // and if anything went wron return false  --  IT IS NEVER USED
                 .value(false)
         }
@@ -395,7 +398,7 @@ class StudyManager {
             currentStudy.missedSurveyCheck = !reachable  // whut?
             self.setNextSurveyTime().done { _ in
                 if reachable {
-                    self.checkSurveys()
+                    _ = self.checkSurveys()
                 }
             }.catch { _ in
                 log.error("Error checking for surveys")
@@ -404,7 +407,7 @@ class StudyManager {
             // This (missedUploadCheck?) will be saved because setNextUpload saves the study
             currentStudy.missedUploadCheck = !reachable
             self.setNextUploadTime().done { _ in
-                self.upload(!reachable)
+                _ = self.upload(!reachable)
             }.catch { _ in
                 log.error("Error checking for uploads")  // this is kindof unnecessary
             }
@@ -424,9 +427,9 @@ class StudyManager {
         var numFiles = 0
         
         // oh good a promiseChain...
-        let promiseChain: Promise<Bool> = Recline.shared.compact().then { _ -> Promise<Bool> in
+        let promiseChain: Promise<Bool> = Recline.shared.compact().then { (_: Void) -> Promise<Bool> in
             // run prepare for upload
-            DataStorageManager.sharedInstance.prepareForUpload().then { _ -> Promise<Bool> in
+            DataStorageManager.sharedInstance.prepareForUpload().then { (_: Void) -> Promise<Bool> in
                 log.info("prepareForUpload finished")
                 return .value(true)
             }
@@ -453,16 +456,16 @@ class StudyManager {
                     let uploadRequest = UploadRequest(fileName: filename, filePath: filePath.path)
                     
                     // add the upload operation to the upload chain
-                    uploadChain = uploadChain.then { _ -> Promise<Bool> in
+                    uploadChain = uploadChain.then { (_: Bool) -> Promise<Bool> in
                         // do an upload
-                        return ApiManager.sharedInstance.makeMultipartUploadRequest(uploadRequest, file: filePath).then { _ -> Promise<Bool> in
+                        return ApiManager.sharedInstance.makeMultipartUploadRequest(uploadRequest, file: filePath).then { (_: (UploadRequest.ApiReturnType, Int)) -> Promise<Bool> in
                             log.warning("Finished uploading: \(filename), deleting.")
                             AppEventManager.sharedInstance.logAppEvent(event: "uploaded", msg: "Uploaded data file", d1: filename)
                             numFiles = numFiles + 1
                             try FileManager.default.removeItem(at: filePath)  // ok I guess this can fail...?
                             return .value(true)
                         }
-                    }.recover { _ -> Promise<Bool> in
+                    }.recover { (_: Error) -> Promise<Bool> in
                         // in case of errors...
                         log.warning("upload failed: \(filename)")
                         AppEventManager.sharedInstance.logAppEvent(event: "upload_file_failed", msg: "Failed Uploaded data file", d1: filename)
@@ -499,23 +502,28 @@ class StudyManager {
     
     /// the bulk of the leave study feature.
     func leaveStudy() -> Promise<Bool> {
-        var promise: Promise<Void> = Promise()
+        fatalError("this is not supposed to run")
         
-        // clear gps? this doesn't look like it disables sensors?
+        // disable gps - gps is special because it interacts with app persistence
         if self.gpsManager != nil {
-            promise = self.gpsManager!.stopAndClear()
+            self.gpsManager!.stopGps()
         }
+        // stop all timers
+        self.timerManager.stop()
+        self.timerManager.clear()
         
         // kill notifications
         NotificationCenter.default.removeObserver(self, name: ReachabilityChangedNotification, object: nil)
         UIApplication.shared.cancelAllLocalNotifications()
         
+        var promise: Promise<Void> = Promise()
         // and then alllll code is located after return statement because Promises are totally meant to be used like this. hooray!
-        return promise.then { _ -> Promise<Bool> in
-            self.gpsManager = nil  // does this clear all the other sensors at deallocation?
+        return promise.then { (_: Void) -> Promise<Bool> in
+            self.gpsManager = nil
+            self.timerManager.clear()  // this may deallocate all sensors.  I think.
             
             // call purge studies and insert a _second_ return statement 🙄
-            return self.purgeStudies().then { _ -> Promise<Bool> in
+            return self.purgeStudies().then { (_: Bool) -> Promise<Bool> in
                 // delete upload diirectory using ugly code
                 var enumerator = FileManager.default.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)
                 if let enumerator = enumerator {
@@ -537,16 +545,16 @@ class StudyManager {
                     }
                 }
                 // clear the study, patient id
-                self.currentStudy = nil
+                self.currentStudy = nil  // self.isStudyLoaded will now fail
                 ApiManager.sharedInstance.patientId = ""
                 
                 // I don't know what this is and I don't think it matters.
                 let instance = InstanceID.instanceID()
-                instance.deleteID { error in
+                instance.deleteID { (error: Error?) in
                     print(error.debugDescription)
                     log.error(error.debugDescription)
                 }
-                return .value(true)  // ohey a third return statement
+                return .value(true)  // ohey a third return statement 🙄
             }
         }
     }
@@ -560,7 +568,7 @@ class StudyManager {
             // delete all the studies
             var promise = Promise<Bool>.value(true)
             for study in studies {
-                promise = promise.then { _ in
+                promise = promise.then { (_: Bool) in
                     Recline.shared.purge(study)
                 }
             }
@@ -590,11 +598,16 @@ class StudyManager {
     
     /// only called from AppDelegate.applicationWillTerminate
     func stop() -> Promise<Bool> {
-        // stop gps (might stop other sensors but doesn't look like it)
-        var promise: Promise<Void> = Promise()
+        // stop gps because it interacts with app persistence.
         if self.gpsManager != nil {
-            promise = self.gpsManager!.stopAndClear()
+            self.gpsManager!.stopGps()
+            self.gpsManager = nil
         }
+        
+        // stop all recording, clear registered
+        self.timerManager.stop()
+        self.timerManager.clear()
+        var promise: Promise<Void> = Promise()
         // clear currentStudy
         return promise.then(on: DispatchQueue.global(qos: .default)) { _ -> Promise<Bool> in
             // self.gpsManager = nil  // I guess this is unnecessary?
