@@ -1,7 +1,7 @@
 import Foundation
 import ObjectMapper
 
-// its the download surveys endpoint
+/// the download surveys endpoint
 struct GetSurveysRequest: Mappable, ApiRequest {
     static let apiEndpoint = "/download_surveys/ios/"
     typealias ApiReturnType = Survey

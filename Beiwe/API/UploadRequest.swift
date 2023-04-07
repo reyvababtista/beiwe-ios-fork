@@ -1,34 +1,22 @@
-//
-//  NewUploadRequest.swift
-//  Beiwe
-//
-//  Created by Keary Griffin on 4/6/16.
-//  Copyright © 2016 Rocketfarm Studios. All rights reserved.
-//
-
 import Foundation
 import ObjectMapper
 
-struct UploadRequest : Mappable, ApiRequest {
-
+/// the upload data file post request
+struct UploadRequest: Mappable, ApiRequest {
     static let apiEndpoint = "/upload/ios/"
-    typealias ApiReturnType = BodyResponse;
+    typealias ApiReturnType = BodyResponse
 
-    var fileName: String?;
-    var fileData: String?;
+    var fileName: String?
+    var fileData: String?
 
+    init?(map: Map) {}
     init(fileName: String, filePath: String) {
-        self.fileName = fileName;
-    }
-
-    init?(map: Map) {
-
+        self.fileName = fileName
     }
 
     // Mappable
     mutating func mapping(map: Map) {
-        fileName         <- map["file_name"];
-        fileData        <- map["file"]
+        self.fileName <- map["file_name"]
+        self.fileData <- map["file"]
     }
-    
 }
