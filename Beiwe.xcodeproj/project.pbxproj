@@ -11,7 +11,6 @@
 		3248853C2469ADC3002F0F81 /* FCMTokenRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3248853B2469ADC2002F0F81 /* FCMTokenRequest.swift */; };
 		32756627245876CC00299A04 /* Private.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32756626245876CC00299A04 /* Private.swift */; };
 		329DD4D426011335006E517F /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 329DD4D326011334006E517F /* GoogleService-Info.plist */; };
-		32CEA436246F2579000EBF69 /* GetSingleSurveyRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32CEA435246F2579000EBF69 /* GetSingleSurveyRequest.swift */; };
 		32E1436324869B38009FAE5A /* TestNotificationRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32E1436224869B38009FAE5A /* TestNotificationRequest.swift */; };
 		59912EB3230EF09400CAF7EB /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 59912EB1230EF09400CAF7EB /* Localizable.strings */; };
 		59912EB92311A33A00CAF7EB /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 59912EBB2311A33A00CAF7EB /* InfoPlist.strings */; };
@@ -84,6 +83,8 @@
 		83FDCFDA1CBCB6D300AFF716 /* ChangePasswordViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83FDCFD91CBCB6D300AFF716 /* ChangePasswordViewController.swift */; };
 		84CACB8E2835A44B00663065 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 84CACB8D2835A44B00663065 /* GoogleService-Info.plist */; };
 		AA63EFB729C2E0FE0074F735 /* DataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA63EFB629C2E0FE0074F735 /* DataService.swift */; };
+		AA774E3B29DFA9440085BDF8 /* UpdateDeviceSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA774E3A29DFA9440085BDF8 /* UpdateDeviceSettings.swift */; };
+		AA92FB6729D5D1800009F620 /* TimerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA92FB6629D5D1800009F620 /* TimerManager.swift */; };
 		ED3081F77ECC8C876F5EF53A /* Pods_Beiwe.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A42DC84D7FED35C57E1B1EE0 /* Pods_Beiwe.framework */; };
 /* End PBXBuildFile section */
 
@@ -94,7 +95,6 @@
 		3248853B2469ADC2002F0F81 /* FCMTokenRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FCMTokenRequest.swift; sourceTree = "<group>"; };
 		32756626245876CC00299A04 /* Private.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Private.swift; sourceTree = "<group>"; };
 		329DD4D326011334006E517F /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
-		32CEA435246F2579000EBF69 /* GetSingleSurveyRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetSingleSurveyRequest.swift; sourceTree = "<group>"; };
 		32D25F81246EE23E005286EB /* Beiwe2Debug2.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Beiwe2Debug2.entitlements; sourceTree = "<group>"; };
 		32D25F82246EE28F005286EB /* Beiwe2Release2.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Beiwe2Release2.entitlements; sourceTree = "<group>"; };
 		32D25F83246EE294005286EB /* Beiwe2Release.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Beiwe2Release.entitlements; sourceTree = "<group>"; };
@@ -188,6 +188,8 @@
 		84CACB8D2835A44B00663065 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		A42DC84D7FED35C57E1B1EE0 /* Pods_Beiwe.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Beiwe.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA63EFB629C2E0FE0074F735 /* DataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataService.swift; sourceTree = "<group>"; };
+		AA774E3A29DFA9440085BDF8 /* UpdateDeviceSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateDeviceSettings.swift; sourceTree = "<group>"; };
+		AA92FB6629D5D1800009F620 /* TimerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerManager.swift; sourceTree = "<group>"; };
 		B58A34E5862CE908C83EB133 /* Pods-Beiwe.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Beiwe.release.xcconfig"; path = "Target Support Files/Pods-Beiwe/Pods-Beiwe.release.xcconfig"; sourceTree = "<group>"; };
 		C222DB6B2786C1ED00ACB3EC /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		E949EF7428480E59009E183F /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Main.strings; sourceTree = "<group>"; };
@@ -332,8 +334,8 @@
 				83C2BFCB1CB7484B00B2251B /* GetSurveysRequest.swift */,
 				8340ABF41CC7115400D0382F /* ChangePasswordRequest.swift */,
 				3248853B2469ADC2002F0F81 /* FCMTokenRequest.swift */,
-				32CEA435246F2579000EBF69 /* GetSingleSurveyRequest.swift */,
 				32E1436224869B38009FAE5A /* TestNotificationRequest.swift */,
+				AA774E3A29DFA9440085BDF8 /* UpdateDeviceSettings.swift */,
 			);
 			path = API;
 			sourceTree = "<group>";
@@ -369,6 +371,7 @@
 				83AF04341CB0E2BB00A37225 /* ReachabilityManager.swift */,
 				83AF04121CAADE6200A37225 /* StudyManager.swift */,
 				AA63EFB629C2E0FE0074F735 /* DataService.swift */,
+				AA92FB6629D5D1800009F620 /* TimerManager.swift */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -673,6 +676,7 @@
 				8337656E1DED321C00E1B883 /* BWSkipStepNavigationRule.swift in Sources */,
 				83AF04151CAB556800A37225 /* GPSManager.swift in Sources */,
 				83AF042D1CB0D21700A37225 /* GyroManager.swift in Sources */,
+				AA774E3B29DFA9440085BDF8 /* UpdateDeviceSettings.swift in Sources */,
 				83C295F21CB817AD0016DD95 /* Survey.swift in Sources */,
 				83C7D37A1CB4E30C00BC7285 /* UploadRequest.swift in Sources */,
 				83C295F61CB8AF160016DD95 /* OneSelection.swift in Sources */,
@@ -685,6 +689,7 @@
 				AA63EFB729C2E0FE0074F735 /* DataService.swift in Sources */,
 				833482F71CA2EF7E00A37B35 /* RegisterViewController.swift in Sources */,
 				83C7D3891CB5F43400BC7285 /* TaskListViewController.swift in Sources */,
+				AA92FB6729D5D1800009F620 /* TimerManager.swift in Sources */,
 				83914CAD1D00DA1100B01C82 /* ForgotPasswordHeaderView.swift in Sources */,
 				83B4D6771CAA05E0001BF283 /* Recline.swift in Sources */,
 				83C7D3841CB5943B00BC7285 /* BWTextButton.m in Sources */,
@@ -705,7 +710,6 @@
 				83AF04291CAF748C00A37225 /* PowerStateManager.swift in Sources */,
 				83AF04351CB0E2BB00A37225 /* ReachabilityManager.swift in Sources */,
 				83E3DE731CA37F7600EB5349 /* MiscHelpers.swift in Sources */,
-				32CEA436246F2579000EBF69 /* GetSingleSurveyRequest.swift in Sources */,
 				832FFC1E1CC8506900F2E1EF /* GradientView.swift in Sources */,
 				832FFC2F1CC9C30E00F2E1EF /* BWXLAction.swift in Sources */,
 				83AF04271CADA02A00A37225 /* AccelerometerManager.swift in Sources */,

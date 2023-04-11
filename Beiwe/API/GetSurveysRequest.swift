@@ -7,7 +7,6 @@ struct GetSurveysRequest: Mappable, ApiRequest {
     typealias ApiReturnType = Survey
 
     init() {}
-
     init?(map: Map) {}
 
     // Mappable

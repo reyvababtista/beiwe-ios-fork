@@ -49,7 +49,7 @@ class StudyManager {
             // grab the first study and the first study only, set the patient id (but not), real_study_loaded to true
             if studies.count > 0 {
                 self.currentStudy = studies[0]
-                print("self.currentStudy.patientId: \(self.currentStudy?.patientId)")
+                // print("self.currentStudy.patientId: \(self.currentStudy?.patientId)")
                 AppDelegate.sharedInstance().setDebuggingUser(self.currentStudy?.patientId ?? "unknown")  // this doesn't do anything...
                 StudyManager.real_study_loaded = true
             }
