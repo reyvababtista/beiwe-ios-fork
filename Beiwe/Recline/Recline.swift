@@ -61,6 +61,8 @@ class Recline {
     }
 
     /// wraps the actual save function in a promise, but its a template type so it might be necessary
+    /// - ah, the templated type is required because this is called from a templated function inside RegisterViewController/ApiManager
+    /// - (This still does not explain or justify why the ONLY CONTENT is factored out into another function with IDENTICAL TEMPLATED TYPING 🙄.)
     func save<T: ReclineObject>(_ obj: T) -> Promise<T> {
         return Promise().then(on: Recline.queue) {
             return self._save(obj)

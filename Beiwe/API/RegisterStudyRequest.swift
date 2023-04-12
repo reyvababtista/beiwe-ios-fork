@@ -20,6 +20,7 @@ struct RegisterStudyRequest: Mappable, ApiRequest {
     var phoneNumber: String?
     var newPassword: String?
 
+    /// effectively our default constructor, called in the parameterized init
     init() {
         if let version = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
             self.appVersion = version
@@ -32,6 +33,8 @@ struct RegisterStudyRequest: Mappable, ApiRequest {
     }
 
     init?(map: Map) {}
+
+    /// This is the one that is called in api manager
     init(patientId: String, phoneNumber: String, newPassword: String) {
         self.init()
         self.patientId = patientId
