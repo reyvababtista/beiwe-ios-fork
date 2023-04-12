@@ -8,11 +8,10 @@ struct FCMTokenRequest: Mappable, ApiRequest {
 
     var fcmToken: String?
 
+    init?(map: Map) {}
     init(fcmToken: String) {
         self.fcmToken = fcmToken
     }
-
-    init?(map: Map) {}
 
     // Mappable
     mutating func mapping(map: Map) {

@@ -8,11 +8,10 @@ struct ChangePasswordRequest: Mappable, ApiRequest {
 
     var newPassword: String?
 
+    init?(map: Map) {}
     init(newPassword: String) {
         self.newPassword = newPassword
     }
-
-    init?(map: Map) {}
 
     // Mappable
     mutating func mapping(map: Map) {

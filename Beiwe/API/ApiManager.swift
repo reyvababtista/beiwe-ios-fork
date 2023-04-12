@@ -106,7 +106,7 @@ class ApiManager {
                     if T.ApiReturnType.self == BodyResponse.self {
                         returnObject = BodyResponse(body: response.result.value) as? T.ApiReturnType
 
-                    } else if T.ApiReturnType.self == StudySettings.self { // StudySettings
+                    } else if T.ApiReturnType.self == StudySettings.self { // StudySettings - ah ok this is for registration, will be piggybacking on this one probably
                         do {
                             var json = try JSONSerialization.jsonObject(with: Data(response.result.value?.utf8 ?? "".utf8)) as? [String: Any]
                             if json?["ios_plist"] is NSNull || json?["ios_plist"] == nil {
