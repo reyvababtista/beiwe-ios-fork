@@ -76,6 +76,7 @@ class ApiManager {
         return NSError(domain: "com.rf.beiwe.studies", code: 2, userInfo: nil)
     }
 
+    /// This function is used to Register for a study, it contains special logic for that scenario - WHY IS IT LIKE THAT THAT IS TERRIBLE THIS IS THE WRONG PLACE FOR THAT CODE.
     func makePostRequest<T: ApiRequest>(_ requestObject: T, password: String? = nil) -> Promise<(T.ApiReturnType, Int)> where T: Mappable {
         var parameters = requestObject.toJSON()
         parameters["password"] = (password == nil) ? self.hashedPassword : Crypto.sharedInstance.sha256Base64URL(password!) // I don't know what this line does
@@ -101,14 +102,16 @@ class ApiManager {
 
                     // casing for return type
                     var returnObject: T.ApiReturnType? // its a mappable?
-
-                    // BodyResponse
+                    
                     if T.ApiReturnType.self == BodyResponse.self {
+                        // BodyResponse case
                         returnObject = BodyResponse(body: response.result.value) as? T.ApiReturnType
-
-                    } else if T.ApiReturnType.self == StudySettings.self { // StudySettings - ah ok this is for registration, will be piggybacking on this one probably
+                    } else if T.ApiReturnType.self == StudySettings.self {
+                        // StudySettings - this case is for registration, which is STUPID it SHOULD NOT BE HERE.
                         do {
+                            // deserialize everything
                             var json = try JSONSerialization.jsonObject(with: Data(response.result.value?.utf8 ?? "".utf8)) as? [String: Any]
+                            // if there is no ios plist content insert this manual copy - gross, this is just Bad.
                             if json?["ios_plist"] is NSNull || json?["ios_plist"] == nil {
                                 json?["ios_plist"] = [
                                     "CLIENT_ID": "",
@@ -128,8 +131,12 @@ class ApiManager {
                                     "DATABASE_URL": "",
                                 ]
                             }
-                            let jsonObject = try? JSONSerialization.data(withJSONObject: json, options: [])
+                            // the json variable passed in here to an Any type, this seems to be safe after years of use, ignore warning.
+                            let jsonObject: Data? = try? JSONSerialization.data(withJSONObject: json, options: [])
+                            // stringify the json object (eg this does _json_ validation)
                             if let jsonString = String(data: jsonObject!, encoding: .utf8) {
+                                // and then this case is always a (the?) StudySettings object, but for obscure reasons we cannot reference it directly, apparently
+                                // returnObject = Mapper<StudySettings>().map(JSONString: jsonString)
                                 returnObject = Mapper<T.ApiReturnType>().map(JSONString: jsonString)
                             }
                         } catch {
@@ -143,6 +150,7 @@ class ApiManager {
 
                     // return
                     if let returnObject = returnObject { // returnObject exists, return
+                        // this returnobject is one of two(?) types, either a bodyresponse or a StudySettings object
                         return resolver.fulfill((returnObject, statusCode ?? 0))
                     } else { // returnObject failed?
                         return resolver.reject(ApiManager.serialErr())

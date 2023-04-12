@@ -6,17 +6,19 @@ struct RegisterStudyRequest: Mappable, ApiRequest {
     static let apiEndpoint = "/register_user/ios/"
     typealias ApiReturnType = StudySettings
 
+    // default init
+    var brand = "apple"
+    var manufacturer = "apple"
+    var appVersion: String?
+    var osName: String?
+    var osVersion: String?
+    var product: String?
+    var model: String?
+    
+    // custom init
     var patientId: String?
     var phoneNumber: String?
     var newPassword: String?
-    var appVersion: String?
-
-    var osVersion: String?
-    var osName: String?
-    var product: String?
-    var model: String?
-    var brand = "apple"
-    var manufacturer = "apple"
 
     init() {
         if let version = Bundle.main.infoDictionary?["CFBundleVersion"] as? String {
@@ -39,15 +41,17 @@ struct RegisterStudyRequest: Mappable, ApiRequest {
 
     // Mappable
     mutating func mapping(map: Map) {
+        // default init (always redundant? when is this functioon even called in the object lifecycle)
+        self.brand <- map["brand"]
+        self.manufacturer <- map["manufacturer"]
+        self.appVersion <- map["beiwe_version"]
+        self.osName <- map["device_os"]
+        self.osVersion <- map["os_version"]
+        self.product <- map["product"]
+        self.model <- map["model"]
+        // custom init
         self.patientId <- map["patient_id"]
         self.phoneNumber <- map["phone_number"]
         self.newPassword <- map["new_password"]
-        self.appVersion <- map["beiwe_version"]
-        self.osVersion <- map["os_version"]
-        self.osName <- map["device_os"]
-        self.product <- map["product"]
-        self.model <- map["model"]
-        self.brand <- map["brand"]
-        self.manufacturer <- map["manufacturer"]
     }
 }

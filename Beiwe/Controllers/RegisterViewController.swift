@@ -17,6 +17,8 @@ class RegisterViewController: FormViewController {
     
     // behavior
     let autoValidation = false
+    
+    // I guess this property is assigned somewhere, but its not assigned in this file...
     var dismiss: ((_ didRegister: Bool) -> Void)?
 
     override func viewDidLoad() {
@@ -40,6 +42,7 @@ class RegisterViewController: FormViewController {
             cell.textLabel?.font = font
             cell.detailTextLabel?.font = font
         }
+        
         let configServer = Configuration.sharedInstance.settings["config-server"] as? Bool ?? false
         var section = Section(NSLocalizedString("registration_screen_title", comment: ""))
         if configServer {
@@ -56,44 +59,53 @@ class RegisterViewController: FormViewController {
             $0.customRules = [RequiredRule()]
             $0.autoValidation = autoValidation
         }
+        
             <<< SVPasswordRow("tempPassword") {
                 $0.title = NSLocalizedString("registration_temp_password_label", comment: "")
                 $0.placeholder = NSLocalizedString("registration_temp_password_hint", comment: "")
                 $0.customRules = [RequiredRule()]
                 $0.autoValidation = autoValidation
             }
+        
             <<< SVPasswordRow("password") {
                 $0.title = NSLocalizedString("registration_new_password_label", comment: "")
                 $0.placeholder = NSLocalizedString("registration_new_password_hint", comment: "")
                 $0.customRules = [RequiredRule(), RegexRule(regex: Constants.passwordRequirementRegex, message: Constants.passwordRequirementDescription)]
                 $0.autoValidation = autoValidation
             }
+        
             <<< SVPasswordRow("confirmPassword") {
                 $0.title = NSLocalizedString("registration_confirm_new_password_label", comment: "")
                 $0.placeholder = NSLocalizedString("registration_confirm_new_password_hint", comment: "")
                 $0.customRules = [RequiredRule(), MinLengthRule(length: 1)]
                 $0.autoValidation = autoValidation
             }
+        
             <<< SVSimplePhoneRow("clinicianPhone") {
                 $0.title = NSLocalizedString("phone_number_entry_your_clinician_label", comment: "")
                 $0.placeholder = NSLocalizedString("phone_number_entry_your_clinician_hint", comment: "")
                 $0.customRules = [RequiredRule(), MinLengthRule(length: 8), MaxLengthRule(length: 15), FloatRule()]
                 $0.autoValidation = autoValidation
             }
+        
             <<< SVSimplePhoneRow("raPhone") {
                 $0.title = NSLocalizedString("phone_number_entry_research_assistant_label", comment: "")
                 $0.placeholder = NSLocalizedString("phone_number_entry_research_assistant_hint", comment: "")
                 $0.customRules = [RequiredRule(), MinLengthRule(length: 8), MaxLengthRule(length: 15), FloatRule()]
                 $0.autoValidation = autoValidation
             }
+        
             <<< ButtonRow {
                 $0.title = NSLocalizedString("registration_submit", comment: "")
             }
+        
             .onCellSelection { [unowned self] (cell: ButtonCellOf<String>, row: ButtonRow) in
                 if self.form.validateAll() {
                     PKHUD.sharedHUD.dimsBackground = true
                     PKHUD.sharedHUD.userInteractionOnUnderlyingViewsEnabled = false
                     HUD.show(.progress)
+                    
+                    // extract form values
                     let formValues = self.form.values()
                     let patientId: String? = formValues["patientId"] as! String?
                     // let phoneNumber: String? = formValues["phone"] as! String?;
@@ -102,6 +114,8 @@ class RegisterViewController: FormViewController {
                     let tempPassword: String? = formValues["tempPassword"] as! String?
                     let clinicianPhone: String? = formValues["clinicianPhone"] as! String?
                     let raPhone: String? = formValues["raPhone"] as! String?
+                    
+                    // set up url
                     var customApiUrl: String?
                     var server: String?
                     if configServer {
@@ -110,6 +124,7 @@ class RegisterViewController: FormViewController {
                     if let server = server {
                         customApiUrl = "https://" + server
                     }
+                    
                     if let patientId = patientId, let phoneNumber = phoneNumber, let newPassword = newPassword, let clinicianPhone = clinicianPhone, let raPhone = raPhone {
                         let registerStudyRequest = RegisterStudyRequest(patientId: patientId, phoneNumber: phoneNumber, newPassword: newPassword)
                             
@@ -119,7 +134,7 @@ class RegisterViewController: FormViewController {
                         ApiManager.sharedInstance.patientId = patientId
                         ApiManager.sharedInstance.customApiUrl = customApiUrl
                         
-                        // make the post request
+                        // make the post request - this studysettings object is instantiated inside the RegisterStudyRequest.makePostRequest
                         ApiManager.sharedInstance.makePostRequest(registerStudyRequest).then { (studySettings: StudySettings, _: Int) -> Promise<Study> in
                             // testing three arbitrary response body values to ensure we hit the correct server and not some random server
                             // that happened to return a 200
@@ -142,8 +157,8 @@ class RegisterViewController: FormViewController {
                             study.raPhoneNumber = raPhone
                             // fuzzgps
                             if studySettings.fuzzGps {
-                                study.fuzzGpsLatitudeOffset = self._generateLatitudeOffset()
-                                study.fuzzGpsLongitudeOffset = self._generateLongitudeOffset()
+                                study.fuzzGpsLatitudeOffset = self.generateLatitudeOffset()
+                                study.fuzzGpsLongitudeOffset = self.generateLongitudeOffset()
                             }
                                 
                             // delete all other studies, set current study
@@ -157,6 +172,7 @@ class RegisterViewController: FormViewController {
                             AppDelegate.sharedInstance().sendFCMToken(fcmToken: token ?? "")
                             HUD.flash(.success, delay: 1)
                             return StudyManager.sharedInstance.loadDefaultStudy()
+                            
                         }.done { (_: Bool) in
                             // set logged in to True, dismiss login view?
                             AppDelegate.sharedInstance().isLoggedIn = true
@@ -165,6 +181,7 @@ class RegisterViewController: FormViewController {
                             } else {
                                 self.presentingViewController?.dismiss(animated: true, completion: nil)
                             }
+                            
                         }.catch { (error: Error) in
                             // Show error message logic
                             print("error received from register: \(error)")
@@ -196,6 +213,7 @@ class RegisterViewController: FormViewController {
                     print("Bad validation.")
                 }
             }
+        
             <<< ButtonRow {
                 $0.title = NSLocalizedString("cancel_button_text", comment: "")
             }.onCellSelection { [unowned self] (cell: ButtonCellOf<String>, row: ButtonRow) in
@@ -218,7 +236,7 @@ class RegisterViewController: FormViewController {
     }
     
     /// Generates a random offset between -1 and 1 (thats not between -0.2 and 0.2)
-    func _generateLatitudeOffset() -> Double {
+    func generateLatitudeOffset() -> Double {
         var ran = Double.random(in: -1 ... 1)
         while ran <= 0.2 && ran >= -0.2 {
             ran = Double.random(in: -1 ... 1)
@@ -227,7 +245,7 @@ class RegisterViewController: FormViewController {
     }
     
     /// Generates a random offset between -180 and 180 (thats not between -10 and 10)
-    func _generateLongitudeOffset() -> Double {
+    func generateLongitudeOffset() -> Double {
         var ran = Double.random(in: -180 ... 180)
         while ran <= 10 && ran >= -10 {
             ran = Double.random(in: -180 ... 180)
