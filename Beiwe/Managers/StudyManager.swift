@@ -2,13 +2,13 @@ import Crashlytics
 import EmitterKit
 import Firebase
 import Foundation
+import ObjectMapper
 import PromiseKit
 import ReachabilitySwift
 
-
 /// Contains all sorts of miiscellaneous study related functionality - this is badly factored and should be defactored into classes that contain their own well-defirned things
 class StudyManager {
-    static let sharedInstance = StudyManager()  // singleton reference
+    static let sharedInstance = StudyManager() // singleton reference
     
     // General code assets
     let appDelegate = UIApplication.shared.delegate as! AppDelegate
@@ -17,15 +17,16 @@ class StudyManager {
     // Really critical app components
     var currentStudy: Study?
     var timerManager: TimerManager = TimerManager()
-    var gpsManager: GPSManager?  // gps manager is slightly special because we use it to keep the app open in the background
-    var keyRef: SecKey?  // the study's security key
+    var gpsManager: GPSManager? // gps manager is slightly special because we use it to keep the app open in the background
+    var keyRef: SecKey? // the study's security key
     
     // State tracking variables
+    var sensorsStartedEver = false
     var isUploading = false
     let surveysUpdatedEvent: Event<Int> = Event<Int>()
     static var real_study_loaded = false
     
-    var isStudyLoaded: Bool {  // returns true if self.currentStudy is populated
+    var isStudyLoaded: Bool { // returns true if self.currentStudy is populated
         return self.currentStudy != nil
     }
     
@@ -40,7 +41,7 @@ class StudyManager {
         
         // mostly sets real_study_loaded to true...
         return firstly { () -> Promise<[Study]> in
-            Recline.shared.queryAll()  // this returns a list of all studies as a parameter to the next promise.
+            Recline.shared.queryAll() // this returns a list of all studies as a parameter to the next promise.
         }.then { (studies: [Study]) -> Promise<Bool> in
             // if there is more than one study, log a warning? this is pointless
             if studies.count > 1 {
@@ -50,7 +51,7 @@ class StudyManager {
             if studies.count > 0 {
                 self.currentStudy = studies[0]
                 // print("self.currentStudy.patientId: \(self.currentStudy?.patientId)")
-                AppDelegate.sharedInstance().setDebuggingUser(self.currentStudy?.patientId ?? "unknown")  // this doesn't do anything...
+                AppDelegate.sharedInstance().setDebuggingUser(self.currentStudy?.patientId ?? "unknown") // this doesn't do anything...
                 StudyManager.real_study_loaded = true
             }
             return .value(true)
@@ -65,7 +66,7 @@ class StudyManager {
         }
         self.setApiCredentials()
         DataStorageManager.sharedInstance.setCurrentStudy(self.currentStudy!, secKeyRef: self.keyRef)
-        self.prepareDataServices()  // okay prepareDataServices is 90% of the function body
+        self.prepareDataServices() // okay prepareDataServices is 90% of the function body
         NotificationCenter.default.addObserver(self, selector: #selector(self.reachabilityChanged), name: ReachabilityChangedNotification, object: nil)
     }
     
@@ -75,7 +76,13 @@ class StudyManager {
         guard let studySettings: StudySettings = currentStudy?.studySettings else {
             return
         }
-        log.info("prepareDataServices")
+        
+        if self.sensorsStartedEver {
+            self.timerManager.clearPollTimer()
+            self.timerManager.stop() // this one may take real time on another thread soooooo I guess we sleep?
+            self.timerManager.clear()
+            Thread.sleep(forTimeInterval: 0.5)
+        }
         
         DataStorageManager.sharedInstance.createDirectories()
         // Move non current files out.  (Probably unnecessary, would happen later anyway)
@@ -116,7 +123,8 @@ class StudyManager {
             self.timerManager.addDataService(on_duration: studySettings.motionOnDurationSeconds, off_duration: studySettings.motionOffDurationSeconds, handler: DeviceMotionManager())
         }
         self.gpsManager!.startGps()
-        timerManager.start()
+        self.timerManager.start()
+        self.sensorsStartedEver = true
     }
     
     /// sets the study as consented, sets api credentials
@@ -153,17 +161,17 @@ class StudyManager {
         // Why is this EVER allowed to be the empty string? that's silent failure FOREVER
         ApiManager.sharedInstance.password = PersistentPasswordManager.sharedInstance.passwordForStudy() ?? ""
         ApiManager.sharedInstance.customApiUrl = currentStudy.customApiUrl
-        if let patientId = currentStudy.patientId {  // again WHY is this even allowed to happen on a null participant id
+        if let patientId = currentStudy.patientId { // again WHY is this even allowed to happen on a null participant id
             ApiManager.sharedInstance.patientId = patientId
             if let clientPublicKey = currentStudy.studySettings?.clientPublicKey {
                 do {
                     // failure means a null key
                     self.keyRef = try PersistentPasswordManager.sharedInstance.storePublicKeyForStudy(clientPublicKey, patientId: patientId)
                 } catch {
-                    log.error("Failed to store RSA key in keychain.")  // why are we not crashing...
+                    log.error("Failed to store RSA key in keychain.") // why are we not crashing...
                 }
             } else {
-                log.error("No public key found.  Can't store")  // why are we not crashing...
+                log.error("No public key found.  Can't store") // why are we not crashing...
             }
         }
     }
@@ -179,13 +187,13 @@ class StudyManager {
                 trackingSurvey = TrackingSurveyPresenter(surveyId: surveyId, activeSurvey: activeSurvey, survey: survey)
                 trackingSurvey.addTimingsEvent("expired", question: nil)
             } else {
-                trackingSurvey = surveyPresenter!  // current survey I think?
+                trackingSurvey = surveyPresenter! // current survey I think?
             }
-            trackingSurvey.finalizeSurveyAnswers()  // its done, do the its-done thing
+            trackingSurvey.finalizeSurveyAnswers() // its done, do the its-done thing
             
             // increment number of submitted surveys
             if activeSurvey.bwAnswers.count > 0 {
-                if let surveyType = survey.surveyType {  // ... isn't this already instantiated?
+                if let surveyType = survey.surveyType { // ... isn't this already instantiated?
                     switch surveyType {
                     case .AudioSurvey:
                         self.currentStudy?.submittedAudioSurveys = (self.currentStudy?.submittedAudioSurveys ?? 0) + 1
@@ -195,7 +203,7 @@ class StudyManager {
                 }
             }
         }
-        self.cleanupSurvey(activeSurvey)  // call cleanup
+        self.cleanupSurvey(activeSurvey) // call cleanup
     }
     
     /// miniscule portion of finishing a survey answefrs file creation, finalizes file sorta; also called in audio surveys
@@ -299,7 +307,7 @@ class StudyManager {
         log.info("Badge Count: \(badgeCnt)")
         UIApplication.shared.applicationIconBadgeNumber = badgeCnt
         
-        // save surveyy data
+        // save survey data
         if surveyDataModified || forceSave {
             self.surveysUpdatedEvent.emit(0)
             Recline.shared.save(study).catch { _ in
@@ -309,13 +317,13 @@ class StudyManager {
         
         // calculate the next survey time for use and return it
         let closestNextSurveyTime: TimeInterval = currentTime + (60.0 * 60.0 * 24.0 * 7)
-        timerManager.resetNextSurveyUpdate(closestNextSurveyTime)
+        self.timerManager.resetNextSurveyUpdate(closestNextSurveyTime)
         return closestNextSurveyTime
     }
     
     ///
     /// Timers! They do what they say and aren't even complicated! Holy !#*&$@#*!
-    ///
+    ///    okay but they do all use completely unnecessary promises.
     
     func setNextUploadTime() -> Promise<Bool> {
         guard let study = currentStudy, let studySettings = study.studySettings else {
@@ -323,7 +331,7 @@ class StudyManager {
         }
         study.nextUploadCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.uploadDataFileFrequencySeconds)
         return Recline.shared.save(study).then { (_: Study) -> Promise<Bool> in
-                .value(true)
+            .value(true)
         }
     }
     
@@ -333,7 +341,17 @@ class StudyManager {
         }
         study.nextSurveyCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.checkForNewSurveysFreqSeconds)
         return Recline.shared.save(study).then { (_: Study) -> Promise<Bool> in
-                .value(true)
+            .value(true)
+        }
+    }
+    
+    func setNextDeviceSettingsTime() -> Promise<Bool> {
+        guard let study = currentStudy else {
+            return .value(true)
+        }
+        study.nextDeviceSettingsCheck = Int64(Date().timeIntervalSince1970) + (30 * 60)  // hardcoded thirty minutes
+        return Recline.shared.save(study).then { (_: Study) -> Promise<Bool> in
+            .value(true)
         }
     }
     
@@ -346,6 +364,57 @@ class StudyManager {
         _ = Promise().done { _ in
             log.info("Reachability changed, running periodic.")
             self.periodicNetworkTransfers()
+        }
+    }
+    
+    /// runs network operations inside of promises, handles checking and updating timer values on the timer.
+    /// called from Timer and a couple other places.
+    func periodicNetworkTransfers() {
+        // fail early logic, get study settings and study.
+        guard let currentStudy = currentStudy, let studySettings = currentStudy.studySettings else {
+            return
+        }
+        // check the uploadOverCellular study detail.
+        let reachable = studySettings.uploadOverCellular ? self.appDelegate.reachability!.isReachable : self.appDelegate.reachability!.isReachableViaWiFi
+        let now: Int64 = Int64(Date().timeIntervalSince1970)
+        let nextSurvey = currentStudy.nextSurveyCheck ?? 0
+        let nextUpload = currentStudy.nextUploadCheck ?? 0
+        let nextDeviceSettings = currentStudy.nextDeviceSettingsCheck ?? 0
+        
+        // print("reachable: \(reachable), missedSurveyCheck: \(currentStudy.missedSurveyCheck), missedUploadCheck: \(currentStudy.missedUploadCheck)")
+        // print("now: \(now), nextSurvey: \(nextSurvey), nextUpload: \(nextUpload), nextDeviceSettings: \(nextDeviceSettings)")
+        
+        // logic for checking for surveys
+        if now > nextSurvey || (reachable && currentStudy.missedSurveyCheck) {
+            // This (missedSurveyCheck?) will be saved because setNextSurveyTime saves the study
+            currentStudy.missedSurveyCheck = !reachable // whut?
+            self.setNextSurveyTime().done { (_: Bool) in
+                if reachable {
+                    _ = self.checkSurveys()
+                }
+            }.catch { (_: Error) in
+                log.error("Error checking for surveys")
+            }
+        }
+        
+        // logic for running uploads code
+        if now > nextUpload || (reachable && currentStudy.missedUploadCheck) {
+            // This (missedUploadCheck?) will be saved because setNextUpload saves the study
+            currentStudy.missedUploadCheck = !reachable
+            self.setNextUploadTime().done { (_: Bool) in
+                _ = self.upload(!reachable)
+            }.catch { (_: Error) in
+                log.error("Error checking for uploads") // this is kindof unnecessary
+            }
+        }
+        
+        // logic for updating the study's device settings.
+        if now > nextDeviceSettings && reachable {
+            self.setNextDeviceSettingsTime().done { (_: Bool) in
+                self.updateDeviceSettings()
+            }.catch { (_: Error) in
+                log.error("Error checking for updated device settings") // this is kindof unnecessary
+            }
         }
     }
     
@@ -369,47 +438,180 @@ class StudyManager {
             log.info("Surveys: \(surveys)")
             study.surveys = surveys
             return Recline.shared.save(study).asVoid()
-        }.then { _ -> Promise<Bool> in  // its an error type
+        }.then { _ -> Promise<Bool> in // its an error type
             // then update the active surveys because the surveys may have just changed
             _ = self.updateActiveSurveys()
             return .value(true)
-        }.recover { _ -> Promise<Bool> in  // _ is of some error type
+        }.recover { _ -> Promise<Bool> in // _ is of some error type
             // and if anything went wron return false  --  IT IS NEVER USED
-                .value(false)
+            .value(false)
         }
     }
     
-    /// runs network operations inside of promises
-    func periodicNetworkTransfers() {
-        // fail early logic.
-        guard let currentStudy = currentStudy, let studySettings = currentStudy.studySettings else {
+    /// This abomination of a function queries the server for new study settings, applies them, and then restarts sensors if anything changed
+    func updateDeviceSettings() {
+        // assert that these are instantiated
+        guard let _ = self.currentStudy, let _ = self.currentStudy?.studySettings else {
             return
         }
-        // check the uploadOverCellular study detail.
-        let reachable = studySettings.uploadOverCellular ? self.appDelegate.reachability!.isReachable : self.appDelegate.reachability!.isReachableViaWiFi
-        // Good time to compact the database
-        let currentTime: Int64 = Int64(Date().timeIntervalSince1970)
-        let nextSurvey = currentStudy.nextSurveyCheck ?? 0
-        let nextUpload = currentStudy.nextUploadCheck ?? 0
-        
-        // logic for checking for studion and runnning the data upload code
-        if currentTime > nextSurvey || (reachable && currentStudy.missedSurveyCheck) {
-            // This (missedSurveyCheck?) will be saved because setNextUpload saves the study
-            currentStudy.missedSurveyCheck = !reachable  // whut?
-            self.setNextSurveyTime().done { _ in
-                if reachable {
-                    _ = self.checkSurveys()
+        // make the post request, convert to json, convert to a JustStudySettings mapper
+        _ = ApiManager.sharedInstance.makePostRequest(UpdateDeviceSettingsRequest()).done { (response: BodyResponse, some_int: Int) in
+            if let body_string = response.body {
+                let newSettings: JustStudySettings? = Mapper<JustStudySettings>().map(JSONString: body_string) // manually calling the mapper
+                // Check EVERY SETTING, record if anything changed, assign any new values
+                if let newSettings = newSettings {
+                    var anything_changed: Bool = false
+                    if self.currentStudy?.studySettings?.accelerometer != newSettings.accelerometer {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.accelerometer = newSettings.accelerometer
+                    }
+                    if self.currentStudy?.studySettings?.accelerometerOffDurationSeconds != newSettings.accelerometerOffDurationSeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.accelerometerOffDurationSeconds = newSettings.accelerometerOffDurationSeconds
+                    }
+                    if self.currentStudy?.studySettings?.accelerometerOnDurationSeconds != newSettings.accelerometerOnDurationSeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.accelerometerOnDurationSeconds = newSettings.accelerometerOnDurationSeconds
+                    }
+                    if self.currentStudy?.studySettings?.accelerometerFrequency != newSettings.accelerometerFrequency {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.accelerometerFrequency = newSettings.accelerometerFrequency
+                    }
+                    if self.currentStudy?.studySettings?.aboutPageText != newSettings.aboutPageText {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.aboutPageText = newSettings.aboutPageText
+                    }
+                    if self.currentStudy?.studySettings?.callClinicianText != newSettings.callClinicianText {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.callClinicianText = newSettings.callClinicianText
+                    }
+                    if self.currentStudy?.studySettings?.consentFormText != newSettings.consentFormText {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.consentFormText = newSettings.consentFormText
+                    }
+                    if self.currentStudy?.studySettings?.checkForNewSurveysFreqSeconds != newSettings.checkForNewSurveysFreqSeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.checkForNewSurveysFreqSeconds = newSettings.checkForNewSurveysFreqSeconds
+                    }
+                    if self.currentStudy?.studySettings?.createNewDataFileFrequencySeconds != newSettings.createNewDataFileFrequencySeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.createNewDataFileFrequencySeconds = newSettings.createNewDataFileFrequencySeconds
+                    }
+                    if self.currentStudy?.studySettings?.gps != newSettings.gps {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.gps = newSettings.gps
+                    }
+                    if self.currentStudy?.studySettings?.gpsOffDurationSeconds != newSettings.gpsOffDurationSeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.gpsOffDurationSeconds = newSettings.gpsOffDurationSeconds
+                    }
+                    if self.currentStudy?.studySettings?.gpsOnDurationSeconds != newSettings.gpsOnDurationSeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.gpsOnDurationSeconds = newSettings.gpsOnDurationSeconds
+                    }
+                    if self.currentStudy?.studySettings?.powerState != newSettings.powerState {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.powerState = newSettings.powerState
+                    }
+                    if self.currentStudy?.studySettings?.secondsBeforeAutoLogout != newSettings.secondsBeforeAutoLogout {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.secondsBeforeAutoLogout = newSettings.secondsBeforeAutoLogout
+                    }
+                    if self.currentStudy?.studySettings?.submitSurveySuccessText != newSettings.submitSurveySuccessText {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.submitSurveySuccessText = newSettings.submitSurveySuccessText
+                    }
+                    if self.currentStudy?.studySettings?.uploadDataFileFrequencySeconds != newSettings.uploadDataFileFrequencySeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.uploadDataFileFrequencySeconds = newSettings.uploadDataFileFrequencySeconds
+                    }
+                    if self.currentStudy?.studySettings?.voiceRecordingMaxLengthSeconds != newSettings.voiceRecordingMaxLengthSeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.voiceRecordingMaxLengthSeconds = newSettings.voiceRecordingMaxLengthSeconds
+                    }
+                    if self.currentStudy?.studySettings?.wifi != newSettings.wifi {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.wifi = newSettings.wifi
+                    }
+                    if self.currentStudy?.studySettings?.wifiLogFrequencySeconds != newSettings.wifiLogFrequencySeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.wifiLogFrequencySeconds = newSettings.wifiLogFrequencySeconds
+                    }
+                    if self.currentStudy?.studySettings?.proximity != newSettings.proximity {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.proximity = newSettings.proximity
+                    }
+                    if self.currentStudy?.studySettings?.magnetometer != newSettings.magnetometer {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.magnetometer = newSettings.magnetometer
+                    }
+                    if self.currentStudy?.studySettings?.magnetometerOffDurationSeconds != newSettings.magnetometerOffDurationSeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.magnetometerOffDurationSeconds = newSettings.magnetometerOffDurationSeconds
+                    }
+                    if self.currentStudy?.studySettings?.magnetometerOnDurationSeconds != newSettings.magnetometerOnDurationSeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.magnetometerOnDurationSeconds = newSettings.magnetometerOnDurationSeconds
+                    }
+                    if self.currentStudy?.studySettings?.gyro != newSettings.gyro {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.gyro = newSettings.gyro
+                    }
+                    if self.currentStudy?.studySettings?.gyroOffDurationSeconds != newSettings.gyroOffDurationSeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.gyroOffDurationSeconds = newSettings.gyroOffDurationSeconds
+                    }
+                    if self.currentStudy?.studySettings?.gyroOnDurationSeconds != newSettings.gyroOnDurationSeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.gyroOnDurationSeconds = newSettings.gyroOnDurationSeconds
+                    }
+                    if self.currentStudy?.studySettings?.gyroFrequency != newSettings.gyroFrequency {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.gyroFrequency = newSettings.gyroFrequency
+                    }
+                    if self.currentStudy?.studySettings?.motion != newSettings.motion {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.motion = newSettings.motion
+                    }
+                    if self.currentStudy?.studySettings?.motionOffDurationSeconds != newSettings.motionOffDurationSeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.motionOffDurationSeconds = newSettings.motionOffDurationSeconds
+                    }
+                    if self.currentStudy?.studySettings?.motionOnDurationSeconds != newSettings.motionOnDurationSeconds {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.motionOnDurationSeconds = newSettings.motionOnDurationSeconds
+                    }
+                    if self.currentStudy?.studySettings?.reachability != newSettings.reachability {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.reachability = newSettings.reachability
+                    }
+                    if self.currentStudy?.studySettings?.consentSections != newSettings.consentSections {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.consentSections = newSettings.consentSections
+                    }
+                    if self.currentStudy?.studySettings?.uploadOverCellular != newSettings.uploadOverCellular {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.uploadOverCellular = newSettings.uploadOverCellular
+                    }
+                    if self.currentStudy?.studySettings?.fuzzGps != newSettings.fuzzGps {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.fuzzGps = newSettings.fuzzGps
+                    }
+                    if self.currentStudy?.studySettings?.callClinicianButtonEnabled != newSettings.callClinicianButtonEnabled {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.callClinicianButtonEnabled = newSettings.callClinicianButtonEnabled
+                    }
+                    if self.currentStudy?.studySettings?.callResearchAssistantButtonEnabled != newSettings.callResearchAssistantButtonEnabled {
+                        anything_changed = true
+                        self.currentStudy?.studySettings?.callResearchAssistantButtonEnabled = newSettings.callResearchAssistantButtonEnabled
+                    }
+                    // if anything changed, reset all data services.
+                    _ = Recline.shared.save(self.currentStudy!).done { (_: Study) in
+                        if anything_changed {
+                            self.prepareDataServices()
+                        }
+                    }
                 }
-            }.catch { _ in
-                log.error("Error checking for surveys")
-            }
-        } else if currentTime > nextUpload || (reachable && currentStudy.missedUploadCheck) {
-            // This (missedUploadCheck?) will be saved because setNextUpload saves the study
-            currentStudy.missedUploadCheck = !reachable
-            self.setNextUploadTime().done { _ in
-                _ = self.upload(!reachable)
-            }.catch { _ in
-                log.error("Error checking for uploads")  // this is kindof unnecessary
             }
         }
     }
@@ -450,7 +652,7 @@ class StudyManager {
             
             // we call with processOnly=true when we have no network access
             if !processOnly {
-                var uploadChain = Promise<Bool>.value(true)  // iinstantiate the start (end? yeah its the end) of the promise chain
+                var uploadChain = Promise<Bool>.value(true) // iinstantiate the start (end? yeah its the end) of the promise chain
                 for filename in filesToProcess {
                     let filePath = DataStorageManager.uploadDataDirectory().appendingPathComponent(filename)
                     let uploadRequest = UploadRequest(fileName: filename, filePath: filePath.path)
@@ -458,11 +660,11 @@ class StudyManager {
                     // add the upload operation to the upload chain
                     uploadChain = uploadChain.then { (_: Bool) -> Promise<Bool> in
                         // do an upload
-                        return ApiManager.sharedInstance.makeMultipartUploadRequest(uploadRequest, file: filePath).then { (_: (UploadRequest.ApiReturnType, Int)) -> Promise<Bool> in
-                            log.warning("Finished uploading: \(filename), deleting.")
+                        ApiManager.sharedInstance.makeMultipartUploadRequest(uploadRequest, file: filePath).then { (_: (UploadRequest.ApiReturnType, Int)) -> Promise<Bool> in
+                            print("Finished uploading: \(filename), deleting.")
                             AppEventManager.sharedInstance.logAppEvent(event: "uploaded", msg: "Uploaded data file", d1: filename)
                             numFiles = numFiles + 1
-                            try FileManager.default.removeItem(at: filePath)  // ok I guess this can fail...?
+                            try FileManager.default.removeItem(at: filePath) // ok I guess this can fail...?
                             return .value(true)
                         }
                     }.recover { (_: Error) -> Promise<Bool> in
@@ -520,7 +722,7 @@ class StudyManager {
         // and then alllll code is located after return statement because Promises are totally meant to be used like this. hooray!
         return promise.then { (_: Void) -> Promise<Bool> in
             self.gpsManager = nil
-            self.timerManager.clear()  // this may deallocate all sensors.  I think.
+            self.timerManager.clear() // this may deallocate all sensors.  I think.
             
             // call purge studies and insert a _second_ return statement 🙄
             return self.purgeStudies().then { (_: Bool) -> Promise<Bool> in
@@ -545,7 +747,7 @@ class StudyManager {
                     }
                 }
                 // clear the study, patient id
-                self.currentStudy = nil  // self.isStudyLoaded will now fail
+                self.currentStudy = nil // self.isStudyLoaded will now fail
                 ApiManager.sharedInstance.patientId = ""
                 
                 // I don't know what this is and I don't think it matters.
@@ -554,7 +756,7 @@ class StudyManager {
                     print(error.debugDescription)
                     log.error(error.debugDescription)
                 }
-                return .value(true)  // ohey a third return statement 🙄
+                return .value(true) // ohey a third return statement 🙄
             }
         }
     }
@@ -563,7 +765,7 @@ class StudyManager {
     func purgeStudies() -> Promise<Bool> {
         /// reaches into the database, removes the study, no clue what the queryall does
         return firstly { () -> Promise<[Study]> in
-            Recline.shared.queryAll()  // this returns a list of all studies as a parameter to the next promise.
+            Recline.shared.queryAll() // this returns a list of all studies as a parameter to the next promise.
         }.then { (studies: [Study]) -> Promise<Bool> in
             // delete all the studies
             var promise = Promise<Bool>.value(true)
@@ -609,7 +811,7 @@ class StudyManager {
         self.timerManager.clear()
         var promise: Promise<Void> = Promise()
         // clear currentStudy
-        return promise.then(on: DispatchQueue.global(qos: .default)) { _ -> Promise<Bool> in
+        return promise.then(on: DispatchQueue.global(qos: .default)) { (_: Void) -> Promise<Bool> in
             // self.gpsManager = nil  // I guess this is unnecessary?
             self.currentStudy = nil
             StudyManager.real_study_loaded = false

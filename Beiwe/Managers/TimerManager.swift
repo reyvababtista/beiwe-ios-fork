@@ -20,6 +20,7 @@ class TimerManager {
     var timer: Timer = Timer()
     var nextSurveyUpdate: TimeInterval = 0
     var nextServiceDate: TimeInterval = 0
+    var nextSettingsUpdate: TimeInterval = 0
     
     /// a core function that enables many sensor managers (DataServiceProtocols)
     func addDataService(on_duration: Int, off_duration: Int, handler: DataServiceProtocol) {
@@ -57,7 +58,6 @@ class TimerManager {
             // use .done because not returning anything - wutchutalkinbout Tuck, we return an empty promise!
             promise = promise.done(on: globalQueue) { (_: ()) in  // this is a very stupid type declaration, _ is an unused Void-returning callable that takes no arguments.
                 dataStatus.handler.finishCollecting().then(on: self.globalQueue) { (_: Void) -> Promise<Void> in  // need to explicitly state return type
-                    print("Returned from finishCollecting")
                     return Promise()
                 }.catch(on: DispatchQueue.global(qos: .default)) { _ in
                     print("err from finish collecting")
@@ -80,22 +80,22 @@ class TimerManager {
     }
     
     /// Starts or stops every data service, returns the time interval until the next event.
-    /// called in self.pollServices
+    /// called in self.pollServices, which assigns to self
     func dispatchToServices() -> TimeInterval {
         // get time at start of call
-        let currentDate = Date().timeIntervalSince1970
-        var nextServiceDate = currentDate + (60 * 60)
+        let now = Date().timeIntervalSince1970
+        var nextServiceDate = now + (60 * 60)
 
         // for every data service get its nextToggleTime, turn it on or off as appropriate,
         // set state as appropriate, update nextToggleTime.
         for dataStatus in self.dataCollectionServices {
             if let nextToggleTime = dataStatus.nextToggleTime {
                 var serviceDate = nextToggleTime.timeIntervalSince1970
-                if serviceDate <= currentDate {
+                if serviceDate <= now {
                     if dataStatus.currentlyOn {
                         dataStatus.handler.pauseCollecting() // stops recording
                         dataStatus.currentlyOn = false
-                        dataStatus.nextToggleTime = Date(timeIntervalSince1970: currentDate + dataStatus.offDurationSeconds)
+                        dataStatus.nextToggleTime = Date(timeIntervalSince1970: now + dataStatus.offDurationSeconds)
                     } else {
                         dataStatus.handler.startCollecting() // start recording
                         dataStatus.currentlyOn = true
@@ -103,12 +103,12 @@ class TimerManager {
                         if dataStatus.offDurationSeconds == 0 {
                             dataStatus.nextToggleTime = nil
                         } else {
-                            dataStatus.nextToggleTime = Date(timeIntervalSince1970: currentDate + dataStatus.onDurationSeconds)
+                            dataStatus.nextToggleTime = Date(timeIntervalSince1970: now + dataStatus.onDurationSeconds)
                         }
                     }
-                    serviceDate = dataStatus.nextToggleTime?.timeIntervalSince1970 ?? DBL_MAX
+                    serviceDate = dataStatus.nextToggleTime?.timeIntervalSince1970 ?? Double.greatestFiniteMagnitude
                 }
-                // nextServiceDate to soonest of nextServiceDate, serviceDate
+                // As we iterate over all the DataServiceStatuses we look for the soonest event time to trigger
                 nextServiceDate = min(nextServiceDate, serviceDate)
             }
         }
@@ -122,20 +122,22 @@ class TimerManager {
     /// runs StudyManaager.periodicNetworkTransfers, sets next survey update, starts another timer.
     @objc func pollServices() {
         // log.info("Polling...")
-        self.clearPollTimer() // purpose unclear?
+        self.clearPollTimer()
         AppEventManager.sharedInstance.logAppEvent(event: "poll_service", msg: "Polling service") // probably pointless
-        // return early if services are not renning
+        // return early if services should not be running
         if !self.areServicesRunning {
             return
         }
 
         /// set the next service date (its a timeInterval object) to the next event time
         self.nextServiceDate = self.dispatchToServices()
-        let currentTime = Date().timeIntervalSince1970 // from before the network tasks execute
+        let now = Date().timeIntervalSince1970 // from before the network tasks execute
+        
+        // conditionally runs any network operations, handles reachability
         StudyManager.sharedInstance.periodicNetworkTransfers()
 
         // run update survey logic
-        if currentTime > self.nextSurveyUpdate {
+        if now > self.nextSurveyUpdate {
             self.nextSurveyUpdate = StudyManager.sharedInstance.updateActiveSurveys()
         }
         self.setTimerForService()
@@ -152,8 +154,9 @@ class TimerManager {
     /// set a timer
     func setTimerForService() {
         self.nextServiceDate = min(self.nextSurveyUpdate, self.nextServiceDate)
-        let currentTime = Date().timeIntervalSince1970
-        let nextServiceSeconds = max(nextServiceDate - currentTime, 1.0)
+        let now = Date().timeIntervalSince1970
+        // next time minus current time = the time interval until target moment; at least 1 second tho.e
+        let nextServiceSeconds = max(nextServiceDate - now, 1.0)
         self.startPollTimer(nextServiceSeconds)
     }
 

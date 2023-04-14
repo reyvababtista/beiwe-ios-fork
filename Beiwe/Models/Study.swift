@@ -2,31 +2,37 @@ import Foundation
 import ObjectMapper
 
 class Study: ReclineObject {
-    var studyId = Constants.defaultStudyId
-    var patientPhoneNumber: String = ""
+    // StudySettings is (probably?) saved recursively as it is a mappable - if that's how Recline works
     var studySettings: StudySettings?
+    
+    // constants (these should not change after registration)
+    var studyId = Constants.defaultStudyId  // except for this one? I don't even know.
+    var participantConsented: Bool = false
     var patientId: String?
+    var patientPhoneNumber: String = "" // uh, I don't think this is used?
     var clinicianPhoneNumber: String?
     var raPhoneNumber: String?
+    var customApiUrl: String?
+    var fuzzGpsLongitudeOffset: Double = 0.0
+    var fuzzGpsLatitudeOffset: Double = 0.0
+    var registerDate: Int64?
+    
+    // app state
     var nextUploadCheck: Int64?
     var nextSurveyCheck: Int64?
+    var nextDeviceSettingsCheck: Int64?
     var lastUploadSuccess: Int64 = 0
     var missedSurveyCheck: Bool = false
     var missedUploadCheck: Bool = false
     var lastBadgeCnt = 0
-    var registerDate: Int64?
     var receivedAudioSurveys: Int = 0
     var receivedTrackingSurveys: Int = 0
-    var submittedAudioSurveys: Int = 0
-    var submittedTrackingSurveys: Int = 0
-    var customApiUrl: String?
-    var fuzzGpsLongitudeOffset: Double = 0.0
-    var fuzzGpsLatitudeOffset: Double = 0.0
+    var submittedAudioSurveys: Int = 0 // TODO: what is this and is it breaking uploads
+    var submittedTrackingSurveys: Int = 0 // TODO: what is this and is it breaking uploads
     
+    // Survey app state
     var surveys: [Survey] = []
     var activeSurveys: [String: ActiveSurvey] = [:]
-
-    var participantConsented: Bool = false
 
     init(patientPhone: String, patientId: String, studySettings: StudySettings, apiUrl: String?, studyId: String = Constants.defaultStudyId) {
         super.init()
