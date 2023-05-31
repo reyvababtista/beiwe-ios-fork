@@ -371,6 +371,9 @@ class DataStorage {
             self.conditionalApplog(event: "file_err", msg: "Error writing to file", d1: self.name, d2: "Error opening file for writing")
             fatalError("unable to open file \(self.filename)")
         }
+        if (recur != RECUR_DEPTH){
+            log.error("write_raw_to_end_of_file recur SUCCESS at \(recur).")
+        }
     }
 
     ///This is the main write function for most app datastreams
