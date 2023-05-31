@@ -18,7 +18,6 @@ class MainViewController: UIViewController {
     var hakuba: Hakuba!
     var selectedSurvey: ActiveSurvey?
 
-    
     @IBOutlet weak var haveAQuestionLabel: UILabel!
     @IBOutlet weak var callClinicianButton: UIButton!
     @IBOutlet weak var footerSeperator: UIView!
@@ -32,48 +31,48 @@ class MainViewController: UIViewController {
         navigationController?.presentTransparentNavigationBar()
         let leftImage: UIImage? = UIImage(named: "ic-user")!.withRenderingMode(.alwaysOriginal)
         navigationItem.leftBarButtonItem = UIBarButtonItem(
-            image: leftImage, style: UIBarButtonItem.Style.plain, target: self, action: #selector(userButton))
+            image: leftImage, style: UIBarButtonItem.Style.plain, target: self, action: #selector(self.userButton))
         // let rightImage : UIImage? = UIImage(named:"ic-info")!.imageWithRenderingMode(.AlwaysOriginal);
         // self.navigationItem.rightBarButtonItem = UIBarButtonItem(image: rightImage, style: UIBarButtonItemStyle.Plain, target: self, action: #selector(infoButton))
         navigationController?.navigationBar.tintColor = UIColor.white
         navigationItem.rightBarButtonItem = nil
 
         // Do any additional setup after loading the view.
-        hakuba = Hakuba(tableView: surveyTableView)
-        surveyTableView.backgroundView = nil
-        surveyTableView.backgroundColor = UIColor.clear
+        self.hakuba = Hakuba(tableView: self.surveyTableView)
+        self.surveyTableView.backgroundView = nil
+        self.surveyTableView.backgroundColor = UIColor.clear
         // hakuba.registerCell(SurveyCell)
 
         var clinicianText: String
         clinicianText = StudyManager.sharedInstance.currentStudy?.studySettings?.callClinicianText ?? NSLocalizedString("default_call_clinician_text", comment: "")
-        callClinicianButton.setTitle(clinicianText, for: UIControl.State())
-        callClinicianButton.setTitle(clinicianText, for: UIControl.State.highlighted)
+        self.callClinicianButton.setTitle(clinicianText, for: UIControl.State())
+        self.callClinicianButton.setTitle(clinicianText, for: UIControl.State.highlighted)
         if #available(iOS 9.0, *) {
             callClinicianButton.setTitle(clinicianText, for: UIControl.State.focused)
         }
 
         // Hide call button if it's disabled in the study settings
         if !(StudyManager.sharedInstance.currentStudy?.studySettings?.callClinicianButtonEnabled)! {
-            haveAQuestionLabel.isHidden = true
-            callClinicianButton.isHidden = true
+            self.haveAQuestionLabel.isHidden = true
+            self.callClinicianButton.isHidden = true
         }
 
-        listeners += StudyManager.sharedInstance.surveysUpdatedEvent.on { [weak self] data in
+        self.listeners += StudyManager.sharedInstance.surveysUpdatedEvent.on { [weak self] data in
             self?.refreshSurveys()
         }
 
         if AppDelegate.sharedInstance().debugEnabled {
-            addDebugMenu()
+            self.addDebugMenu()
         }
 
-        refreshSurveys()
+        self.refreshSurveys()
     }
 
     func refreshSurveys() {
-        hakuba.removeAll()
+        self.hakuba.removeAll()
         let section = Section() // create a new section
 
-        hakuba.insert(section, atIndex: 0).bump()
+        self.hakuba.insert(section, atIndex: 0).bump()
 
         var count = 0
         if let activeSurveys = StudyManager.sharedInstance.currentStudy?.activeSurveys {
@@ -93,20 +92,20 @@ class MainViewController: UIViewController {
                             strongSelf.presentSurvey(surveyId)
                         }
                     }
-                    hakuba[0].append(cellmodel)
+                    self.hakuba[0].append(cellmodel)
                     count += 1
                 }
             }
-            hakuba[0].bump()
+            self.hakuba[0].bump()
         }
         if count > 0 {
-            footerSeperator.isHidden = false
-            surveyTableView.tableHeaderView = activeSurveyHeader
-            surveyTableView.isScrollEnabled = true
+            self.footerSeperator.isHidden = false
+            self.surveyTableView.tableHeaderView = self.activeSurveyHeader
+            self.surveyTableView.isScrollEnabled = true
         } else {
-            footerSeperator.isHidden = true
-            surveyTableView.tableHeaderView = emptySurveyHeader
-            surveyTableView.isScrollEnabled = false
+            self.footerSeperator.isHidden = true
+            self.surveyTableView.tableHeaderView = self.emptySurveyHeader
+            self.surveyTableView.isScrollEnabled = false
         }
     }
 
@@ -117,7 +116,7 @@ class MainViewController: UIViewController {
 
     func addDebugMenu() {
         // adds a debug command? (Keary never told us about this.)
-        let tapRecognizer = UITapGestureRecognizer(target: self, action: #selector(debugTap))
+        let tapRecognizer = UITapGestureRecognizer(target: self, action: #selector(self.debugTap))
         tapRecognizer.numberOfTapsRequired = 2
         tapRecognizer.numberOfTouchesRequired = 2
         view.addGestureRecognizer(tapRecognizer)
@@ -128,7 +127,7 @@ class MainViewController: UIViewController {
             return
         }
 
-        refreshSurveys()
+        self.refreshSurveys()
 
         let actionController = BWXLActionController()
         actionController.settings.cancelView.backgroundColor = AppColors.highlightColor
@@ -158,7 +157,7 @@ class MainViewController: UIViewController {
                 self.changePassword(self)
             }
         }
-)
+        )
 
         // Only add Call button if it's enabled by the study
         if (StudyManager.sharedInstance.currentStudy?.studySettings?.callResearchAssistantButtonEnabled)! {
@@ -202,8 +201,7 @@ class MainViewController: UIViewController {
     @IBAction func leaveStudy(_ sender: AnyObject) {
         let alertController = UIAlertController(title: NSLocalizedString("unregister_alert_title", comment: ""), message: NSLocalizedString("unregister_alert_text", comment: ""), preferredStyle: .alert)
 
-        let cancelAction = UIAlertAction(title: NSLocalizedString("cancel_button_text", comment: ""), style: .cancel) { _ in
-        }
+        let cancelAction = UIAlertAction(title: NSLocalizedString("cancel_button_text", comment: ""), style: .cancel) { _ in }
         alertController.addAction(cancelAction)
 
         let OKAction = UIAlertAction(title: NSLocalizedString("ok_button_text", comment: ""), style: .default) { _ in
@@ -227,7 +225,7 @@ class MainViewController: UIViewController {
         case .TrackingSurvey:
             TrackingSurveyPresenter(surveyId: surveyId, activeSurvey: activeSurvey, survey: survey).present(self)
         case .AudioSurvey:
-            selectedSurvey = activeSurvey
+            self.selectedSurvey = activeSurvey
             performSegue(withIdentifier: "audioQuestionSegue", sender: self)
             // AudioSurveyPresenter(surveyId: surveyId, activeSurvey: activeSurvey, survey: survey).present(self);
         }
@@ -252,7 +250,7 @@ class MainViewController: UIViewController {
         // Pass the selected object to the new view controller.
         if segue.identifier == "audioQuestionSegue" {
             let questionController: AudioQuestionViewController = segue.destination as! AudioQuestionViewController
-            questionController.activeSurvey = selectedSurvey
+            questionController.activeSurvey = self.selectedSurvey
         }
     }
 }

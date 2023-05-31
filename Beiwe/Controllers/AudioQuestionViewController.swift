@@ -6,22 +6,21 @@
 //  Copyright © 2016 Rocketfarm Studios. All rights reserved.
 //
 
-import UIKit
 import AVFoundation
 import PKHUD
 import PromiseKit
-
+import UIKit
 
 class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AVAudioPlayerDelegate {
-
     enum AudioState {
         case initial
         case recording
         case recorded
         case playing
     }
+
     var activeSurvey: ActiveSurvey!
-    var maxLen: Int = 60;
+    var maxLen: Int = 60
     var recordingSession: AVAudioSession!
     var recorder: AVAudioRecorder?
     var player: AVAudioPlayer?
@@ -42,24 +41,24 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
         super.viewDidLoad()
         
         // Do any additional setup after loading the view.
-        let prompt = activeSurvey.survey?.questions[0].prompt ?? "";
+        let prompt = self.activeSurvey.survey?.questions[0].prompt ?? ""
         /* TESTING
-        for _ in 0...100 {
-            prompt = prompt + "More text goes here! "
-        }
-        */
-        promptLabel.text = prompt
+         for _ in 0...100 {
+             prompt = prompt + "More text goes here! "
+         }
+         */
+        self.promptLabel.text = prompt
 
-        self.navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .trash, target: self, action:  #selector(cancelButton))
+        self.navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .trash, target: self, action: #selector(self.cancelButton))
 
-        reset()
+        self.reset()
 
-        recordingSession = AVAudioSession.sharedInstance()
+        self.recordingSession = AVAudioSession.sharedInstance()
 
         do {
-            try recordingSession.setCategory(AVAudioSession.Category.playAndRecord)
-            try recordingSession.setActive(true)
-            recordingSession.requestRecordPermission() { [unowned self] (allowed: Bool) -> Void in
+            try self.recordingSession.setCategory(AVAudioSession.Category.playAndRecord)
+            try self.recordingSession.setActive(true)
+            self.recordingSession.requestRecordPermission { [unowned self] (allowed: Bool) in
                 DispatchQueue.main.async {
                     if !allowed {
                         self.fail()
@@ -67,22 +66,20 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
                 }
             }
         } catch {
-            fail()
+            self.fail()
         }
-        updateRecordButton()
-        recorder = nil
+        self.updateRecordButton()
+        self.recorder = nil
 
         if let study = StudyManager.sharedInstance.currentStudy {
             // Just need to put any old answer in here...
-            activeSurvey.bwAnswers["A"] = "A"
-            Recline.shared.save(study).done {_ in
-                log.info("Saved.");
-                }.catch { e in
-                    log.error("Error saving updated answers: \(e)");
+            self.activeSurvey.bwAnswers["A"] = "A"
+            Recline.shared.save(study).done { _ in
+                log.info("Saved.")
+            }.catch { e in
+                log.error("Error saving updated answers: \(e)")
             }
         }
-
-
     }
 
     func cleanupAndDismiss() {
@@ -92,42 +89,42 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
             } catch { }
             self.filename = nil
         }
-        recorder?.delegate = nil
-        player?.delegate = nil
-        recorder?.stop()
-        player?.stop()
-        player = nil;
-        recorder = nil
-        StudyManager.sharedInstance.surveysUpdatedEvent.emit(0);
+        self.recorder?.delegate = nil
+        self.player?.delegate = nil
+        self.recorder?.stop()
+        self.player?.stop()
+        self.player = nil
+        self.recorder = nil
+        StudyManager.sharedInstance.surveysUpdatedEvent.emit(0)
         self.navigationController?.popViewController(animated: true)
     }
+
     @objc func cancelButton() {
-        if (state != .initial) {
+        if self.state != .initial {
             let alertController = UIAlertController(title: NSLocalizedString("audio_survey_abandon_recording_alert", comment: ""), message: "", preferredStyle: .actionSheet)
 
-            let leaveAction = UIAlertAction(title: NSLocalizedString("audio_survey_abandon_recording_alert_confirm_button", comment: ""), style: .destructive) { (action) in
+            let leaveAction = UIAlertAction(title: NSLocalizedString("audio_survey_abandon_recording_alert_confirm_button", comment: ""), style: .destructive) { action in
                 DispatchQueue.main.async {
                     self.cleanupAndDismiss()
                 }
             }
             alertController.addAction(leaveAction)
-            let cancelAction = UIAlertAction(title: NSLocalizedString("cancel_button_text", comment: ""), style: .default) { (action) in
+            let cancelAction = UIAlertAction(title: NSLocalizedString("cancel_button_text", comment: ""), style: .default) { action in
             }
             alertController.addAction(cancelAction)
-
 
             self.present(alertController, animated: true) {
             }
 
         } else {
-            cleanupAndDismiss()
+            self.cleanupAndDismiss()
         }
     }
 
     func fail() {
         let alertController = UIAlertController(title: NSLocalizedString("recording_alert_title", comment: ""), message: NSLocalizedString("microphone_permission_error", comment: ""), preferredStyle: .alert)
 
-        let OKAction = UIAlertAction(title: NSLocalizedString("ok_button_text", comment: ""), style: .default) { (action) in
+        let OKAction = UIAlertAction(title: NSLocalizedString("ok_button_text", comment: ""), style: .default) { action in
             DispatchQueue.main.async {
                 self.cleanupAndDismiss()
             }
@@ -139,141 +136,138 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
     }
 
     func updateLengthLabel() {
-        currentLengthLabel.text = "Length: \(currentLength) seconds"
+        self.currentLengthLabel.text = "Length: \(self.currentLength) seconds"
     }
 
     @objc func recordingTimer() {
         if let recorder = recorder, recorder.currentTime > 0 {
-            currentLength = round(recorder.currentTime * 10) / 10
-            if (currentLength >= Double(maxLen)) {
-                currentLength = Double(maxLen)
-                if (recorder.isRecording) {
-                    resetTimer()
+            self.currentLength = round(recorder.currentTime * 10) / 10
+            if self.currentLength >= Double(self.maxLen) {
+                self.currentLength = Double(self.maxLen)
+                if recorder.isRecording {
+                    self.resetTimer()
                     recorder.stop()
                 }
             }
-
         }
-        updateLengthLabel()
+        self.updateLengthLabel()
     }
-    func startRecording() {
-        var settings: [String: AnyObject];
-        let format = activeSurvey.survey?.audioSurveyType ?? "compressed"
-        let bitrate = activeSurvey.survey?.audioBitrate ?? 64000
-        let samplerate = activeSurvey.survey?.audioSampleRate ?? 44100
 
-        if (format == "compressed") {
+    func startRecording() {
+        var settings: [String: AnyObject]
+        let format = self.activeSurvey.survey?.audioSurveyType ?? "compressed"
+        let bitrate = self.activeSurvey.survey?.audioBitrate ?? 64000
+        let samplerate = self.activeSurvey.survey?.audioSampleRate ?? 44100
+
+        if format == "compressed" {
             self.suffix = ".mp4"
             settings = [
                 AVFormatIDKey: Int(kAudioFormatMPEG4AAC) as AnyObject,
-                //AVEncoderBitRateKey: bitrate,
+                // AVEncoderBitRateKey: bitrate,
                 AVEncoderBitRatePerChannelKey: bitrate as AnyObject,
                 AVSampleRateKey: Double(samplerate) as AnyObject,
                 AVNumberOfChannelsKey: 1 as NSNumber,
-                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue as AnyObject
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue as AnyObject,
             ]
-        } else if (format == "raw") {
+        } else if format == "raw" {
             self.suffix = ".wav"
             settings = [
                 AVFormatIDKey: Int(kAudioFormatLinearPCM) as AnyObject,
-                //AVEncoderBitRateKey: bitrate * 1024,
+                // AVEncoderBitRateKey: bitrate * 1024,
                 AVSampleRateKey: Double(samplerate) as AnyObject,
                 AVNumberOfChannelsKey: 1 as NSNumber,
-                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue as AnyObject
+                AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue as AnyObject,
             ]
         } else {
-            return fail()
+            return self.fail()
         }
 
-
-        filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString + suffix)
+        self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString + self.suffix)
 
         do {
             // 5
             log.info("Beginning recording")
-            recorder = try AVAudioRecorder(url: filename!, settings: settings)
-            recorder?.delegate = self
-            currentLength = 0;
-            state = .recording
-            updateLengthLabel()
-            currentLengthLabel.isHidden = false
-            recorder?.record()
-            resetTimer()
-            disableIdleTimer()
-            timer = Timer.scheduledTimer(timeInterval: 0.1, target: self, selector: #selector(recordingTimer), userInfo: nil, repeats: true)
-        } catch  let error as NSError{
+            self.recorder = try AVAudioRecorder(url: self.filename!, settings: settings)
+            self.recorder?.delegate = self
+            self.currentLength = 0
+            self.state = .recording
+            self.updateLengthLabel()
+            self.currentLengthLabel.isHidden = false
+            self.recorder?.record()
+            self.resetTimer()
+            self.disableIdleTimer()
+            self.timer = Timer.scheduledTimer(timeInterval: 0.1, target: self, selector: #selector(self.recordingTimer), userInfo: nil, repeats: true)
+        } catch let error as NSError {
             log.error("Err: \(error)")
             fail()
         }
-        updateRecordButton()
+        self.updateRecordButton()
     }
 
     func stopRecording() {
         if let recorder = recorder {
-            resetTimer()
+            self.resetTimer()
             recorder.stop()
         }
     }
 
     func playRecording() {
         if let player = player {
-            state = .playing
+            self.state = .playing
             player.play()
-            updateRecordButton()
+            self.updateRecordButton()
         }
     }
 
     func stopPlaying() {
         if let player = player {
-            state = .recorded
+            self.state = .recorded
             player.stop()
             player.currentTime = 0.0
-            updateRecordButton()
+            self.updateRecordButton()
         }
     }
 
     @IBAction func recordCancelPressed(_ sender: AnyObject) {
-        switch(state) {
+        switch self.state {
         case .initial:
-            startRecording()
+            self.startRecording()
         case .recording:
-            stopRecording()
+            self.stopRecording()
         case .recorded:
-            playRecording()
+            self.playRecording()
         case .playing:
-            stopPlaying()
+            self.stopPlaying()
         }
     }
 
     func writeSomeData(_ handle: FileHandle, encFile: EncryptedStorage) -> Promise<Void> {
-        return Promise().then(on: DispatchQueue.global(qos: .background)) {_ -> Promise<Void> in
+        return Promise().then(on: DispatchQueue.global(qos: .background)) { _ -> Promise<Void> in
             // closure return
             let data: Data = handle.readDataToEndOfFile()
-            if (data.count > 0) {
-                return encFile.write(data as NSData, writeLen: data.count).then {_ in
+            if data.count > 0 {
+                return encFile.write(data as NSData, writeLen: data.count).then { _ in
                     // closure recur
-                    return self.writeSomeData(handle, encFile: encFile)
+                    self.writeSomeData(handle, encFile: encFile)
                 }
             }
             /* We're done... */
             AppEventManager.sharedInstance.logAppEvent(event: "audio_save_closing", msg: "Closing audio file", d1: encFile.eventualFilename.lastPathComponent)
             return encFile.close()
         }
-
     }
 
     func saveEncryptedAudio() -> Promise<Void> {
-        
         if let study = StudyManager.sharedInstance.currentStudy {
             var fileHandle: FileHandle
             do {
-                fileHandle = try FileHandle(forReadingFrom: filename!)
+                fileHandle = try FileHandle(forReadingFrom: self.filename!)
             } catch {
                 return Promise<Void>(error: BWErrors.ioError)
             }
-            let surveyId = self.activeSurvey.survey?.surveyId;
-            let name = "voiceRecording" + "_" + surveyId!;
-            let encFile = DataStorageManager.sharedInstance.createEncryptedFile(type: name, suffix: suffix)
+            let surveyId = self.activeSurvey.survey?.surveyId
+            let name = "voiceRecording" + "_" + surveyId!
+            let encFile = DataStorageManager.sharedInstance.createEncryptedFile(type: name, suffix: self.suffix)
             return encFile.open().then {
                 return self.writeSomeData(fileHandle, encFile: encFile)
             }.always {
@@ -283,23 +277,24 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
             return Promise<Void>(error: BWErrors.ioError)
         }
         /*
-        return Promise<Void> { fulfill, reject in
-            let is: NSInputStream? = NSInputStream(URL: self.filename)
-            if (!)
-        }
-        */
+         return Promise<Void> { fulfill, reject in
+             let is: NSInputStream? = NSInputStream(URL: self.filename)
+             if (!)
+         }
+         */
     }
+
     @IBAction func saveButtonPressed(_ sender: AnyObject) {
-        PKHUD.sharedHUD.dimsBackground = true;
-        PKHUD.sharedHUD.userInteractionOnUnderlyingViewsEnabled = false;
+        PKHUD.sharedHUD.dimsBackground = true
+        PKHUD.sharedHUD.userInteractionOnUnderlyingViewsEnabled = false
 
         HUD.show(.labeledProgress(title: "Saving", subtitle: ""))
         AppEventManager.sharedInstance.logAppEvent(event: "audio_save", msg: "Save audio pressed")
 
-         saveEncryptedAudio().done { _ -> Void in
-            self.activeSurvey.isComplete = true;
+        self.saveEncryptedAudio().done { _ in
+            self.activeSurvey.isComplete = true
             StudyManager.sharedInstance.cleanupSurvey(self.activeSurvey)
-            StudyManager.sharedInstance.updateActiveSurveys(true);
+            StudyManager.sharedInstance.updateActiveSurveys(true)
             HUD.flash(.success, delay: 0.5)
             self.cleanupAndDismiss()
         }.catch { err in
@@ -308,28 +303,27 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
                 self.cleanupAndDismiss()
             }
         }
-
     }
 
     func updateRecordButton() {
         /*
-        var imageName: String;
-        switch(state) {
-        case .Initial:
-            imageName = "record"
-        case .Playing, .Recording:
-            imageName = "stop"
-        case .Recorded:
-            imageName = "play"
-        }
+         var imageName: String;
+         switch(state) {
+         case .Initial:
+             imageName = "record"
+         case .Playing, .Recording:
+             imageName = "stop"
+         case .Recorded:
+             imageName = "play"
+         }
 
-        let image = UIImage(named: imageName)
-        recordPlayButton.setImage(image, forState: .Highlighted)
-        recordPlayButton.setImage(image, forState: .Normal)
-        recordPlayButton.setImage(image, forState: .Disabled)
-        */
+         let image = UIImage(named: imageName)
+         recordPlayButton.setImage(image, forState: .Highlighted)
+         recordPlayButton.setImage(image, forState: .Normal)
+         recordPlayButton.setImage(image, forState: .Disabled)
+         */
         var text: String
-        switch(state) {
+        switch self.state {
         case .initial:
             text = NSLocalizedString("audio_survey_record_button", comment: "")
         case .playing, .recording:
@@ -337,101 +331,101 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
         case .recorded:
             text = NSLocalizedString("audio_survey_play_button", comment: "")
         }
-        recordPlayButton.setTitle(text, for: .highlighted)
-        recordPlayButton.setTitle(text, for: UIControl.State())
-        recordPlayButton.setTitle(text, for: .disabled)
-
+        self.recordPlayButton.setTitle(text, for: .highlighted)
+        self.recordPlayButton.setTitle(text, for: UIControl.State())
+        self.recordPlayButton.setTitle(text, for: .disabled)
     }
 
     func resetTimer() {
         if let timer = timer {
-            timer.invalidate();
+            timer.invalidate()
             self.timer = nil
         }
     }
+
     func reset() {
-        resetTimer()
-        filename = nil
-        player = nil
-        recorder = nil
-        state = .initial
-        //saveButton.enabled = false
-        saveButton.isHidden = true
-        reRecordButton.isHidden = true
-        maxLen = StudyManager.sharedInstance.currentStudy?.studySettings?.voiceRecordingMaxLengthSeconds ?? 60
-        //maxLen = 5
-        maxLengthLabel.text = "Maximum length \(maxLen) seconds"
-        currentLengthLabel.isHidden = true
-        updateRecordButton()
+        self.resetTimer()
+        self.filename = nil
+        self.player = nil
+        self.recorder = nil
+        self.state = .initial
+        // saveButton.enabled = false
+        self.saveButton.isHidden = true
+        self.reRecordButton.isHidden = true
+        self.maxLen = StudyManager.sharedInstance.currentStudy?.studySettings?.voiceRecordingMaxLengthSeconds ?? 60
+        // maxLen = 5
+        self.maxLengthLabel.text = "Maximum length \(self.maxLen) seconds"
+        self.currentLengthLabel.isHidden = true
+        self.updateRecordButton()
     }
+
     @IBAction func reRecordButtonPressed(_ sender: AnyObject) {
-        recorder?.deleteRecording()
-        reset()
+        self.recorder?.deleteRecording()
+        self.reset()
     }
+
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
     }
 
     func enableIdleTimer() {
-        UIApplication.shared.isIdleTimerDisabled = false;
+        UIApplication.shared.isIdleTimerDisabled = false
     }
 
     func disableIdleTimer() {
-        UIApplication.shared.isIdleTimerDisabled = true;
+        UIApplication.shared.isIdleTimerDisabled = true
     }
 
     func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
-        log.debug("recording finished, success: \(flag), len: \(currentLength)")
-        resetTimer()
-        enableIdleTimer();
-        if (flag && currentLength > 0.0) {
+        log.debug("recording finished, success: \(flag), len: \(self.currentLength)")
+        self.resetTimer()
+        self.enableIdleTimer()
+        if flag && self.currentLength > 0.0 {
             self.recorder = nil
-            state = .recorded
-            //saveButton.enabled = true
-            saveButton.isHidden = false
-            reRecordButton.isHidden = false
+            self.state = .recorded
+            // saveButton.enabled = true
+            self.saveButton.isHidden = false
+            self.reRecordButton.isHidden = false
             do {
-                player = try AVAudioPlayer(contentsOf: filename!)
-                player?.delegate = self
+                self.player = try AVAudioPlayer(contentsOf: self.filename!)
+                self.player?.delegate = self
             } catch {
-                reset()
+                self.reset()
             }
-            updateRecordButton()
+            self.updateRecordButton()
         } else {
             self.recorder?.deleteRecording()
-            reset()
+            self.reset()
         }
     }
 
     func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
         log.error("Error received in audio recorded: \(error)")
-        enableIdleTimer();
+        self.enableIdleTimer()
         self.recorder?.deleteRecording()
-        reset()
+        self.reset()
     }
 
     func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        if (state == .playing) {
-            state = .recorded
-            updateRecordButton()
+        if self.state == .playing {
+            self.state = .recorded
+            self.updateRecordButton()
         }
     }
     
-
     /*
-    // MARK: - Navigation
+     // MARK: - Navigation
 
-    // In a storyboard-based application, you will often want to do a little preparation before navigation
-    override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
-        // Get the new view controller using segue.destinationViewController.
-        // Pass the selected object to the new view controller.
-    }
-    */
-
+     // In a storyboard-based application, you will often want to do a little preparation before navigation
+     override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
+         // Get the new view controller using segue.destinationViewController.
+         // Pass the selected object to the new view controller.
+     }
+     */
 }
 
 // Helper function inserted by Swift 4.2 migrator.
 fileprivate func convertFromAVAudioSessionCategory(_ input: AVAudioSession.Category) -> String {
-	return input.rawValue
+    return input.rawValue
 }

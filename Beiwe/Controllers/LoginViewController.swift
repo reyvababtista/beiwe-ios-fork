@@ -6,13 +6,12 @@
 //  Copyright © 2016 Rocketfarm Studios. All rights reserved.
 //
 
-import UIKit
+import Firebase
 import PKHUD
 import ResearchKit
-import Firebase
+import UIKit
 
 class LoginViewController: UIViewController, UITextFieldDelegate {
-
     @IBOutlet weak var callClinicianButton: UIButton!
     @IBOutlet weak var loginButton: BWBorderedButton!
     @IBOutlet weak var password: UITextField!
@@ -23,19 +22,19 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
 
         var clinicianText: String
         clinicianText = StudyManager.sharedInstance.currentStudy?.studySettings?.callClinicianText ?? NSLocalizedString("default_call_clinician_text", comment: "")
-        callClinicianButton.setTitle(clinicianText, for: UIControl.State())
-        callClinicianButton.setTitle(clinicianText, for: UIControl.State.highlighted)
+        self.callClinicianButton.setTitle(clinicianText, for: UIControl.State())
+        self.callClinicianButton.setTitle(clinicianText, for: UIControl.State.highlighted)
         if #available(iOS 9.0, *) {
             callClinicianButton.setTitle(clinicianText, for: UIControl.State.focused)
         }
         // Hide call button if it's disabled in the study settings
         if !(StudyManager.sharedInstance.currentStudy?.studySettings?.callClinicianButtonEnabled)! {
-            callClinicianButton.isHidden = true
+            self.callClinicianButton.isHidden = true
         }
 
-        password.delegate = self
-        loginButton.isEnabled = false
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(tap))
+        self.password.delegate = self
+        self.loginButton.isEnabled = false
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(self.tap))
         view.addGestureRecognizer(tapGesture)
 
         // Do any additional setup after loading the view.
@@ -53,7 +52,7 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
         PKHUD.sharedHUD.userInteractionOnUnderlyingViewsEnabled = false
 
         if let password = password.text, password.count > 0 {
-            if (AppDelegate.sharedInstance().checkPasswordAndLogin(password)) {
+            if AppDelegate.sharedInstance().checkPasswordAndLogin(password) {
                 // register for notifications and log in?
                 HUD.flash(.success, delay: 0.5)
                 AppDelegate.sharedInstance().checkFirebaseCredentials()
@@ -68,23 +67,22 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
     }
 
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        loginPressed(self)
+        self.loginPressed(self)
         textField.resignFirstResponder()
         return true
     }
 
     @objc func tap(_ gesture: UITapGestureRecognizer) {
-        password.resignFirstResponder()
+        self.password.resignFirstResponder()
     }
 
     func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
-
         // Find out what the text field will be after adding the current edit
         if let text = (password.text as NSString?)?.replacingCharacters(in: range, with: string) {
-            if !text.isEmpty{//Checking if the input field is not empty
-                loginButton.isEnabled = true //Enabling the button
+            if !text.isEmpty { // Checking if the input field is not empty
+                self.loginButton.isEnabled = true // Enabling the button
             } else {
-                loginButton.isEnabled = false //Disabling the button
+                self.loginButton.isEnabled = false // Disabling the button
             }
         }
 
@@ -103,11 +101,9 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
             self.dismiss(animated: true, completion: nil)
         }
         present(vc, animated: true, completion: nil)
-
     }
 
     @IBAction func callClinician(_ sender: AnyObject) {
         confirmAndCallClinician(self)
     }
-
 }
