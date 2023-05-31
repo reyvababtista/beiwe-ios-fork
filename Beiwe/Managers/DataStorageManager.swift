@@ -199,6 +199,10 @@ class DataStorage {
     var name = ""
     var secKeyRef: SecKey? // TODO: make non-optional
 
+    // we have some locks to deal with critical code, at the very least we have at-upload-time threading conflicts.
+    var lock_write = NSLock()
+    var lock_exists = NSLock()
+    
     init(type: String, headers: [String], patientId: String, publicKey: String, moveOnClose: Bool = false, keyRef: SecKey?) {
         self.type = type
         self.patientId = patientId
@@ -278,10 +282,22 @@ class DataStorage {
     }
 
     func check_file_exists() -> Bool {
+        // operation profiled on an iphone 8 plus to take roughly 400-450us average/rms, standard deviation of 200us
         return FileManager.default.fileExists(atPath: self.filename.path)
     }
-
+    
+    /// atomic function to ensure that a file exists
     func ensure_file_exists(recur: Int = RECUR_DEPTH) {
+        // quick and easy way to keep this function from overlapping
+        defer {  // use defer to ensure the lock unlocks.
+            self.lock_exists.unlock()
+        }
+        self.lock_exists.lock()
+        self._ensure_file_exists(recur: recur)
+    }
+    
+    /// non-atomic function to ensure that a file exists
+    func _ensure_file_exists(recur: Int) {
         // if there is no file, create it with these permissions and no data
         if !self.check_file_exists() {
             let created = FileManager.default.createFile(
@@ -327,12 +343,19 @@ class DataStorage {
         // if file handle instantiated (file open) append data (a line) to the end of the file.
         // it appears to be the case that lines are constructed ending with \n, so we don't handle that here.
         if let fileHandle = try? FileHandle(forWritingTo: self.filename) {
+            // this lock blocks a write operation and seek opration, it blocks overlapping writes.
             defer {
                 fileHandle.closeFile()
+                self.lock_write.unlock()
             }
+            // (all profiling done on a 5 year old iphone 8 plus)
+            // seeks take on the order of 3us-, but writes are highly variant and depend on the size of the write.
+            // Initial file writes are much longer, on the order of 10s of milliseconds.
+            // The RMS of accelerometer/magnetomiter writes is just under 1ms. We do see writes as low as 10us.
+            // lock/unlock almost always takes less than 3us.
+            self.lock_write.lock()
             fileHandle.seekToEndOfFile()
             fileHandle.write(data)
-            fileHandle.closeFile()
             // this data variable is a string of the full line in base64 including the iv. (i.e. it is encrypted)
             // print("write to \(self.filename), length: \(data.count), '\(String(data: data, encoding: String.Encoding.utf8))'")
         } else {
