@@ -27,13 +27,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     let gcmMessageIDKey = "gcm.message_id"
 
     // ui stuff
-    var window: UIWindow?
+    var window: UIWindow? // this needs to be present according to docs
     var storyboard: UIStoryboard?
     var currentRootView: String? = "launchScreen"
 
     // app capability stuff (why do these need to be here? at all?
     let motionManager = CMMotionManager()
-    var reachability: Reachability?  // tells us about our network access
+    var reachability: Reachability? // tells us about our network access
     
     var canOpenTel = false
     var locationPermission = false
@@ -130,7 +130,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             }
             // okay we currently are removing notifications, not ideal.
             UNUserNotificationCenter.current().removeAllDeliveredNotifications()
-            self.transitionToLoadedAppState()  // transition to loaded app state
+            self.transitionToLoadedAppState() // transition to loaded app state
         }.catch { (_: Error) in
             print("Database open failed, probably should just crash the app tbh")
         }
@@ -234,7 +234,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("applicationWillTerminate")
         AppEventManager.sharedInstance.logAppEvent(event: "terminate", msg: "Application terminating")
         
-        let dispatchGroup = DispatchGroup()  // I don't know what this multithreading control tool is
+        let dispatchGroup = DispatchGroup() // I don't know what this multithreading control tool is
         dispatchGroup.enter()
         // call stop on the study, then... leave the dispatch group, which I think means wait for everything to finish (or crash)
         StudyManager.sharedInstance.stop().done(on: DispatchQueue.global(qos: .default)) { (_: Bool) in
@@ -242,7 +242,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         }.catch(on: DispatchQueue.global(qos: .default)) { (_: Error) in
             dispatchGroup.leave()
         }
-        dispatchGroup.wait()  // block until the dispatch group is... finished? until the promise is finished?
+        dispatchGroup.wait() // block until the dispatch group is... finished? until the promise is finished?
         print("applicationWillTerminate exiting")
     }
 
@@ -374,24 +374,33 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
         completionHandler(UIBackgroundFetchResult.newData)
     }
-
-    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /////////////////////////////////////////////////////////////// MISC BEIWE STUFF /////////////////////////////////////////////////////////////////
-    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
+    
+    /// code to run when receivinga push notification with surveys in it. Called from an AppDelegate extension.
+    /// Checks for any new surveys on the server and pops any survey notifications indicated in the push notificattion
     func handleSurveyNotification(userInfo: Dictionary<AnyHashable, Any>) {
+        // return if nothing found
         guard let surveyIdsString = userInfo["survey_ids"] else {
-            print("no surveyIds found")
+            print("no surveyIds found, checking for new surveys anyway.")
+            self.downloadSurveys(surveyIds: [])
             return
         }
+        
+        // extract survey ids to force-display
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Received notification while app was killed")
-        let surveyIds = self.jsonToSurveyIdArray(json: surveyIdsString as! String)
+        let surveyIds: [String] = self.jsonToSurveyIdArray(json: surveyIdsString as! String)
+        
+        // downloadSurveys calls setActiveSurveys, even if it errors/fails. We always want to download the most recent survey information.
+        // (old versions of the backend don't supply the sent_time key)
         if let sentTimeString = userInfo["sent_time"] as! String? {
             self.downloadSurveys(surveyIds: surveyIds, sentTime: self.stringToTimeInterval(timeString: sentTimeString))
         } else {
             self.downloadSurveys(surveyIds: surveyIds)
         }
     }
+    
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////// MISC BEIWE STUFF /////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     // converting sent_time string into a TimeInterval
     func stringToTimeInterval(timeString: String) -> TimeInterval {
@@ -440,6 +449,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         }
     }
 
+    /// sets the active survey on the main app page, force-enables any specified surveys.
     func setActiveSurveys(surveyIds: [String], sentTime: TimeInterval = 0) {
         if let study = StudyManager.sharedInstance.currentStudy {
             for surveyId in surveyIds {
@@ -505,7 +515,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         if ApiManager.sharedInstance.patientId != "" && FirebaseApp.app() == nil {
             self.checkFirebaseCredentials()
             let token = Messaging.messaging().fcmToken
-            sendFCMToken(fcmToken: token ?? "")
+            self.sendFCMToken(fcmToken: token ?? "")
         }
     }
     
@@ -615,35 +625,35 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     /////////////////////////////////////////////////////////////// CRASHLYTICS STUFF ////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
-    func setupCrashLytics() {
-        Fabric.with([Crashlytics.self])
-        let crashlyticsLogDestination = XCGCrashlyticsLogDestination(owner: log, identifier: "advancedlogger.crashlyticsDestination")
-        crashlyticsLogDestination.outputLevel = .debug
-        crashlyticsLogDestination.showLogIdentifier = true
-        crashlyticsLogDestination.showFunctionName = true
-        crashlyticsLogDestination.showThreadName = true
-        crashlyticsLogDestination.showLevel = true
-        crashlyticsLogDestination.showFileName = true
-        crashlyticsLogDestination.showLineNumber = true
-        crashlyticsLogDestination.showDate = true
-    
-        // Add the destination to the logger
-        log.add(destination: crashlyticsLogDestination)
-        log.logAppDetails()
-    }
-    
-    // completely disabled, does nothing
-    func setDebuggingUser(_ username: String) {
-        // TODO: Use the current user's information
-        // You can call any combination of these three methods
-        // Crashlytics.sharedInstance().setUserEmail("user@fabric.io")
-        // Crashlytics.sharedInstance().setUserIdentifier(username)
-        // Crashlytics.sharedInstance().setUserName("Test User")
-    }
-    
-    func crash() {
-        Crashlytics.sharedInstance().crash()
-    }
+    // func setupCrashLytics() {
+    //     Fabric.with([Crashlytics.self])
+    //     let crashlyticsLogDestination = XCGCrashlyticsLogDestination(owner: log, identifier: "advancedlogger.crashlyticsDestination")
+    //     crashlyticsLogDestination.outputLevel = .debug
+    //     crashlyticsLogDestination.showLogIdentifier = true
+    //     crashlyticsLogDestination.showFunctionName = true
+    //     crashlyticsLogDestination.showThreadName = true
+    //     crashlyticsLogDestination.showLevel = true
+    //     crashlyticsLogDestination.showFileName = true
+    //     crashlyticsLogDestination.showLineNumber = true
+    //     crashlyticsLogDestination.showDate = true
+    //
+    //     // Add the destination to the logger
+    //     log.add(destination: crashlyticsLogDestination)
+    //     log.logAppDetails()
+    // }
+    //
+    // // completely disabled, does nothing
+    // func setDebuggingUser(_ username: String) {
+    //     // TODO: Use the current user's information
+    //     // You can call any combination of these three methods
+    //     // Crashlytics.sharedInstance().setUserEmail("user@fabric.io")
+    //     // Crashlytics.sharedInstance().setUserIdentifier(username)
+    //     // Crashlytics.sharedInstance().setUserName("Test User")
+    // }
+    //
+    // func crash() {
+    //     Crashlytics.sharedInstance().crash()
+    // }
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////// SENTRY STUFF ////////////////////////////////////////////////////////////////
@@ -726,6 +736,7 @@ extension AppDelegate: MessagingDelegate {
             self.sendFCMToken(fcmToken: fcmToken)
         }
     }
+
     // [END refresh_token]
 
     // [START ios_10_data_message]
