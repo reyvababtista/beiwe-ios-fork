@@ -9,83 +9,81 @@
 import Foundation
 import ObjectMapper
 
-class ActiveSurvey : Mappable {
-
-    var isComplete: Bool = false;
-    var survey: Survey?;
-//    var nextScheduledTime: TimeInterval = 0;
-    var received: TimeInterval = 0;
-    var rkAnswers: Data?;
-//    var notification: UILocalNotification?;
-    var stepOrder: [Int]?;
-    var bwAnswers: [String:String] = [:]
+class ActiveSurvey: Mappable {
+    var isComplete: Bool = false
+    var survey: Survey?
+    // var nextScheduledTime: TimeInterval = 0;
+    var received: TimeInterval = 0
+    var rkAnswers: Data?
+    // var notification: UILocalNotification?;
+    var stepOrder: [Int]?
+    var bwAnswers: [String: String] = [:]
 
     init(survey: Survey) {
-        self.survey = survey;
+        self.survey = survey
         self.reset(survey)
     }
 
     required init?(map: Map) {
-
     }
 
     // Mappable
     func mapping(map: Map) {
-        isComplete  <- map["is_complete"];
-        survey      <- map["survey"];
-//        nextScheduledTime     <- map["expires"]
-        received    <- map["received"];
-        rkAnswers   <- (map["rk_answers"], transformNSData);
-        bwAnswers   <- map["bk_answers"]
-//        notification    <- (map["notification"], transformNotification);
-        stepOrder   <- map["stepOrder"];
+        self.isComplete <- map["is_complete"]
+        self.survey <- map["survey"]
+        // nextScheduledTime     <- map["expires"]
+        self.received <- map["received"]
+        self.rkAnswers <- (map["rk_answers"], transformNSData)
+        self.bwAnswers <- map["bk_answers"]
+        // notification    <- (map["notification"], transformNotification);
+        self.stepOrder <- map["stepOrder"]
     }
 
     // resets the survey to its original configuration
     func reset(_ survey: Survey? = nil) {
         if let survey = survey {
-            self.survey = survey;
+            self.survey = survey
         }
-        rkAnswers = nil;
-        bwAnswers = [:]
-        isComplete = false;
+        self.rkAnswers = nil
+        self.bwAnswers = [:]
+        self.isComplete = false
         guard let survey = survey else {
-            return;
+            return
         }
 
-        var steps = [Int](0..<survey.questions.count)
-        if (survey.randomize) {
-            shuffle(&steps);
+        var steps = [Int](0 ..< survey.questions.count)
+        if survey.randomize {
+            shuffle(&steps)
         }
-        log.info("shuffle steps \(steps)");
+        log.info("shuffle steps \(steps)")
 
-        let numQuestions = survey.randomize ? min(survey.questions.count, survey.numberOfRandomQuestions ?? 999) : survey.questions.count;
+        let numQuestions = survey.randomize ? min(survey.questions.count, survey.numberOfRandomQuestions ?? 999) : survey.questions.count
         if var order = stepOrder, survey.randomizeWithMemory && numQuestions > 0 {
             // We must have already asked a bunch of questions, otherwise stepOrder would be nil.  Remove them
-            order.removeFirst(min(numQuestions, order.count));
+            order.removeFirst(min(numQuestions, order.count))
             // remove all in stepOrder that are greater than count.  Could happen if questions are deleted
             // after stepOrder already set...
-            order = order.filter({ $0 < survey.questions.count });
-            if (order.count < numQuestions) {
-                order.append(contentsOf: steps);
+            order = order.filter({ $0 < survey.questions.count })
+            if order.count < numQuestions {
+                order.append(contentsOf: steps)
             }
             /* If we have a repeat in the first X steps, move it to the end and try again.. */
-            log.info("proposed order \(order)");
-            var index:Int=numQuestions - 1;
-            while(index > 0) {
-                let val = order[index];
-                if order[0..<index].contains(val) {
-                    order.remove(at: index);
-                    order.append(val);
+            log.info("proposed order \(order)")
+            var index: Int = numQuestions - 1
+            while index > 0 {
+                let val = order[index]
+                if order[0 ..< index].contains(val) {
+                    order.remove(at: index)
+                    order.append(val)
                 } else {
-                    index = index - 1;
+                    index = index - 1
                 }
             }
-            stepOrder = order;
-            log.info("proposed stepOrder \(stepOrder)");
+            self.stepOrder = order
+            log.info("proposed stepOrder \(self.stepOrder)")
         } else {
-            stepOrder = steps;
+            self.stepOrder = steps
         }
-        log.info("final stepOrder \(stepOrder)");
+        log.info("final stepOrder \(self.stepOrder)")
     }
 }
