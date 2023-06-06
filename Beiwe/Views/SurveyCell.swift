@@ -10,14 +10,13 @@ import Foundation
 import Hakuba
 
 class SurveyCellModel: CellModel {
-    let activeSurvey: ActiveSurvey;
+    let activeSurvey: ActiveSurvey
 
     init(activeSurvey: ActiveSurvey, selectionHandler: @escaping SelectionHandler) {
-        self.activeSurvey = activeSurvey;
+        self.activeSurvey = activeSurvey
         super.init(cell: SurveyCell.self, selectionHandler: selectionHandler)
     }
 }
-
 
 class SurveyCell: Cell, CellType {
     typealias CellModel = SurveyCellModel
@@ -30,25 +29,23 @@ class SurveyCell: Cell, CellType {
             return
         }
 
-
-        var desc: String;
+        var desc: String
         if let surveyType = cellmodel.activeSurvey.survey?.surveyType, surveyType == .AudioSurvey {
-            desc = NSLocalizedString("survey_type_audio", comment: "");
+            desc = NSLocalizedString("survey_type_audio", comment: "")
         } else {
-            desc = NSLocalizedString("survey_type_tracking", comment: "");
+            desc = NSLocalizedString("survey_type_tracking", comment: "")
         }
-        descriptionLabel.text = desc;
-        if(cellmodel.activeSurvey.survey?.alwaysAvailable ?? false){
-            newLabel.text = NSLocalizedString("survey_status_available", comment: "");
+        self.descriptionLabel.text = desc
+        if cellmodel.activeSurvey.survey?.alwaysAvailable ?? false {
+            self.newLabel.text = NSLocalizedString("survey_status_available", comment: "")
+        } else {
+            self.newLabel.text = (cellmodel.activeSurvey.bwAnswers.count > 0) ? NSLocalizedString("survey_status_incomplete", comment: "") : NSLocalizedString("survey_status_new", comment: "")
         }
-        else{
-            newLabel.text = (cellmodel.activeSurvey.bwAnswers.count > 0) ? NSLocalizedString("survey_status_incomplete", comment: "") : NSLocalizedString("survey_status_new", comment: "");
-        }
-        backgroundColor = UIColor.clear;
-        //selectionStyle = UITableViewCellSelectionStyle.None;
+        backgroundColor = UIColor.clear
+        // selectionStyle = UITableViewCellSelectionStyle.None;
         let bgColorView = UIView()
         bgColorView.backgroundColor = AppColors.highlightColor
         selectedBackgroundView = bgColorView
-        isSelected = false;
+        isSelected = false
     }
 }
