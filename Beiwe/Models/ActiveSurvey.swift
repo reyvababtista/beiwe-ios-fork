@@ -13,7 +13,7 @@ class ActiveSurvey: Mappable {
     var isComplete: Bool = false
     var survey: Survey?
     // var nextScheduledTime: TimeInterval = 0;
-    var received: TimeInterval = 0
+    var received: TimeInterval = 0 // time the suurvey was rceived by the app?
     var rkAnswers: Data?
     // var notification: UILocalNotification?;
     var stepOrder: [Int]?
@@ -80,7 +80,7 @@ class ActiveSurvey: Mappable {
                 }
             }
             self.stepOrder = order
-            log.info("proposed stepOrder \(self.stepOrder)")
+            log.info("proposed stepOrder \(order)")
         } else {
             self.stepOrder = steps
         }

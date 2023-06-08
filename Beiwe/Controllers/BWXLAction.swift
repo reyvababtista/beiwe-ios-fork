@@ -23,36 +23,35 @@
 
 import XLActionController
 
+/// this cell is used at least in the user menu list of actions
 open class BWXLCell: ActionCell {
-    
-    public override init(frame: CGRect) {
+    override public init(frame: CGRect) {
         super.init(frame: frame)
-        initialize()
+        self.initialize()
     }
     
-    required public init?(coder aDecoder: NSCoder) {
+    public required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
     }
     
-    open override func awakeFromNib() {
+    override open func awakeFromNib() {
         super.awakeFromNib()
-        initialize()
+        self.initialize()
     }
     
     func initialize() {
-        //backgroundColor = .clearColor()
-        backgroundColor = AppColors.Beiwe2.withAlphaComponent(0.8)
+        // self.backgroundColor = .clearColor() // some old or default value
+        self.backgroundColor = AppColors.Beiwe2.withAlphaComponent(0.8)
         let backgroundView = UIView()
-        backgroundView.backgroundColor = UIColor.clear // UIColor.whiteColor().colorWithAlphaComponent(0.3)
-        selectedBackgroundView = backgroundView
-        actionTitleLabel?.textColor = .white
-        actionTitleLabel?.textAlignment = .left
-        
+        // this alpha compoonent is applied/overlayed when you tap a menu item
+        backgroundView.backgroundColor = UIColor.white.withAlphaComponent(0.3)
+        self.selectedBackgroundView = backgroundView
+        self.actionTitleLabel?.textColor = .white
+        self.actionTitleLabel?.textAlignment = .left
     }
 }
 
 public struct BWXLHeaderData {
-    
     var title: String
     var subtitle: String
     var image: UIImage
@@ -65,7 +64,6 @@ public struct BWXLHeaderData {
 }
 
 open class BWXLHeaderView: UICollectionReusableView {
-    
     open lazy var imageView: UIImageView = {
         let imageView = UIImageView(frame: CGRect.zero)
         imageView.image = UIImage(named: "sp-header-icon")
@@ -93,26 +91,26 @@ open class BWXLHeaderView: UICollectionReusableView {
         return discArtist
     }()
     
-    public override init(frame: CGRect) {
+    override public init(frame: CGRect) {
         super.init(frame: frame)
-        initialize()
+        self.initialize()
     }
     
-    required public init?(coder aDecoder: NSCoder) {
+    public required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
     }
     
-    open override func awakeFromNib() {
+    override open func awakeFromNib() {
         super.awakeFromNib()
-        initialize()
+        self.initialize()
     }
     
     func initialize() {
         translatesAutoresizingMaskIntoConstraints = false
         backgroundColor = .clear
-        addSubview(imageView)
-        addSubview(title)
-        addSubview(artist)
+        addSubview(self.imageView)
+        addSubview(self.title)
+        addSubview(self.artist)
         let separator: UIView = {
             let separator = UIView(frame: CGRect.zero)
             separator.backgroundColor = UIColor.white.withAlphaComponent(0.3)
@@ -121,8 +119,8 @@ open class BWXLHeaderView: UICollectionReusableView {
         }()
         addSubview(separator)
         
-        let views = [ "ico": imageView, "title": title, "artist": artist, "separator": separator ]
-        let metrics = [ "icow": 54, "icoh": 54 ]
+        let views = ["ico": imageView, "title": title, "artist": artist, "separator": separator]
+        let metrics = ["icow": 54, "icoh": 54]
         let options = NSLayoutConstraint.FormatOptions()
         
         addConstraints(NSLayoutConstraint.constraints(withVisualFormat: "H:|-15-[ico(icow)]-10-[title]-15-|", options: options, metrics: metrics, views: views))
@@ -134,89 +132,106 @@ open class BWXLHeaderView: UICollectionReusableView {
     }
 }
 
+/// This appears to be the menu view, eg the user menu actions menu
 open class BWXLActionController: ActionController<BWXLCell, ActionData, BWXLHeaderView, BWXLHeaderData, UICollectionReusableView, Void> {
-    
+    /// runs when view appears, probably is the visual effect for the background of the main page
     fileprivate lazy var blurView: UIVisualEffectView = {
+        print("aostenuhdaonstehudasotehuidanotehudaoeunthdaonetuhdaonetuhdaonetgudanoetgidsaoecidaosethudaoeu")
         let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
-        blurView.autoresizingMask = UIView.AutoresizingMask.flexibleHeight.union(.flexibleWidth)
+        blurView.autoresizingMask = UIView.AutoresizingMask.flexibleHeight.union(.flexibleWidth) // appears to have no effect...
         return blurView
     }()
-
-
+    
+    override open func viewDidLoad() {
+        super.viewDidLoad()
+        // backgroundView.addSubview(blurView)
+        
+        // disabled, this inserts a 20 pixel(?) gap in the menu? what was the ui bug?
+        /* Hack.  Why does iOS 11 fail? */
+        // if #available(iOS 11.0, *) {
+        //     contentHeight = contentHeight + 20
+        //     _setUpContentInsetForHeight(view.frame.height)
+        // }
+        
+        self._setUpContentInsetForHeight(view.frame.height)
+        self.cancelView?.frame.origin.y = view.bounds.size.height // no obvious effect
+        
+        // there was a shadow located between the cancel button and the bottom of the list view of options, it wasn't very good.
+        // cancelView?.layer.shadowColor = UIColor.black.cgColor
+        // cancelView?.layer.shadowOffset = CGSize(width: 0, height: -4)
+        // cancelView?.layer.shadowRadius = 2
+        // cancelView?.layer.shadowOpacity = 0.6
+    }
+    
+    /// appears to be a fix of some kind for ios 11, or possibly for devices with flush-to-bottom-edge screens
+    /// I cannot work out what this code accomplishes.
     fileprivate func _setUpContentInsetForHeight(_ height: CGFloat) {
         let currentInset = collectionView.contentInset
         let bottomInset = settings.cancelView.showCancel ? settings.cancelView.height : currentInset.bottom
         var topInset = height - contentHeight
-
         if settings.cancelView.showCancel {
             topInset -= settings.cancelView.height
         }
-
         topInset = max(topInset, max(30, height - contentHeight))
-
-        collectionView.contentInset = UIEdgeInsets(top: topInset, left: currentInset.left, bottom: bottomInset, right: currentInset.right)
-    }
-
-    open override func viewDidLoad() {
-
-        super.viewDidLoad()
-        //backgroundView.addSubview(blurView)
-
-        /* Hack.  Why does iOS 11 fail? */
-        if #available(iOS 11.0, *) {
-            contentHeight = contentHeight + 20;
-            _setUpContentInsetForHeight(view.frame.height)
-        }
-
-        
-        cancelView?.frame.origin.y = view.bounds.size.height // Starts hidden below screen
-        cancelView?.layer.shadowColor = UIColor.black.cgColor
-        cancelView?.layer.shadowOffset = CGSize(width: 0, height: -4)
-        cancelView?.layer.shadowRadius = 2
-        cancelView?.layer.shadowOpacity = 0.8
+        // no obviouus changes to topInset or bottomInset seem to do anything?
+        self.collectionView.contentInset = UIEdgeInsets(top: topInset, left: currentInset.left, bottom: bottomInset, right: currentInset.right)
     }
     
-    open override func viewWillAppear(_ animated: Bool) {
+    /// called by os, sets/modifies a blur which I'm pretty sure is disabled...
+    override open func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        blurView.frame = backgroundView.bounds
+        self.blurView.frame = backgroundView.bounds
     }
     
-    public override init(nibName nibNameOrNil: String? = nil, bundle nibBundleOrNil: Bundle? = nil) {
+    override public init(nibName nibNameOrNil: String? = nil, bundle nibBundleOrNil: Bundle? = nil) {
         super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
-        settings.behavior.bounces = true
-        settings.behavior.scrollEnabled = true
-        settings.cancelView.showCancel = true
-        settings.cancelView.hideCollectionViewBehindCancelView = false
-        //settings.cancelView.height = 50
-        settings.animation.scale = nil
-        settings.animation.present.springVelocity = 0.0
         
-        cellSpec = .nibFile(nibName: "BWXLCell", bundle: Bundle(for: BWXLCell.self), height: { _ in 60 })
-        headerSpec = .cellClass( height: { _ in 84 })
+        // behaviors for the menu, disabled scrolling so this is probably outdated
+        self.settings.behavior.bounces = true
+        self.settings.behavior.scrollEnabled = false // scrolling on this is bad, there is no filler, it just moves the elements up. disabling it.
+        self.settings.cancelView.showCancel = true
+        self.settings.cancelView.hideCollectionViewBehindCancelView = false
+        self.settings.cancelView.height = 50
+        self.settings.animation.scale = nil // commenting this out makes the menu a bit transparent
+        self.settings.animation.present.springVelocity = 0.0
         
-        onConfigureCellForAction = { [weak self] cell, action, indexPath in
+        // set the heigh of elements in the menu
+        self.cellSpec = .nibFile(nibName: "BWXLCell", bundle: Bundle(for: BWXLCell.self), height: { _ in 60 })
+        
+        // changing the value has no obvious effect
+        self.headerSpec = .cellClass(height: { _ in 84 })
+        
+        // setup for each of the (4) cells in the menu
+        self.onConfigureCellForAction = { [weak self] (cell: BWXLCell, action: Action<ActionData>, indexPath: IndexPath) in
+            // assigns assets, image is always nil
             cell.setup(action.data?.title, detail: action.data?.subtitle, image: action.data?.image)
+            
+            // separator is the line below each cell, this logic disables it for the bottom item (leave study)
             cell.separatorView?.isHidden = indexPath.item == (self?.collectionView.numberOfItems(inSection: indexPath.section))! - 1
-            cell.alpha = action.enabled ? 1.0 : 0.5
-            //cell.actionTitleLabel?.textColor = action.style == .Destructive ? AppColors.Beiwe5 : UIColor.whiteColor();
+            cell.alpha = action.enabled ? 1.0 : 0.5 // always 1.0?
+            
+            // this... makes the leave study button ~red
+            // cell.actionTitleLabel?.textColor = action.style == .destructive ? AppColors.Beiwe5 : UIColor.white
         }
-        onConfigureHeader = { (header: BWXLHeaderView, data: BWXLHeaderData)  in
+        
+        // configures the header... but this code does not appear to execute...
+        onConfigureHeader = { (header: BWXLHeaderView, data: BWXLHeaderData) in
             header.title.text = data.title
             header.artist.text = data.subtitle
             header.imageView.image = data.image
         }
     }
     
-    required public init?(coder aDecoder: NSCoder) {
+    public required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
     
-    open override func performCustomDismissingAnimation(_ presentedView: UIView, presentingView: UIView) {
+    override open func performCustomDismissingAnimation(_ presentedView: UIView, presentingView: UIView) {
         super.performCustomDismissingAnimation(presentedView, presentingView: presentingView)
-        cancelView?.frame.origin.y = view.bounds.size.height + 10
+        self.cancelView?.frame.origin.y = self.view.bounds.size.height + 10
     }
     
-    open override func onWillPresentView() {
-        cancelView?.frame.origin.y = view.bounds.size.height
+    override open func onWillPresentView() {
+        self.cancelView?.frame.origin.y = self.view.bounds.size.height
     }
 }
