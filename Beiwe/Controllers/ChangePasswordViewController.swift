@@ -13,7 +13,7 @@ class ChangePasswordViewController: FormViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        // self.view = GradientView() // This doesn't work at
+        // self.view = GradientView() // This doesn't work at all
         tableView?.backgroundColor = AppColors.Beiwe1
         
         // create the for elements
