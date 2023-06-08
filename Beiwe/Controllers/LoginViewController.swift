@@ -1,11 +1,3 @@
-//
-//  LoginViewController.swift
-//  Beiwe
-//
-//  Created by Keary Griffin on 4/4/16.
-//  Copyright © 2016 Rocketfarm Studios. All rights reserved.
-//
-
 import Firebase
 import PKHUD
 import ResearchKit
@@ -36,8 +28,6 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
         self.loginButton.isEnabled = false
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(self.tap))
         view.addGestureRecognizer(tapGesture)
-
-        // Do any additional setup after loading the view.
     }
 
     override func didReceiveMemoryWarning() {
@@ -46,26 +36,30 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
         log.warning("didReceiveMemoryWarning")
     }
     
+    /// the login button
     @IBAction func loginPressed(_ sender: AnyObject) {
         password.resignFirstResponder()
         PKHUD.sharedHUD.dimsBackground = true
         PKHUD.sharedHUD.userInteractionOnUnderlyingViewsEnabled = false
 
         if let password = password.text, password.count > 0 {
+            // register for notifications (for some reason) and log in
             if AppDelegate.sharedInstance().checkPasswordAndLogin(password) {
-                // register for notifications and log in?
-                HUD.flash(.success, delay: 0.5)
+                
+                // ... why does this block login....
                 AppDelegate.sharedInstance().checkFirebaseCredentials()
                 if let token: String = Messaging.messaging().fcmToken {
                     AppDelegate.sharedInstance().sendFCMToken(fcmToken: token)
                 }
                 AppDelegate.sharedInstance().transitionToLoadedAppState()
+                
+                HUD.flash(.success, delay: 0.5) // this is the checkbox thingy that flashes on the screen
             } else {
-                HUD.flash(.error, delay: 1)
+                HUD.flash(.error, delay: 1) // the X box thingy
             }
         }
     }
-
+    
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         self.loginPressed(self)
         textField.resignFirstResponder()
@@ -89,20 +83,23 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
         // Return true so the text field will be changed
         return true
     }
-
+    
+    /// some overridden class method afaik
     func textFieldShouldEndEditing(_ textField: UITextField) -> Bool {
         return true
     }
 
+    /// reset password button
     @IBAction func forgotPassword(_ sender: AnyObject) {
         let vc = ChangePasswordViewController()
         vc.isForgotPassword = true
-        vc.finished = { _ in
+        vc.finished = { (_: Bool) in
             self.dismiss(animated: true, completion: nil)
         }
         present(vc, animated: true, completion: nil)
     }
 
+    /// call clinician button
     @IBAction func callClinician(_ sender: AnyObject) {
         confirmAndCallClinician(self)
     }
