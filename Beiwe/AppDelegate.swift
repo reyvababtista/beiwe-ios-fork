@@ -171,6 +171,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     /// the app (or keychain?) up and forgets the password. This app doesn't actually have any data to show the user,
     /// the password is for show/getting the app through the original IRB/participant security theater.
     func checkPasswordAndLogin(_ password: String) -> Bool {
+        // uncomment these lines to make login always succeed, useful for debugging patterns.
+        // ApiManager.sharedInstance.password = PersistentPasswordManager.sharedInstance.passwordForStudy() ?? ""
+        // self.isLoggedIn = true
+        // return true
+        
         // 2.2.1: there was a bug where access of passwordForStudy using the optional-force operoter (then line 169), e.g.
         //    PersistentPasswordManager.sharedInstance.passwordForStudy()!
         // would error as null. Using the optional coalescing operator should fix it
@@ -533,12 +538,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
         // initialize Firebase on the main thread
         DispatchQueue.main.async {
-            let isBeiwe2 = Configuration.sharedInstance.settings["config-server"] as? Bool ?? false
-            if isBeiwe2 {
-                FirebaseApp.configure(options: options)
-            } else {
-                FirebaseApp.configure()
-            }
+            // this used to depend on what version of beiwe (with or without pre-filled server url)
+            FirebaseApp.configure(options: options)
             print("Configured Firebase")
         }
     }

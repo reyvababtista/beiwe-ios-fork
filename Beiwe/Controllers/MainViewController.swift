@@ -65,7 +65,7 @@ class MainViewController: UIViewController {
         self.refreshSurveys()
     }
 
-    /// updates the ui list of studies
+    /// updates the ui list of surveys
     func refreshSurveys() {
         // clean out the current list, add a new empty section at the beginning
         self.hakuba.removeAll()
@@ -98,7 +98,7 @@ class MainViewController: UIViewController {
             // self.hakuba[0].bump(.fade) // this causes ui glitches
         }
         
-        self.hakuba.bump(.fade)  // this applies the animation to the list (hakuba section?) as a whole, clean enough
+        self.hakuba.bump(.fade) // this applies the animation to the list (hakuba section?) as a whole, clean enough
         
         // set the scrollability based on active_survey_count of surveys, set header.
         // emptySurveyHeader is the box with the string "there are no active surveys to take at this time"
@@ -140,7 +140,6 @@ class MainViewController: UIViewController {
         actionController.settings.cancelView.backgroundColor = AppColors.Beiwe3
         actionController.headerData = nil // no obvious effect
         
-        //set the
         actionController.addAction(Action(ActionData(title: NSLocalizedString("change_password_button", comment: "")), style: .default) { _action in
             DispatchQueue.main.async {
                 self.changePassword(self)

@@ -6,7 +6,7 @@ import UIKit
 
 /// This class is used in two places, the forgot password menu (on the login page), and the logged in change password (user menu option)
 class ChangePasswordViewController: FormViewController {
-    let autoValidation = false // Always false?
+    let autoValidation = false
     var isForgotPassword = false // flag determines whether this is the forgot password or change password use-case
     let db = Recline.shared // this is not used
     var finished: ((_ changed: Bool) -> Void)? // dunnoo
@@ -16,8 +16,7 @@ class ChangePasswordViewController: FormViewController {
         // self.view = GradientView() // This doesn't work at all
         tableView?.backgroundColor = AppColors.Beiwe1
         
-        // create the for elements
-        //
+        // create the "form" (menu option) elements
         form +++ Section { section in
             if self.isForgotPassword {
                 // populate

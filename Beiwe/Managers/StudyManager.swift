@@ -37,6 +37,7 @@ class StudyManager {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
     /// sets (but also clears?) the current study, and the gpsManager, sets real_study_loaded to true
+    /// called just after registration, and when app is loaded with a registered study
     func loadDefaultStudy() -> Promise<Bool> {
         self.currentStudy = nil
         self.gpsManager = nil
@@ -748,7 +749,7 @@ class StudyManager {
     
     /// the bulk of the leave study feature.
     func leaveStudy() -> Promise<Bool> {
-        fatalError("this is not supposed to run")
+        // fatalError("this is not supposed to run")
         
         // disable gps - gps is special because it interacts with app persistence
         if self.gpsManager != nil {

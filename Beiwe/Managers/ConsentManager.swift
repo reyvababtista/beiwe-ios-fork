@@ -2,6 +2,7 @@ import CoreLocation
 import Foundation
 import ResearchKit
 
+// the (ordered?) steps in the registration process after submitting registration information
 enum StepIds: String {
     case Permission = "PermissionsStep"
     case LocationPermission
@@ -10,6 +11,7 @@ enum StepIds: String {
     case VisualConsent = "VisualConsentStep"
     case ConsentReview = "ConsentReviewStep"
 }
+
 
 class WaitForPermissionsRule: ORKStepNavigationRule {
     let nextTask: (ORKTaskResult) -> String
@@ -27,12 +29,15 @@ class WaitForPermissionsRule: ORKStepNavigationRule {
     }
 }
 
+
+/// the secondary step(s) of registration after the network calls are made. permissions, confirmation etc.
 class ConsentManager: NSObject, ORKTaskViewControllerDelegate {
     var retainSelf: AnyObject?
     var consentViewController: ORKTaskViewController!
     var consentDocument: ORKConsentDocument!
     var notificationPermission: Bool = false
-
+    
+    
     var PermissionsStep: ORKStep {
         let instructionStep = ORKInstructionStep(identifier: StepIds.Permission.rawValue)
         instructionStep.title = NSLocalizedString("permission_alert_title", comment: "")
@@ -92,7 +97,8 @@ class ConsentManager: NSObject, ORKTaskViewControllerDelegate {
             (.studyTasks, "study_tasks"),
             (.withdrawing, "withdrawing"),
         ]
-
+        
+        // get the consent sections out of the study information
         var hasAdditionalConsent = false
         var consentSections: [ORKConsentSection] = [overviewSection]
         for (contentSectionType, bwType) in consentSectionTypes {
@@ -106,7 +112,8 @@ class ConsentManager: NSObject, ORKTaskViewControllerDelegate {
                 consentSections.append(consentSection)
             }
         }
-
+        
+        // looks like someone thought there would be areal signature step?
         self.consentDocument.addSignature(ORKConsentSignature(forPersonWithTitle: nil, dateFormatString: nil, identifier: "ConsentDocumentParticipantSignature"))
         self.consentDocument.sections = consentSections // TODO: signature
 
@@ -114,13 +121,10 @@ class ConsentManager: NSObject, ORKTaskViewControllerDelegate {
         steps += [visualConsentStep]
 
         // let signature = consentDocument.signatures!.first!
-
         if hasAdditionalConsent {
             let reviewConsentStep = ORKConsentReviewStep(identifier: StepIds.ConsentReview.rawValue, signature: nil, in: self.consentDocument)
-
             reviewConsentStep.text = NSLocalizedString("review_consent_text", comment: "")
             reviewConsentStep.reasonForConsent = NSLocalizedString("review_consent_reason", comment: "")
-
             steps += [reviewConsentStep]
         }
 

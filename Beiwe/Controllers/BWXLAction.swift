@@ -136,7 +136,6 @@ open class BWXLHeaderView: UICollectionReusableView {
 open class BWXLActionController: ActionController<BWXLCell, ActionData, BWXLHeaderView, BWXLHeaderData, UICollectionReusableView, Void> {
     /// runs when view appears, probably is the visual effect for the background of the main page
     fileprivate lazy var blurView: UIVisualEffectView = {
-        print("aostenuhdaonstehudasotehuidanotehudaoeunthdaonetuhdaonetuhdaonetgudanoetgidsaoecidaosethudaoeu")
         let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
         blurView.autoresizingMask = UIView.AutoresizingMask.flexibleHeight.union(.flexibleWidth) // appears to have no effect...
         return blurView
