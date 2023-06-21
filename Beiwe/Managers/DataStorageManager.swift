@@ -8,8 +8,10 @@ enum DataStorageErrors: Error {
     case notInitialized
 }
 
-let DELIMITER = ","
-let KEYLENGTH = 128
+let DELIMITER = "," // csv separator character, named for legible code reasons
+let KEYLENGTH = 128 // encryption key length for any given line of encrypted data.
+
+// settings for functions that have retry logic
 let RECUR_SLEEP_DURATION = 0.05 // 50 milliseconds
 let RECUR_DEPTH = 3
 
@@ -27,6 +29,8 @@ class DataStorageManager {
     var study: Study?
     var secKeyRef: SecKey?
 
+    ///////////////////////////////////////////////// Setup //////////////////////////////////////////////////////
+    
     /// instantiates your DataStorage object - called in every manager
     func createStore(_ type: String, headers: [String]) -> DataStorage {
         if self.storageTypes[type] == nil {
@@ -45,18 +49,7 @@ class DataStorageManager {
         return self.storageTypes[type]!
     }
 
-    // TODO: we are using the cache directory, we should be using applicationSupportDirectory (Library/Application support/)
-    // https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html
-    static func currentDataDirectory() -> URL {
-        let cacheDir = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true)[0]
-        return URL(fileURLWithPath: cacheDir).appendingPathComponent("currentdata")
-    }
-
-    static func uploadDataDirectory() -> URL {
-        let cacheDir = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true)[0]
-        return URL(fileURLWithPath: cacheDir).appendingPathComponent("uploaddata")
-    }
-
+    /// creates the currentData and upload directories. app crashes if this fails because that is a fundamental app failure.
     func createDirectories(recur: Int = RECUR_DEPTH) {
         do {
             try FileManager.default.createDirectory(
@@ -88,64 +81,6 @@ class DataStorageManager {
         }
     }
 
-    func closeStore(_ type: String) -> Promise<Void> {
-        self.storageTypes.removeValue(forKey: type)
-        return Promise()
-    }
-
-    func flushAll() {
-        // calls flush for all files
-        for (_, storage) in self.storageTypes {
-            storage.reset()
-        }
-    }
-
-    func isUploadFile(_ filename: String) -> Bool {
-        return filename.hasSuffix(DataStorageManager.dataFileSuffix) || filename.hasSuffix(".mp4") || filename.hasSuffix(".wav")
-    }
-
-    private func moveFile(_ src: URL, dst: URL) {
-        // TODO: is this not-moving case safe?  need to understand upload logic to answer
-        do {
-            try FileManager.default.moveItem(at: src, to: dst)
-            // log.info("moved \(src) to \(dst)")
-        } catch {
-            log.error("Error moving \(src) to \(dst)")
-        }
-    }
-
-    func prepareForUpload() -> Promise<Void> {
-        let prepQ = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default)
-        return Promise().then(on: prepQ) { _ -> Promise<Void> in
-            self.prepareForUpload_actual()
-            return Promise()
-        }
-    }
-
-    private func prepareForUpload_actual() {
-        // TODO: this is a really dangerous general solution to ensuring files are getting uploaded...
-        let prepQ = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default)
-        // let prepQ = DispatchQueue.global(qos: DispatchQoS.QoSClass.utility)  // this is the fix for the warning, not changing atm.
-
-        // Flush once to get all of the files currently processing, record names
-        self.flushAll()
-        var filesToUpload: [String] = []
-        if let enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path) {
-            while let filename = enumerator.nextObject() as? String {
-                if self.isUploadFile(filename) {
-                    filesToUpload.append(filename)
-                } else {
-                    log.warning("Non upload file sitting in directory: \(filename)")
-                }
-            }
-        }
-
-        for filename in filesToUpload {
-            self.moveFile(DataStorageManager.currentDataDirectory().appendingPathComponent(filename),
-                          dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
-        }
-    }
-
     func createEncryptedFile(type: String, suffix: String) -> EncryptedStorage {
         return EncryptedStorage(
             data_stream_type: type,
@@ -155,7 +90,89 @@ class DataStorageManager {
             keyRef: self.secKeyRef
         )
     }
+    
+    ///////////////////////////////////////////////// Informational //////////////////////////////////////////////////////
+    
+    // TODO: we are using the cache directory, we should be using applicationSupportDirectory (Library/Application support/)
+    // https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html
+    static func currentDataDirectory() -> URL {
+        let cacheDir = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true)[0]
+        return URL(fileURLWithPath: cacheDir).appendingPathComponent("currentdata")
+    }
 
+    static func uploadDataDirectory() -> URL {
+        let cacheDir = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true)[0]
+        return URL(fileURLWithPath: cacheDir).appendingPathComponent("uploaddata")
+    }
+    
+    func isUploadFile(_ filename: String) -> Bool {
+        return filename.hasSuffix(DataStorageManager.dataFileSuffix) || filename.hasSuffix(".mp4") || filename.hasSuffix(".wav")
+    }
+    
+    ///////////////////////////////////////////////// Teardown //////////////////////////////////////////////////////
+    
+    func closeStore(_ type: String) -> Promise<Void> {
+        // deletes a DataStorage object from the list
+        // TODO: there is no corresponding close mechasims on datastorage objects themselves so... this is dangerous?
+        self.storageTypes.removeValue(forKey: type)
+        return Promise()
+    }
+
+    // calls reset for all files
+    private func resetAll() {
+        for (_, storage) in self.storageTypes {
+            storage.reset()
+        }
+    }
+    
+    ///////////////////////////////////////////////// Upload //////////////////////////////////////////////////////
+    
+    func prepareForUpload() -> Promise<Void> {
+        let prepQ = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default)
+        // let prepQ = DispatchQueue.global(qos: DispatchQoS.QoSClass.utility)  // this is the fix for the warning, not changing atm.
+        return Promise().then(on: prepQ) { _ -> Promise<Void> in
+            self.prepareForUpload_actual()
+            return Promise()
+        }
+    }
+
+    private func prepareForUpload_actual() {
+        // TODO: this is a really dangerous general solution to ensuring files are getting uploaded...
+        // Reset once to get all of the currently processing file paths.
+        self.resetAll()
+        var filesToUpload: [String] = []
+        if let enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path) {
+            // for each file check its file type and add to list
+            while let filename = enumerator.nextObject() as? String {
+                if self.isUploadFile(filename) {
+                    filesToUpload.append(filename)
+                } else {
+                    log.warning("Non upload file sitting in directory: \(filename)")
+                }
+            }
+        }
+        // move all data in the current data directory to the upload file directory.
+        // active files are stored in a temp directory, then moved to the currentDataDirectory. this moves them to the upload directory.
+        for filename in filesToUpload {
+            self.moveFile(DataStorageManager.currentDataDirectory().appendingPathComponent(filename),
+                          dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
+        }
+    }
+    
+    // move file function with retry logic, fails silently but that is ok because it is only used prepareForUpload_actual
+    private func moveFile(_ src: URL, dst: URL, recur: Int = RECUR_DEPTH) {
+        do {
+            try FileManager.default.moveItem(at: src, to: dst)
+        } catch {
+            if recur > 0 {
+                log.error("moveFile recur at \(recur).")
+                Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                return self.moveFile(src, dst: dst, recur: recur - 1)
+            }
+            log.error("Error moving \(src) to \(dst)")
+        }
+    }
+    
     // func _printFileInfo(_ file: URL) {
     //     // debugging function - unused
     //     let path = file.path
@@ -186,33 +203,39 @@ class DataStorageManager {
 ////////////////////////////////////////////////////// Data Storage ///////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// Data Storage ///////////////////////////////////////////////////////
 ////////////////////////////////////////////////////// Data Storage ///////////////////////////////////////////////////////
-class DataStorage {
-    var headers: [String]
-    var type: String
-    var aesKey: Data
-    var publicKey: String
-    var filename: URL
-    var realFilename: URL
-    var patientId: String
-    var sanitize = false
-    let moveOnClose: Bool
-    var name = ""
-    var secKeyRef: SecKey? // TODO: make non-optional
 
-    // we have some locks to deal with critical code, at the very least we have at-upload-time threading conflicts.
-    var lock_write = NSLock()
-    var lock_exists = NSLock()
+class DataStorage {
+    // participant info (to be factored out)
+    var patientId: String // TODO: factor out
+    var publicKey: String // string of the public key for local access. TODO: factor out
+    var secKeyRef: SecKey? // TODO: make non-optional
+    
+    // file settings
+    var headers: [String] // csv file header line
+    var type: String // data stream type
+    var name = "" // name of this data storage object
+    var sanitize = false // flag for the store function, replace commas with semicolons. TODO: factor out
+    let moveOnClose: Bool // flag for whether to move the file (to the upload folder) when it is reset.
+    
+    // file state
+    var aesKey: Data // the current encryption key
+    var filename: URL // the current file name
+    var realFilename: URL // the target file name that will be used eventually when the file is moved into the upload folder
+
+    // Locks to deal with critical code. We have at-upload-time threading conflicts, and tighter write conflicts.
+    var lock_write = NSLock() // lowest level, locks file seek and file write
+    var lock_exists = NSLock() // locks on the exists check
+    var lock_file_level_operation = NSLock()
     
     init(type: String, headers: [String], patientId: String, publicKey: String, moveOnClose: Bool = false, keyRef: SecKey?) {
         self.type = type
         self.patientId = patientId
         self.publicKey = publicKey
-        //
         self.headers = headers
         self.moveOnClose = moveOnClose
         self.secKeyRef = keyRef
 
-        // these need to be instantiated to allow non-optionals, they are immediately reset in self.reset()
+        // these need to be instantiated to allow non-optional typings, but they are immediately reset in self.reset()
         self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
         self.realFilename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
         self.filename = self.realFilename
@@ -220,50 +243,43 @@ class DataStorage {
         self.reset() // properly creates mutables
     }
     
-    func reset(recur: Int = RECUR_DEPTH) {
-        // called when max filesize is reached, inside flush when the file is empty
-        // generally resets all object assets and creates a new filename.
-        // log.info("DataStorage.reset called on \(self.name)...")
-        if self.moveOnClose == true {
-            do {
-                if self.check_file_exists() {
-                    try FileManager.default.moveItem(at: self.filename, to: self.realFilename)
-                    // log.info("moved temp data file \(self.filename) to \(self.realFilename)")
-                }
-            } catch {
-                log.error("Error moving temp data \(self.filename) to \(self.realFilename)")
-                if recur > 0 {
-                    log.error("reset recur at \(recur).")
-                    Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
-                    return self.reset(recur: recur - 1)
-                }
-                fatalError("Error moving temp data \(self.filename) to \(self.realFilename)")
-            }
+    ////////////////////////////////////// Locking, public functions ///////////////////////////////////////
+    
+    /// the write function used for all data streams.
+    public func store(_ data: [String]) {
+        defer {
+            self.lock_file_level_operation.unlock()
         }
-        // set new name, filenames
-        self.name = self.patientId + "_" + self.type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
-        self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
-
-        if self.moveOnClose {
-            self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
-        } else {
-            self.filename = self.realFilename
-        }
-
-        // generate and write encryptiion key
-        self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
-        self.write_raw_to_end_of_file(self.get_rsa_line())
-        self.encrypted_write(self.headers.joined(separator: DELIMITER))
-
-        // log creating new file.
-        self.conditionalApplog(event: "file_init", msg: "Init new data file", d1: self.name)
+        self.lock_file_level_operation.lock()
+        self._store(data)
     }
-
+    
+    /// The public reset (create new file) function, all calls that are internal to the class should be to _reset() so lock.
+    public func reset() {
+        defer {
+            self.lock_file_level_operation.unlock()
+        }
+        self._reset()
+        self.lock_file_level_operation.lock()
+    }
+    
+    /// synchronized function to ensure that a file exists
+    // Keep _ensure_file_exists function from overlapping with itself, keep lock logic clean.
+    // The inner recursive call should be to _ensure_file_exists.
+    private func ensure_file_exists(recur: Int = RECUR_DEPTH) {
+        defer {
+            self.lock_exists.unlock()
+        }
+        self.lock_exists.lock()
+        self._ensure_file_exists(recur: recur)
+    }
+    
+    ////////////////////////////////////// Informational Functions /////////////////////////////////////////
+    
+    /// Returns the entire raw string of the first line of a file containing an RSA-encoded decryption key.
     private func get_rsa_line() -> Data {
-        // Returns the entire raw string of the first line of a file containing an RSA-encoded decryption key.
         // TODO: why are these two functions are not identical, the call to encryptString
         //   have different args, publicKey vs publicKeyId. And self.secKeyRef is sometimes not present?
-
         if let keyRef = self.secKeyRef {
             return try! Crypto.sharedInstance.base64ToBase64URL(
                 (SwiftyRSA.encryptString(
@@ -280,24 +296,62 @@ class DataStorage {
                 )) + "\n").data(using: String.Encoding.utf8)!
         }
     }
-
-    func check_file_exists() -> Bool {
+    
+    /// returns boolean about whether a file exists on the file system for self.
+    private func check_file_exists() -> Bool {
         // operation profiled on an iphone 8 plus to take roughly 400-450us average/rms, standard deviation of 200us
         return FileManager.default.fileExists(atPath: self.filename.path)
     }
     
-    /// atomic function to ensure that a file exists
-    func ensure_file_exists(recur: Int = RECUR_DEPTH) {
-        // quick and easy way to keep this function from overlapping
-        defer {  // use defer to ensure the lock unlocks.
-            self.lock_exists.unlock()
+    /// Unless self's "type" (data stream) is the ios log, write a message to the ios log.
+    private func conditionalApplog(event: String, msg: String = "", d1: String = "", d2: String = "", d3: String = "", d4: String = "") {
+        if self.type != "ios_log" {
+            AppEventManager.sharedInstance.logAppEvent(event: event, msg: msg, d1: d1, d2: d2, d3: d3)
         }
-        self.lock_exists.lock()
-        self._ensure_file_exists(recur: recur)
     }
     
-    /// non-atomic function to ensure that a file exists
-    func _ensure_file_exists(recur: Int) {
+    /////////////////////////////////// Complex Functions (manages state) ///////////////////////////////////
+    
+    // generally resets all object assets and creates a new filename.
+    // called when max filesize is reached, and inside resetAll.
+    private func _reset(recur: Int = RECUR_DEPTH) {
+        // log.info("DataStorage.reset called on \(self.name)...")
+        if self.moveOnClose == true {
+            do {
+                if self.check_file_exists() {
+                    try FileManager.default.moveItem(at: self.filename, to: self.realFilename)
+                    // log.info("moved temp data file \(self.filename) to \(self.realFilename)")
+                }
+            } catch {
+                log.error("Error moving temp data \(self.filename) to \(self.realFilename)")
+                if recur > 0 {
+                    log.error("reset recur at \(recur).")
+                    Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                    return self._reset(recur: recur - 1)
+                }
+                fatalError("Error moving temp data \(self.filename) to \(self.realFilename)")
+            }
+        }
+        
+        // set new filename and real filename mased on move on close
+        self.name = self.patientId + "_" + self.type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
+        self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
+        if self.moveOnClose {
+            self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
+        } else {
+            self.filename = self.realFilename
+        }
+
+        // generate and write encryptiion key
+        self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
+        self.write_raw_to_end_of_file(self.get_rsa_line())
+        self.encrypted_write(self.headers.joined(separator: DELIMITER))
+        // log creating new file.
+        self.conditionalApplog(event: "file_init", msg: "Init new data file", d1: self.name)
+    }
+    
+    /// unlocked function to ensure that a file exists.
+    private func _ensure_file_exists(recur: Int) {
         // if there is no file, create it with these permissions and no data
         if !self.check_file_exists() {
             let created = FileManager.default.createFile(
@@ -318,13 +372,16 @@ class DataStorage {
                 if recur > 0 {
                     log.error("ensure_file_exists recur at \(recur).")
                     Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
-                    return self.ensure_file_exists(recur: recur - 1)
+                    return self._ensure_file_exists(recur: recur - 1) // needs to actually call the _ version of the function (2.3.1 was incorrect, oops)
                 }
                 fatalError(message)
             }
         }
     }
-
+    
+    ///////////////////////////////////////// Actual write logic ///////////////////////////////////////////
+    
+    /// outer write operation, handles encrypting data and passes it off to the write_raw_to_end_of_file
     private func encrypted_write(_ line: String) {
         self.ensure_file_exists()
         let iv: Data = Crypto.sharedInstance.randomBytes(16)
@@ -338,6 +395,7 @@ class DataStorage {
         self.write_raw_to_end_of_file(base64_data)
     }
 
+    /// Writes a line of data to the end of the current file, has locks to handle single-line-level write contention.
     private func write_raw_to_end_of_file(_ data: Data, recur: Int = RECUR_DEPTH) {
         self.ensure_file_exists()
         // if file handle instantiated (file open) append data (a line) to the end of the file.
@@ -361,7 +419,7 @@ class DataStorage {
         } else {
             // error opening file, reset and try again
             if recur > 0 {
-                self.reset()
+                self._reset() // must call _reset() because we could be inside a locked reset()
                 log.error("write_raw_to_end_of_file recur at \(recur).")
                 Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
                 return self.write_raw_to_end_of_file(data, recur: recur - 1)
@@ -371,16 +429,19 @@ class DataStorage {
             self.conditionalApplog(event: "file_err", msg: "Error writing to file", d1: self.name, d2: "Error opening file for writing")
             fatalError("unable to open file \(self.filename)")
         }
-        if (recur != RECUR_DEPTH){
+        if recur != RECUR_DEPTH {
             log.error("write_raw_to_end_of_file recur SUCCESS at \(recur).")
         }
     }
-
-    ///This is the main write function for most app datastreams
-    func store(_ data: [String]) {
+    
+    /// This is the main write function for all write operations from all data streams
+    // This function is dumb, it should be replaced entirely by encrypted write once the stupid TODO below is addressed.
+    private func _store(_ data: [String]) {
         var sanitizedData: [String]
         if self.sanitize {
-            // TODO: survey answers and survey timings files have a (naive) comma replacement behavior. This Should Be Moved out of datastorage before the write operation (this factoring is..,.. horrible. this is So Bad. I cannot even. who with a brain in their head thought this was a good idea.)
+            // TODO: survey answers and survey timings files have a (naive) comma replacement behavior.
+            // This Should Be Moved out of datastorage before the write operation (this factoring is... horrible.
+            // Its So Bad. I cannot even. Who with a brain in their head thought this was a good idea.)
             sanitizedData = []
             for line in data {
                 sanitizedData.append(
@@ -393,12 +454,6 @@ class DataStorage {
         }
         self.encrypted_write(sanitizedData.joined(separator: DELIMITER))
     }
-
-    private func conditionalApplog(event: String, msg: String = "", d1: String = "", d2: String = "", d3: String = "", d4: String = "") {
-        if self.type != "ios_log" {
-            AppEventManager.sharedInstance.logAppEvent(event: event, msg: msg, d1: d1, d2: d2, d3: d3)
-        }
-    }
 }
 
 /////////////////////////////////////////////////////// EncryptedStorage /////////////////////////////////////////////////////
@@ -407,7 +462,7 @@ class DataStorage {
 
 // EncryptedStorage Originally included a buffered write pattern in AudioQuestionViewController.
 // orig comment: only write multiples of 3, since we are base64 encoding and would otherwise end up with padding
-//    if (isFlush)
+//    if (isFlush) // don't know what this variable is anymore....
 //        evenLength = self.currentData.length
 //    else
 //        evenLength = (self.currentData.length / 3) * 3
