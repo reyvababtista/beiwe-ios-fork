@@ -193,7 +193,7 @@ class StudyManager {
             } else {
                 trackingSurvey = surveyPresenter! // current survey I think?
             }
-            trackingSurvey.finalizeSurveyAnswers() // its done, do the its-done thing
+            trackingSurvey.finalizeSurveyAnswers() // its done, do the its-done thing (writes file)
             
             // increment number of submitted surveys
             if activeSurvey.bwAnswers.count > 0 {
@@ -228,6 +228,7 @@ class StudyManager {
     /// (this is a mess, it should be broken down some, but it does all that needs to happen at this time)
     /// Called from GpsManager.pollServices, AudioQuestionsViewController.saveButtonPressed, StudyManager.checkSurveys,
     ///  and inside TrackingSurveyPresenter when the survey is completed.
+    // FIXME: this function needs to be rewritten, it is horribly overloaded and used in unrelated locations.
     func updateActiveSurveys(_ forceSave: Bool = false) -> TimeInterval {
         // if for some reason we don't have a current study, return 15 minutes (used when surveys are scheduled tells something to wait 15 minutes)
         guard let study = currentStudy else {
@@ -677,7 +678,7 @@ class StudyManager {
         let promiseChain: Promise<Bool> = Recline.shared.compact().then { (_: Void) -> Promise<Bool> in
             // run prepare for upload
             DataStorageManager.sharedInstance.prepareForUpload().then { (_: Void) -> Promise<Bool> in
-                log.info("prepareForUpload finished")
+                print("prepareForUpload finished")
                 return .value(true)
             }
         }
