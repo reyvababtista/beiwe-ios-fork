@@ -40,14 +40,15 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     
     // the current question (do display?)
     var currentQuestion: GenericSurveyQuestion?
-
+    
+    // (Note: this executes at app load)
     init(surveyId: String, activeSurvey: ActiveSurvey, survey: Survey) {
         self.timingsName = TrackingSurveyPresenter.timingDataType + "_" + surveyId // any reason we are setting this up early?
         
-        // let tempSurvey = Mapper<Survey>().map(contentJson)
+        // let tempSurvey = Mapper<Survey>().map(contentJson) // very old debugging code from keary
         // let questions = tempSurvey!.questions
-        let questions = survey.questions
-
+        let questions: [GenericSurveyQuestion] = survey.questions
+        
         super.init()
         self.surveyId = surveyId
         self.activeSurvey = activeSurvey
@@ -83,9 +84,8 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                 
                 switch questionType {
                 case .Checkbox, .RadioButton:
-                    // swift weirdness, you cannot do step = ORKQuestionStep(identifier: question.questionId)
                     let questionStep = ORKQuestionStep(identifier: question.questionId)
-                    step = questionStep
+                    step = questionStep // swift weirdness? you cannot do step = ORKQuestionStep(identifier: question.questionId)
                     // set up the question and its answers
                     questionStep.answerFormat = ORKTextAnswerFormat.choiceAnswerFormat(
                         with: questionType == .RadioButton ? .singleChoice : .multipleChoice,
@@ -94,21 +94,40 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                             ORKTextChoice(text: el.text, value: index as NSNumber)
                         }
                     )
+                    
+                case .Time:
+                    // its not clear what providing the withDefaultComponents parameter does, its still the current date
+                    let questionStep = ORKQuestionStep(identifier: question.questionId)
+                    step = questionStep
+                    questionStep.answerFormat = ORKTextAnswerFormat.timeOfDayAnswerFormat()
+                
+                case .Date:
+                    let questionStep = ORKQuestionStep(identifier: question.questionId)
+                    step = questionStep
+                    // dateAnswerFormat with all nils still defaults to the current date
+                    questionStep.answerFormat = ORKTextAnswerFormat.dateAnswerFormat(withDefaultDate: nil, minimumDate: nil, maximumDate: nil, calendar: nil)
+                
+                case .DateTime:
+                    // defaults to current date and time
+                    let questionStep = ORKQuestionStep(identifier: question.questionId)
+                    step = questionStep
+                    questionStep.answerFormat = ORKTextAnswerFormat.dateTime()
                 
                 case .FreeResponse:
                     let questionStep = ORKQuestionStep(identifier: question.questionId)
                     step = questionStep
+                    
                     // the 3 types of text entry options - numeric is a text type.
                     if let textFieldType = question.textFieldType {
                         switch textFieldType {
                         case .SingleLine:
-                            let textFormat = ORKTextAnswerFormat.textAnswerFormat()
-                            textFormat.multipleLines = false
-                            questionStep.answerFormat = textFormat
+                            let multiline_text = ORKTextAnswerFormat.textAnswerFormat()
+                            multiline_text.multipleLines = false
+                            questionStep.answerFormat = multiline_text
                         case .MultiLine:
-                            let textFormat = ORKTextAnswerFormat.textAnswerFormat()
-                            textFormat.multipleLines = true
-                            questionStep.answerFormat = textFormat
+                            let singleline_text = ORKTextAnswerFormat.textAnswerFormat()
+                            singleline_text.multipleLines = true
+                            questionStep.answerFormat = singleline_text
                         case .Numeric:
                             questionStep.answerFormat = ORKNumericAnswerFormat(
                                 // numeric answers have min and max ranges, "unit" is ua localizeable field for like miles vs kilometers.
@@ -119,7 +138,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                     
                 case .InformationText:
                     step = ORKInstructionStep(identifier: question.questionId)
-                    break // uhhh, this SHOULD break the switch statement, which means it does nothing, but I'm not changeing it or testing this assertion.
+                    break // this SHOULD break the switch statement? which means it does nothing, but I'm not changeing it or testing it, have funn!
                 
                 case .Slider:
                     if let minValue = question.minValue, let maxValue = question.maxValue {
@@ -207,37 +226,37 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         // parent.navigationController?.topViewController?.modalPresentationStyle = UIModalPresentationStyle.pageSheet // doesn't do anything
     }
 
-    func arrayAnswer(_ array: [String]) -> String {
-        return "[" + array.joined(separator: ";") + "]"
-    }
-
+    // almost unreadable function that handles unpacking answers and saving them to a file
     func storeAnswer(_ identifier: String, result: ORKTaskResult) {
         guard let question = questionIdToQuestion[identifier], let stepResult = result.stepResult(forStepIdentifier: identifier) else {
             return
         }
-
         var answersString = ""
 
         if let questionType = question.questionType {
             switch questionType {
+            // this one is ... messy...
             case .Checkbox, .RadioButton:
+                // if there are results...
                 if let results = stepResult.results {
-                    if let choiceResults = results as? [ORKChoiceQuestionResult] {
-                        if choiceResults.count > 0 {
+                    if let choiceResults = results as? [ORKChoiceQuestionResult] { // cast to ORKChoiceQuestionResult,
+                        if choiceResults.count > 0 { // if there are results...
                             if let choiceAnswers = choiceResults[0].choiceAnswers {
                                 var arr: [String] = []
-                                for a in choiceAnswers {
-                                    if let num: NSNumber = a as? NSNumber {
+                                for choice_answer in choiceAnswers { // for each result get the answers...
+                                    // the choices are numbered, cast
+                                    if let num: NSNumber = choice_answer as? NSNumber {
                                         let numValue: Int = num.intValue
                                         if numValue >= 0 && numValue < question.selectionValues.count {
                                             arr.append(question.selectionValues[numValue].text)
                                         } else {
                                             arr.append("")
                                         }
-                                    } else {
+                                    } else { // don't know what this case covers
                                         arr.append("")
                                     }
                                 }
+                                // then populate the answers as a string, for radio and checkbox
                                 if questionType == .Checkbox {
                                     answersString = self.arrayAnswer(arr)
                                 } else {
@@ -247,7 +266,8 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                         }
                     }
                 }
-            case .FreeResponse:
+                
+            case .FreeResponse, .Date, .Time, .DateTime:
                 if let results = stepResult.results {
                     if let freeResponses = results as? [ORKQuestionResult] {
                         if freeResponses.count > 0 {
@@ -257,8 +277,10 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                         }
                     }
                 }
+                
             case .InformationText:
-                break
+                break // ah you need an executable line in a switch-case
+                
             case .Slider:
                 if let results = stepResult.results {
                     if let sliderResults = results as? [ORKScaleQuestionResult] {
@@ -283,12 +305,15 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         var answersString = ""
 
         if let questionType = question.questionType {
+            // get the answers and the question type
             typeString = questionType.rawValue
             if let answer = activeSurvey?.bwAnswers[question.questionId] {
                 answersString = answer
             } else {
                 answersString = "NOT_PRESENTED"
             }
+            
+            // special cases for the various question types
             switch questionType {
             case .Checkbox, .RadioButton:
                 optionsString = self.arrayAnswer(question.selectionValues.map { $0.text })
@@ -296,11 +321,13 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                 optionsString = "Text-field input type = " + (question.textFieldType?.rawValue ?? "")
             case .InformationText:
                 answersString = ""
-                break
+                break // this is pointless, right?
             case .Slider:
                 if let minValue = question.minValue, let maxValue = question.maxValue {
                     optionsString = "min = " + String(minValue) + "; max = " + String(maxValue)
                 }
+            case .Date, .Time, .DateTime:
+                break
             }
         }
         return (typeString, optionsString, answersString)
@@ -314,12 +341,11 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         guard let stepOrder = activeSurvey.stepOrder, survey.questions.count > 0 else {
             return
         }
-
         guard activeSurvey.bwAnswers.count > 0 else {
-            print("No questions answered, not submitting.")
+            // print("No questions answered, not submitting.")
             return
         }
-
+        
         // set up data file
         let name = TrackingSurveyPresenter.surveyDataType + "_" + surveyId
         let dataFile = DataStorage(type: name, headers: TrackingSurveyPresenter.headers, patientId: patientId, publicKey: publicKey, moveOnClose: true, keyRef: DataStorageManager.sharedInstance.secKeyRef)
@@ -344,25 +370,10 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         }
         dataFile.reset() // clear out the file
     }
-
-    static func addTimingsEvent(_ surveyId: String, event: String) {
-        var timingsStore: DataStorage?
-        let timingsName: String = TrackingSurveyPresenter.timingDataType + "_" + surveyId
-
-        timingsStore = DataStorageManager.sharedInstance.createStore(timingsName, headers: TrackingSurveyPresenter.timingsHeaders)
-        timingsStore!.sanitize = true
-        var data: [String] = [String(Int64(Date().timeIntervalSince1970 * 1000))]
-        data.append("")
-        data.append("")
-        data.append("")
-        data.append("")
-        data.append("")
-        data.append(event)
-        // print("TimingsEvent: \(data.joined(separator: ","))")  // don't need to know
-        timingsStore?.store(data)
-    }
-
+    
+    // writes a timing event for the provided question (and value)
     func addTimingsEvent(_ event: String, question: GenericSurveyQuestion?, forcedValue: String? = nil) {
+        // get the current time, then set up the timings event using the question
         var data: [String] = [String(Int64(Date().timeIntervalSince1970 * 1000))]
         if let question = question {
             data.append(question.questionId)
@@ -372,7 +383,8 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
             data.append(optionsString)
             data.append(forcedValue != nil ? forcedValue! : answersString)
         } else {
-            data.append("")
+            // probably unreachable? populates empty values if the question isn't present.
+            data.append("") // pad commas
             data.append("")
             data.append("")
             data.append("")
@@ -383,19 +395,26 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         self.timingsStore?.store(data)
     }
 
+    // very simple pseudo json array
+    func arrayAnswer(_ array: [String]) -> String {
+        return "[" + array.joined(separator: ";") + "]"
+    }
+    
+    // very poorly named, records survey dismissal I think.
     func possiblyAddUnpresent() {
-        self.valueChangeHandler?.flush()
+        self.valueChangeHandler?.flush() // force the debouncer to fire
         self.valueChangeHandler = nil
         if let currentQuestion = currentQuestion {
+            // write a timings event that card has been dismissed?
             self.addTimingsEvent("unpresent", question: currentQuestion)
             self.currentQuestion = nil
         }
     }
 
     func closeSurvey() {
-        self.retainSelf = nil
-        StudyManager.sharedInstance.surveysUpdatedEvent.emit(0)
-        self.parent?.dismiss(animated: true, completion: nil)
+        self.retainSelf = nil // unknown
+        StudyManager.sharedInstance.surveysUpdatedEvent.emit(0) // also unknown
+        self.parent?.dismiss(animated: true, completion: nil) // dismiss the researchkit survey
     }
 
     func displaySurveyQuestion(_ identifier: String) -> Bool {

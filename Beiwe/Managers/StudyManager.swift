@@ -25,7 +25,7 @@ class StudyManager {
     // State tracking variables
     var sensorsStartedEver = false
     var isUploading = false
-    let surveysUpdatedEvent: Event<Int> = Event<Int>()
+    let surveysUpdatedEvent: Event<Int> = Event<Int>() // I don't know what this is. sometimes we emit events, like when closing a survey
     static var real_study_loaded = false
     
     var isStudyLoaded: Bool { // returns true if self.currentStudy is populated

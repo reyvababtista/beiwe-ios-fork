@@ -7,6 +7,9 @@ enum SurveyQuestionType: String {
     case RadioButton = "radio_button"
     case Checkbox = "checkbox"
     case FreeResponse = "free_response"
+    case Date = "date"
+    case Time = "time"
+    case DateTime = "date_time"
 }
 
 // all the entry field types for a survey
