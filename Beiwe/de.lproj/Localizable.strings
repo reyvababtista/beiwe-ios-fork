@@ -33,7 +33,7 @@
 
 /* Change password screen */
 "title_activity_reset_password" = "Passwort zurücksetzen:";
-"forgot_password_title" = "Wenden Sie sich bitte an Ihr Forschungsteam und teilen Sie ihnen Ihren Benutzernamen mit, damit sie Ihnen ein vorläufiges Passwort geben können.";
+"forgot_password_title" = "Wenden Sie sich bitte an die Studienunterstützung und teilen Sie ihnen Ihren Benutzernamen mit, damit sie Ihnen ein vorläufiges Passwort geben können.";
 "reset_password_current_password_caption" = "Passwort zurücksetzen:";
 "forgot_password_temporary_password_caption" = "vorläufiges Passwort:";
 "reset_password_new_password_caption" = "neues Passwort:";
@@ -66,12 +66,12 @@
 "change_password_button" = "Passwort ändern";
 "call_research_assistant_button" = "technische Unterstützung anrufen";
 "logout_button" = "Abmelden";
-"unregister_button" = "Studie verlassen";
+"unregister_button" = "Studienteilnahme beenden";
 "unregister_alert_title" = "Studienteilnahme beenden";
 "unregister_alert_text" = "Sind Sie sicher, dass Sie Ihre Teilnahme an der Studie beenden wollen?";
 
 /* Task list view controller */
-"pending_study_tasks_title" = "aktive Befragungen";
+"pending_study_tasks_title" = "neue Befragungen";
 "tracking_survey_title" = "efragung";
 "audio_survey_title" = "Audiobefragung";
 "received_abbreviation" = " Abgekürzt empfangen ";
