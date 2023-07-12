@@ -456,12 +456,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     /// sets the active survey on the main app page, force-enables any specified surveys.
     func setActiveSurveys(surveyIds: [String], sentTime: TimeInterval = 0) {
-        if let study = StudyManager.sharedInstance.currentStudy {
-            for surveyId in surveyIds {
-                if let survey = study.getSurvey(surveyId: surveyId) {
-                    let activeSurvey = ActiveSurvey(survey: survey)
+        guard let study = StudyManager.sharedInstance.currentStudy else {
+            return
+        }
+        // force reload all always-available surveys and any passed in surveys
+        for survey in study.surveys {
+            let surveyId = survey.surveyId!
+            let from_notification = surveyIds.contains(surveyId)
+            if from_notification || survey.alwaysAvailable {
+                let activeSurvey = ActiveSurvey(survey: survey)
+                // when we receive a notification we need to record that, this is used to sort surveys on the main screen (I think)
+                if from_notification {
                     activeSurvey.received = sentTime
                     if let surveyType = survey.surveyType {
+                        // I don't know what study.receivedAudioSurveys and study.receivedTrackingSurveys are
                         switch surveyType {
                         case .AudioSurvey:
                             study.receivedAudioSurveys = (study.receivedAudioSurveys) + 1
@@ -469,21 +477,27 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                             study.receivedTrackingSurveys = (study.receivedTrackingSurveys) + 1
                         }
                     }
-                    study.activeSurveys[surveyId] = activeSurvey
-                } else {
-                    print("Could not get survey")
-                    AppEventManager.sharedInstance.logAppEvent(event: "survey_download", msg: "Could not get obtain survey for ActiveSurvey")
                 }
+                study.activeSurveys[surveyId] = activeSurvey
             }
-            // Emits a surveyUpdated event to the listener
-            StudyManager.sharedInstance.surveysUpdatedEvent.emit(0)
-            Recline.shared.save(study).catch { (_: Error) in
-                print("Failed to save study after processing surveys")
-            }
-
-            // set badge number
-            UIApplication.shared.applicationIconBadgeNumber = study.activeSurveys.count
         }
+        
+        // if the survey id doesn't exist record a log statement
+        for surveyId in surveyIds {
+            if study.surveyExists(surveyId: surveyId) {
+                print("Could not get survey \(surveyId)")
+                AppEventManager.sharedInstance.logAppEvent(event: "survey_download", msg: "Could not get obtain survey for ActiveSurvey")
+            }
+        }
+        
+        // Emits a surveyUpdated event to the listener
+        StudyManager.sharedInstance.surveysUpdatedEvent.emit(0)
+        Recline.shared.save(study).catch { (_: Error) in
+            print("Failed to save study after processing surveys")
+        }
+
+        // set badge number
+        UIApplication.shared.applicationIconBadgeNumber = study.activeSurveys.count
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
