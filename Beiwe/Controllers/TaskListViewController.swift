@@ -20,7 +20,8 @@ class TaskListViewController: FormViewController {
         // Dispose of any resources that can be recreated.
     }
     
-    /// this is not explicitly called anywhere in the codebase
+    /// This is the code to populate the survey list on the main screen
+    // this is not explicitly called anywhere in the codebase
     func loadSurveys() -> Int {
         self.dateFormatter.dateFormat = "MMM d h:mm a"  // this doesn't appear to have another appropriate place to get set
         var cnt = 0

@@ -41,7 +41,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     // the current question (do display?)
     var currentQuestion: GenericSurveyQuestion?
     
-    // (Note: this executes at app load)
+    /// This executes at app load Twice (whyyy?) and on survey load
     init(surveyId: String, activeSurvey: ActiveSurvey, survey: Survey) {
         self.timingsName = TrackingSurveyPresenter.timingDataType + "_" + surveyId // any reason we are setting this up early?
         
@@ -189,6 +189,8 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
 
     /// function is called when the survey card is initially brought up.
     func present(_ parent: UIViewController) {
+        self.parent = parent
+        
         // restore data for the active survey or start a new one.
         if let activeSurvey = activeSurvey, let restorationData = activeSurvey.rkAnswers {
             self.surveyViewController = BWORKTaskViewController(
@@ -198,8 +200,6 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
             self.surveyViewController = BWORKTaskViewController(task: self.task, taskRun: nil)
             self.surveyViewController!.delegate = self
         }
-        
-        self.parent = parent
                 
         self.retainSelf = self
         self.surveyViewController!.displayDiscard = false
@@ -321,7 +321,6 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                 optionsString = "Text-field input type = " + (question.textFieldType?.rawValue ?? "")
             case .InformationText:
                 answersString = ""
-                break // this is pointless, right?
             case .Slider:
                 if let minValue = question.minValue, let maxValue = question.maxValue {
                     optionsString = "min = " + String(minValue) + "; max = " + String(maxValue)
@@ -415,13 +414,6 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         self.retainSelf = nil // unknown
         StudyManager.sharedInstance.surveysUpdatedEvent.emit(0) // also unknown
         self.parent?.dismiss(animated: true, completion: nil) // dismiss the researchkit survey
-    }
-
-    func displaySurveyQuestion(_ identifier: String) -> Bool {
-        guard let question = questionIdToQuestion[identifier], let survey = survey, let displayIf = question.displayIf else {
-            return true
-        }
-        return false
     }
 
     ////////////////////////////////////////////////////////////////////////// ORK Delegates ////////////////////////////////////////////////////////////////////////////////
