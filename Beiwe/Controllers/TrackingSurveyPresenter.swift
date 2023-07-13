@@ -234,65 +234,81 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         var answersString = ""
 
         if let questionType = question.questionType {
+            // and now some mess
             switch questionType {
-            // this one is ... messy...
             case .Checkbox, .RadioButton:
                 // if there are results...
-                if let results = stepResult.results {
-                    if let choiceResults = results as? [ORKChoiceQuestionResult] { // cast to ORKChoiceQuestionResult,
-                        if choiceResults.count > 0 { // if there are results...
-                            if let choiceAnswers = choiceResults[0].choiceAnswers {
-                                var arr: [String] = []
-                                for choice_answer in choiceAnswers { // for each result get the answers...
-                                    // the choices are numbered, cast
-                                    if let num: NSNumber = choice_answer as? NSNumber {
-                                        let numValue: Int = num.intValue
-                                        if numValue >= 0 && numValue < question.selectionValues.count {
-                                            arr.append(question.selectionValues[numValue].text)
-                                        } else {
-                                            arr.append("")
-                                        }
-                                    } else { // don't know what this case covers
-                                        arr.append("")
-                                    }
-                                }
-                                // then populate the answers as a string, for radio and checkbox
-                                if questionType == .Checkbox {
-                                    answersString = self.arrayAnswer(arr)
+                if let choiceResults = stepResult.results as? [ORKChoiceQuestionResult], choiceResults.count > 0 { // if there are results...
+                    if let choiceAnswers = choiceResults[0].choiceAnswers {
+                        var arr: [String] = []
+                        for choice_answer in choiceAnswers { // for each result get the answers...
+                            // the choices are numbered, cast
+                            if let num: NSNumber = choice_answer as? NSNumber { // I don't know why the type is NSNumber
+                                let numValue: Int = num.intValue
+                                if numValue >= 0 && numValue < question.selectionValues.count {
+                                    arr.append(question.selectionValues[numValue].text)
                                 } else {
-                                    answersString = arr.count > 0 ? arr[0] : ""
+                                    arr.append("")
                                 }
+                            } else { // if there was no number selected we need an empty string
+                                arr.append("")
                             }
+                        }
+                        // then populate the answers as a string for radio and checkbox
+                        if questionType == .Checkbox {
+                            answersString = self.arrayAnswer(arr) //
+                        } else {
+                            answersString = arr.count > 0 ? arr[0] : "" // radio buttons have only one answer
                         }
                     }
                 }
-                
-            case .FreeResponse, .Date, .Time, .DateTime:
-                if let results = stepResult.results {
-                    if let freeResponses = results as? [ORKQuestionResult] {
-                        if freeResponses.count > 0 {
-                            if let answer = freeResponses[0].answer {
-                                answersString = String(describing: answer)
-                            }
-                        }
+            case .FreeResponse:
+                if let freeResponses = stepResult.results as? [ORKQuestionResult], freeResponses.count > 0 {
+                    if let answer = freeResponses[0].answer {
+                        answersString = String(describing: answer)
                     }
                 }
-                
             case .InformationText:
                 break // ah you need an executable line in a switch-case
                 
             case .Slider:
-                if let results = stepResult.results {
-                    if let sliderResults = results as? [ORKScaleQuestionResult] {
-                        if sliderResults.count > 0 {
-                            if let answer = sliderResults[0].scaleAnswer {
-                                answersString = String(describing: answer)
-                            }
-                        }
+                if let sliderResults = stepResult.results as? [ORKScaleQuestionResult], sliderResults.count > 0 {
+                    if let answer = sliderResults[0].scaleAnswer {
+                        answersString = String(describing: answer)
+                    }
+                }
+            case .Date:
+                if let dateResponses = stepResult.results as? [ORKQuestionResult], dateResponses.count > 0 {
+                    if let answer = dateResponses[0].answer as? Date {
+                        let formatter = DateFormatter()
+                        formatter.locale = Locale(identifier: "en_US_POSIX")
+                        formatter.dateFormat = "yyyy-MM-dd"
+                        answersString = formatter.string(from: answer)
+                    }
+                }
+            case .Time:
+                if let timeResponses = stepResult.results as? [ORKQuestionResult], timeResponses.count > 0 {
+                    if let answer = timeResponses[0].answer as? NSDateComponents {
+                        var minute = ""
+                        var hour = ""
+                        if answer.minute < 10 { minute = "0\(answer.minute)" } else { minute = "\(answer.minute)" }
+                        if answer.hour < 10 { hour = "0\(answer.hour)" } else { hour = "\(answer.hour)"}
+                        answersString = "\(hour):\(minute)"
+                    }
+                }
+            case .DateTime:
+                if let datetimeResponses = stepResult.results as? [ORKQuestionResult], datetimeResponses.count > 0 {
+                    if let answer = datetimeResponses[0].answer as? Date {
+                        let formatter = DateFormatter()
+                        formatter.locale = Locale(identifier: "en_US_POSIX")
+                        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+                        answersString = formatter.string(from: answer)
                     }
                 }
             }
         }
+        
+        // no answer case
         if answersString == "" || answersString == "[]" {
             answersString = "NO_ANSWER_SELECTED"
         }
@@ -304,30 +320,32 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         var optionsString = ""
         var answersString = ""
 
-        if let questionType = question.questionType {
-            // get the answers and the question type
-            typeString = questionType.rawValue
-            if let answer = activeSurvey?.bwAnswers[question.questionId] {
-                answersString = answer
-            } else {
-                answersString = "NOT_PRESENTED"
+        // get the answers and the question type
+        guard let questionType = question.questionType else {
+            return (typeString, optionsString, answersString)
+        }
+        
+        typeString = questionType.rawValue
+        if let answer: String = activeSurvey?.bwAnswers[question.questionId] {
+            answersString = answer
+        } else {
+            answersString = "NOT_PRESENTED"
+        }
+        
+        // special cases for the various question types
+        switch questionType {
+        case .Checkbox, .RadioButton:
+            optionsString = self.arrayAnswer(question.selectionValues.map { $0.text })
+        case .FreeResponse:
+            optionsString = "Text-field input type = " + (question.textFieldType?.rawValue ?? "")
+        case .InformationText:
+            answersString = ""
+        case .Slider:
+            if let minValue = question.minValue, let maxValue = question.maxValue {
+                optionsString = "min = " + String(minValue) + "; max = " + String(maxValue)
             }
-            
-            // special cases for the various question types
-            switch questionType {
-            case .Checkbox, .RadioButton:
-                optionsString = self.arrayAnswer(question.selectionValues.map { $0.text })
-            case .FreeResponse:
-                optionsString = "Text-field input type = " + (question.textFieldType?.rawValue ?? "")
-            case .InformationText:
-                answersString = ""
-            case .Slider:
-                if let minValue = question.minValue, let maxValue = question.maxValue {
-                    optionsString = "min = " + String(minValue) + "; max = " + String(maxValue)
-                }
-            case .Date, .Time, .DateTime:
-                break
-            }
+        case .Date, .Time, .DateTime:
+            break // fully formatted in storeAnswer
         }
         return (typeString, optionsString, answersString)
     }
@@ -358,8 +376,8 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         
         // store the questions line by line
         for i in 0 ..< numQuestions {
-            let question = survey.questions[stepOrder[i]]
-            var data = [question.questionId]
+            let question: GenericSurveyQuestion = survey.questions[stepOrder[i]]
+            var data: [String] = [question.questionId]
             let (questionType, optionsString, answersString) = self.questionResponse(question)
             data.append(questionType)
             data.append(question.prompt ?? "")
@@ -393,11 +411,6 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         // print("TimingsEvent: \(data.joined(separator: ","))")  // we don't need to see every timings event
         self.timingsStore?.store(data)
     }
-
-    // very simple pseudo json array
-    func arrayAnswer(_ array: [String]) -> String {
-        return "[" + array.joined(separator: ";") + "]"
-    }
     
     // very poorly named, records survey dismissal I think.
     func possiblyAddUnpresent() {
@@ -409,14 +422,19 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
             self.currentQuestion = nil
         }
     }
-
+    
     func closeSurvey() {
         self.retainSelf = nil // unknown
         StudyManager.sharedInstance.surveysUpdatedEvent.emit(0) // also unknown
         self.parent?.dismiss(animated: true, completion: nil) // dismiss the researchkit survey
     }
-
-    ////////////////////////////////////////////////////////////////////////// ORK Delegates ////////////////////////////////////////////////////////////////////////////////
+    
+    // very simple pseudo json array
+    func arrayAnswer(_ array: [String]) -> String {
+        return "[" + array.joined(separator: ";") + "]"
+    }
+    
+    /////////////////////////////////////////////////////////////// ORK Delegates ///////////////////////////////////////////////////////////////////
     
     // called when the card is dismissed (including cancel button - end task menu item)
     // called when survey done button is pressed
@@ -548,11 +566,9 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                         delay = 0.25
                     }
                     self.valueChangeHandler = Debouncer<String>(delay: delay) { [weak self] (val: String?) in
-                        if let strongSelf = self {
-                            if currentValue != val {
-                                currentValue = val
-                                strongSelf.addTimingsEvent("changed", question: question, forcedValue: val)
-                            }
+                        if let strongSelf = self, currentValue != val {
+                            currentValue = val
+                            strongSelf.addTimingsEvent("changed", question: question, forcedValue: val)
                         }
                     }
                 }

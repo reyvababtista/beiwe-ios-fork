@@ -18,7 +18,7 @@ class ActiveSurvey: Mappable {
     
     // the data!
     var rkAnswers: Data?  // answers for researchkit
-    var bwAnswers: [String: String] = [:] // recorded answers (I hope)
+    var bwAnswers: [String: String] = [:] // recorded answers
     
     init(survey: Survey) {
         self.survey = survey
