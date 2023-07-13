@@ -459,6 +459,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         guard let study = StudyManager.sharedInstance.currentStudy else {
             return
         }
+        
         // force reload all always-available surveys and any passed in surveys
         for survey in study.surveys {
             let surveyId = survey.surveyId!
@@ -484,7 +485,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         
         // if the survey id doesn't exist record a log statement
         for surveyId in surveyIds {
-            if study.surveyExists(surveyId: surveyId) {
+            if !study.surveyExists(surveyId: surveyId) {
                 print("Could not get survey \(surveyId)")
                 AppEventManager.sharedInstance.logAppEvent(event: "survey_download", msg: "Could not get obtain survey for ActiveSurvey")
             }
