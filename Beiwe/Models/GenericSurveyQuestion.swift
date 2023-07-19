@@ -29,7 +29,8 @@ struct GenericSurveyQuestion: Mappable {
     var selectionValues: [OneSelection] = []
     var textFieldType: TextFieldType?
     var displayIf: [String: AnyObject]?
-
+    var required = false
+    
     init?(map: Map) {}
 
     // Mappable
@@ -43,5 +44,6 @@ struct GenericSurveyQuestion: Mappable {
         self.textFieldType <- map["text_field_type"]
         self.selectionValues <- map["answers"]
         self.displayIf <- map["display_if"]
+        self.required <- map["required"] // well that's interesting, when a key is missing it Doesn't Crash AND the default value is respected
     }
 }

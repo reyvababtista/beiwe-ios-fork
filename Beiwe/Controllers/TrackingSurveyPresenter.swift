@@ -5,13 +5,15 @@ import ResearchKit
 // example json
 // let contentJson = "{\"content\":[{\"answers\":[{\"text\":\"Never\"},{\"text\":\"Rarely\"},{\"text\":\"Occasionally\"},{\"text\":\"Frequently\"},{\"text\":\"Almost Constantly\"}],\"question_id\":\"6695d6c4-916b-4225-8688-89b6089a24d1\",\"question_text\":\"In the last 7 days, how OFTEN did you EAT BROCCOLI?\",\"question_type\":\"radio_button\"},{\"answers\":[{\"text\":\"None\"},{\"text\":\"Mild\"},{\"text\":\"Moderate\"},{\"text\":\"Severe\"},{\"text\":\"Very Severe\"}],\"display_if\":{\">\":[\"6695d6c4-916b-4225-8688-89b6089a24d1\",0]},\"question_id\":\"41d54793-dc4d-48d9-f370-4329a7bc6960\",\"question_text\":\"In the last 7 days, what was the SEVERITY of your CRAVING FOR BROCCOLI?\",\"question_type\":\"radio_button\"},{\"answers\":[{\"text\":\"Not at all\"},{\"text\":\"A little bit\"},{\"text\":\"Somewhat\"},{\"text\":\"Quite a bit\"},{\"text\":\"Very much\"}],\"display_if\":{\"and\":[{\">\":[\"6695d6c4-916b-4225-8688-89b6089a24d1\",0]},{\">\":[\"41d54793-dc4d-48d9-f370-4329a7bc6960\",0]}]},\"question_id\":\"5cfa06ad-d907-4ba7-a66a-d68ea3c89fba\",\"question_text\":\"In the last 7 days, how much did your CRAVING FOR BROCCOLI INTERFERE with your usual or daily activities, (e.g. eating cauliflower)?\",\"question_type\":\"radio_button\"},{\"display_if\":{\"or\":[{\"and\":[{\"<=\":[\"6695d6c4-916b-4225-8688-89b6089a24d1\",3]},{\"==\":[\"41d54793-dc4d-48d9-f370-4329a7bc6960\",2]},{\"<\":[\"5cfa06ad-d907-4ba7-a66a-d68ea3c89fba\",3]}]},{\"and\":[{\"<=\":[\"6695d6c4-916b-4225-8688-89b6089a24d1\",3]},{\"<\":[\"41d54793-dc4d-48d9-f370-4329a7bc6960\",3]},{\"==\":[\"5cfa06ad-d907-4ba7-a66a-d68ea3c89fba\",2]}]},{\"and\":[{\"==\":[\"6695d6c4-916b-4225-8688-89b6089a24d1\",4]},{\"<=\":[\"41d54793-dc4d-48d9-f370-4329a7bc6960\",1]},{\"<=\":[\"5cfa06ad-d907-4ba7-a66a-d68ea3c89fba\",1]}]}]},\"question_id\":\"9d7f737d-ef55-4231-e901-b3b68ca74190\",\"question_text\":\"While broccoli is a nutritious and healthful food, it's important to recognize that craving too much broccoli can have adverse consequences on your health.  If in a single day you find yourself eating broccoli steamed, stir-fried, and raw with a 'vegetable dip', you may be a broccoli addict.\\u000a\\u000aThis is an additional paragraph (following a double newline) warning you about the dangers of broccoli consumption.\",\"question_type\":\"info_text_box\"},{\"display_if\":{\"or\":[{\"and\":[{\"==\":[\"6695d6c4-916b-4225-8688-89b6089a24d1\",4]},{\"or\":[{\">=\":[\"41d54793-dc4d-48d9-f370-4329a7bc6960\",2]},{\">=\":[\"5cfa06ad-d907-4ba7-a66a-d68ea3c89fba\",2]}]}]},{\"or\":[{\">=\":[\"41d54793-dc4d-48d9-f370-4329a7bc6960\",3]},{\">=\":[\"5cfa06ad-d907-4ba7-a66a-d68ea3c89fba\",3]}]}]},\"question_id\":\"59f05c45-df67-40ed-a299-8796118ad173\",\"question_text\":\"OK, it sounds like your broccoli habit is getting out of hand.  Please call your clinician immediately.\",\"question_type\":\"info_text_box\"},{\"question_id\":\"9745551b-a0f8-4eec-9205-9e0154637513\",\"question_text\":\"How many pounds of broccoli per day could a woodchuck chuck if a woodchuck could chuck broccoli?\",\"question_type\":\"free_response\",\"text_field_type\":\"NUMERIC\"},{\"display_if\":{\"<\":[\"9745551b-a0f8-4eec-9205-9e0154637513\",10]},\"question_id\":\"cedef218-e1ec-46d3-d8be-e30cb0b2d3aa\",\"question_text\":\"That seems a little low.\",\"question_type\":\"info_text_box\"},{\"display_if\":{\"==\":[\"9745551b-a0f8-4eec-9205-9e0154637513\",10]},\"question_id\":\"64a2a19b-c3d0-4d6e-9c0d-06089fd00424\",\"question_text\":\"That sounds about right.\",\"question_type\":\"info_text_box\"},{\"display_if\":{\">\":[\"9745551b-a0f8-4eec-9205-9e0154637513\",10]},\"question_id\":\"166d74ea-af32-487c-96d6-da8d63cfd368\",\"question_text\":\"What?! No way- that's way too high!\",\"question_type\":\"info_text_box\"},{\"max\":\"5\",\"min\":\"1\",\"question_id\":\"059e2f4a-562a-498e-d5f3-f59a2b2a5a5b\",\"question_text\":\"On a scale of 1 (awful) to 5 (delicious) stars, how would you rate your dinner at Chez Broccoli Restaurant?\",\"question_type\":\"slider\"},{\"display_if\":{\">=\":[\"059e2f4a-562a-498e-d5f3-f59a2b2a5a5b\",4]},\"question_id\":\"6dd9b20b-9dfc-4ec9-cd29-1b82b330b463\",\"question_text\":\"Wow, you are a true broccoli fan.\",\"question_type\":\"info_text_box\"},{\"question_id\":\"ec0173c9-ac8d-449d-d11d-1d8e596b4ec9\",\"question_text\":\"THE END. This survey is over.\",\"question_type\":\"info_text_box\"}],\"settings\":{\"number_of_random_questions\":null,\"randomize\":false,\"randomize_with_memory\":false,\"trigger_on_first_download\":false},\"survey_type\":\"tracking_survey\",\"timings\":[[],[67500],[],[],[],[],[]]}"
 
+let NO_ANSWER_SELECTED = "NO_ANSWER_SELECTED"
+
 class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     // generates 2 csv files, the survey answers, and the survey timings. Answers is obvious, timings is human interaction with the buttons of the app.
     static let headers = ["question id", "question type", "question text", "question answer options", "answer"]
     static let timingsHeaders = ["timestamp", "question id", "question type", "question text", "question answer options", "answer", "event"]
     static let surveyDataType = "surveyAnswers"
     static let timingDataType = "surveyTimings"
-
+    
     // no clue
     var retainSelf: AnyObject?
     
@@ -32,7 +34,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     var lastQuestion: [String: Bool] = [:] // I think this is the final question to be displayed, used to go to done-with-survey card. (poorly named, ambiguous with previous or prior question)
     /// uh what are these 2?
     var task: ORKTask? // well its the researchkit task...
-    var valueChangeHandler: Debouncer<String>? // its a user input slow-downer, only functionally necessary for slider questions.
+    var valueChangeHandler: Debouncer<String>? // its a user input slow-downer, only functionally necessary for slider questions afaik.
     
     // survey timings information
     let timingsName: String
@@ -40,6 +42,10 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     
     // the current question (do display?)
     var currentQuestion: GenericSurveyQuestion?
+    
+    // we need to stash continue buttons when set to nil on required questions.
+    var the_continue_button: UIBarButtonItem?
+    var the_internal_continue_button: UIBarButtonItem?
     
     /// This executes at app load Twice (whyyy?) and on survey load
     init(surveyId: String, activeSurvey: ActiveSurvey, survey: Survey) {
@@ -200,30 +206,10 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
             self.surveyViewController = BWORKTaskViewController(task: self.task, taskRun: nil)
             self.surveyViewController!.delegate = self
         }
-                
-        self.retainSelf = self
+        
+        self.retainSelf = self // so I guess this is a strong reference to itself?
         self.surveyViewController!.displayDiscard = false
         parent.present(self.surveyViewController!, animated: true, completion: nil)
-        
-        /// It was not clear where the logic to modify interface stuff even is, here's some hopefully-useful-to-future-us info
-        // surveyViewController - BWORKTaskViewController
-        // surveyViewController?.navigationController? - nil
-        // parent.navigationController - exists, UINavigationController
-        // parent.navigationController?.toolbar - exists, UIToolbar
-        // parent.navigationController?.toolbarItems - nil
-        // parent.navigationController?.topViewController - Beiwe2.MainViewController
-        // parent.navigationController?.visibleViewController - Beiwe2.MainViewController
-        // parent.navigationController?.isNavigationBarHidden - false
-        // parent.navigationController?.isToolbarHidden - true
-        // parent.navigationController?.topViewController?.popoverPresentationController - nil
-        // parent.navigationController?.topViewController?.presentedViewController - nil
-        // parent.navigationController?.topViewController?.navigationController - reference to same object as parent.navigationController
-        // parent.navigationController?.topViewController?.modalPresentationStyle - UIModalPresentationStyle
-        
-        /// And then these are changes that didn't do anything even though they look like they might
-        // self.surveyViewController?.showsProgressInNavigationBar = false // don't do anything
-        // parent.navigationController?.navigationBar.barStyle = UIBarStyle.blackOpaque  // doesn't do anything
-        // parent.navigationController?.topViewController?.modalPresentationStyle = UIModalPresentationStyle.pageSheet // doesn't do anything
     }
 
     // almost unreadable function that handles unpacking answers and saving them to a file
@@ -238,36 +224,38 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
             switch questionType {
             case .Checkbox, .RadioButton:
                 // if there are results...
-                if let choiceResults = stepResult.results as? [ORKChoiceQuestionResult], choiceResults.count > 0 { // if there are results...
-                    if let choiceAnswers = choiceResults[0].choiceAnswers {
-                        var arr: [String] = []
-                        for choice_answer in choiceAnswers { // for each result get the answers...
-                            // the choices are numbered, cast
-                            if let num: NSNumber = choice_answer as? NSNumber { // I don't know why the type is NSNumber
-                                let numValue: Int = num.intValue
-                                if numValue >= 0 && numValue < question.selectionValues.count {
-                                    arr.append(question.selectionValues[numValue].text)
-                                } else {
-                                    arr.append("")
-                                }
-                            } else { // if there was no number selected we need an empty string
+                if let choiceResults = stepResult.results as? [ORKChoiceQuestionResult], choiceResults.count > 0, let choiceAnswers = choiceResults[0].choiceAnswers {
+                    var arr: [String] = []
+                    
+                    for choice_answer in choiceAnswers {
+                        // the choices are numbered, need to cast cast (why is it an NSNumber?)
+                        if let num: NSNumber = choice_answer as? NSNumber {
+                            let numValue: Int = num.intValue
+                            if numValue >= 0 && numValue < question.selectionValues.count {
+                                arr.append(question.selectionValues[numValue].text) // index access safety?
+                            } else {
                                 arr.append("")
                             }
-                        }
-                        // then populate the answers as a string for radio and checkbox
-                        if questionType == .Checkbox {
-                            answersString = self.arrayAnswer(arr) //
-                        } else {
-                            answersString = arr.count > 0 ? arr[0] : "" // radio buttons have only one answer
+                        } else { // if there was no number selected we need an empty string
+                            arr.append("")
                         }
                     }
+                    
+                    // then populate the answers as a string for radio and checkbox
+                    if questionType == .Checkbox {
+                        answersString = self.arrayAnswer(arr)
+                    } else {
+                        answersString = arr.count > 0 ? arr[0] : "" // radio buttons have only one answer
+                    }
                 }
+                
             case .FreeResponse:
                 if let freeResponses = stepResult.results as? [ORKQuestionResult], freeResponses.count > 0 {
                     if let answer = freeResponses[0].answer {
                         answersString = String(describing: answer)
                     }
                 }
+                
             case .InformationText:
                 break // ah you need an executable line in a switch-case
                 
@@ -292,7 +280,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                         var minute = ""
                         var hour = ""
                         if answer.minute < 10 { minute = "0\(answer.minute)" } else { minute = "\(answer.minute)" }
-                        if answer.hour < 10 { hour = "0\(answer.hour)" } else { hour = "\(answer.hour)"}
+                        if answer.hour < 10 { hour = "0\(answer.hour)" } else { hour = "\(answer.hour)" }
                         answersString = "\(hour):\(minute)"
                     }
                 }
@@ -310,11 +298,13 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         
         // no answer case
         if answersString == "" || answersString == "[]" {
-            answersString = "NO_ANSWER_SELECTED"
+            answersString = NO_ANSWER_SELECTED
         }
         self.activeSurvey?.bwAnswers[identifier] = answersString
     }
 
+    // extracts the answer out of a question object, returns a tuple of objects required for use in writing to a csv
+    // the question type, the options for multiple choice questions, and the contents of the answer in string form.
     func questionResponse(_ question: GenericSurveyQuestion) -> (String, String, String) {
         var typeString = ""
         var optionsString = ""
@@ -332,7 +322,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
             answersString = "NOT_PRESENTED"
         }
         
-        // special cases for the various question types
+        // special cases for the various question types - these can all go into store answer?
         switch questionType {
         case .Checkbox, .RadioButton:
             optionsString = self.arrayAnswer(question.selectionValues.map { $0.text })
@@ -424,7 +414,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     }
     
     func closeSurvey() {
-        self.retainSelf = nil // unknown
+        self.retainSelf = nil // clear the reference to self...
         StudyManager.sharedInstance.surveysUpdatedEvent.emit(0) // also unknown
         self.parent?.dismiss(animated: true, completion: nil) // dismiss the researchkit survey
     }
@@ -436,10 +426,47 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     
     /////////////////////////////////////////////////////////////// ORK Delegates ///////////////////////////////////////////////////////////////////
     
+    // function that sets up necessary state for implementing required questions
+    func handleRequiredQuestion(_ stepViewController: ORKStepViewController, _ identifier: String) {
+        // the isEnabled and isHidden properties for the continue and skip buttons are both os version blocked
+        // (16 and 15, respectively) .... and isenabled doesn't do anything?
+        if identifier != "finished", let question = questionIdToQuestion[identifier] {
+            // InformationText questions cannot be required and do not have skip buttons.
+            if question.required && question.questionType != SurveyQuestionType.InformationText {
+                // If you don't remove both internal and regular buttons then they will suddenly reappear
+                // after the participant interacts with the question answers. (Same for the continue button.)
+                stepViewController.skipButtonItem = nil
+                stepViewController.internalSkipButtonItem = nil
+
+                // stash the continue buttons - these are always present together - these are different objects per-question
+                if let a_continue_button = stepViewController.continueButtonItem {
+                    self.the_continue_button = a_continue_button
+                }
+                if let an_internal_continue_button = stepViewController.internalContinueButtonItem {
+                    self.the_internal_continue_button = an_internal_continue_button
+                }
+                    
+                // Determiine whether there is an answer to the current questiion.
+                // (Testing for the empty string should be pointless due to behaviior in storeAnswer())
+                if let some_answer = self.activeSurvey?.bwAnswers[identifier], some_answer != "", some_answer != NO_ANSWER_SELECTED {
+                    stepViewController.continueButtonItem = self.the_continue_button
+                    stepViewController.internalContinueButtonItem = self.the_internal_continue_button
+                } else {
+                    stepViewController.continueButtonItem = nil
+                    stepViewController.internalContinueButtonItem = nil
+                }
+            }
+        }
+    }
+    
     // called when the card is dismissed (including cancel button - end task menu item)
     // called when survey done button is pressed
     func taskViewController(_ taskViewController: ORKTaskViewController, didFinishWith reason: ORKTaskViewControllerFinishReason, error: Error?) {
         // print("\ntaskViewController 1 \(taskViewController.currentStepViewController?.step?.identifier)\n")
+        if let identifier = taskViewController.currentStepViewController?.step?.identifier {
+            self.handleRequiredQuestion(taskViewController.currentStepViewController!, identifier)
+        }
+        
         self.possiblyAddUnpresent()
         if !self.isComplete {
             self.activeSurvey?.rkAnswers = taskViewController.restorationData
@@ -453,11 +480,9 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         }
         self.closeSurvey()
     }
-
-    // called when done button is pressed
-    // called when back button is pressed
-    // called when next button is pressed
-    // called when input occurs
+    
+    // called when done, back, or next button is pressed
+    // called when input occurs - but
     // NOT called when skip is pressed
     func taskViewController(_ taskViewController: ORKTaskViewController, didChange result: ORKTaskResult) {
         // print("\ntaskViewController 2 \(taskViewController.currentStepViewController?.step?.identifier)\n")
@@ -466,6 +491,8 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
             self.storeAnswer(identifier, result: result)
             let currentValue = self.activeSurvey!.bwAnswers[identifier]
             self.valueChangeHandler?.call(currentValue)
+            // needs to be called after the question answer has been updated
+            self.handleRequiredQuestion(taskViewController.currentStepViewController!, identifier)
         }
     }
     
@@ -473,17 +500,11 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     // called when back button is pressed
     func taskViewController(_ taskViewController: ORKTaskViewController, shouldPresent step: ORKStep) -> Bool {
         // print("\ntaskViewController 3 \(taskViewController.currentStepViewController?.step?.identifier)\n")
+        if let identifier = taskViewController.currentStepViewController?.step?.identifier {
+            self.handleRequiredQuestion(taskViewController.currentStepViewController!, identifier)
+        }
         self.possiblyAddUnpresent()
         return true
-    }
-    
-    // never called? I guess this is junk. 🙄
-    func taskViewController(_ taskViewController: ORKTaskViewController, learnMoreForStep stepViewController: ORKStepViewController) {
-        // print("\ntaskViewController 4 \(taskViewController.currentStepViewController?.step?.identifier)\n")
-        // Present modal...
-        let refreshAlert = UIAlertController(title: "Learning more!", message: "You're smart now", preferredStyle: UIAlertController.Style.alert)
-        refreshAlert.addAction(UIAlertAction(title: "Ok", style: .default, handler: { (_: UIAlertAction!) in }))
-        taskViewController.present(refreshAlert, animated: true, completion: nil)
     }
     
     // (called when any survey card is displayed)
@@ -492,9 +513,10 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     // called when survey is initially opened, once with nil and once with a question id (possibly differs if you don't have an informational text box question)
     func taskViewController(_ taskViewController: ORKTaskViewController, hasLearnMoreFor step: ORKStep) -> Bool {
         // print("\ntaskViewController 5 \(taskViewController.currentStepViewController?.step?.identifier)\n")
-        switch step.identifier {
-        default: return false
+        if let identifier = taskViewController.currentStepViewController?.step?.identifier {
+            self.handleRequiredQuestion(taskViewController.currentStepViewController!, identifier)
         }
+        return false
     }
 
     // (called when any survey card is displayed - twice. 🙃)
@@ -502,6 +524,9 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     // called when next/skip button is pressed, once with the 'current' question, BUT TWICE with the next question
     func taskViewController(_ taskViewController: ORKTaskViewController, viewControllerFor step: ORKStep) -> ORKStepViewController? {
         // print("\ntaskViewController 6 \(taskViewController.currentStepViewController?.step?.identifier)\n")
+        if let identifier = taskViewController.currentStepViewController?.step?.identifier {
+            self.handleRequiredQuestion(taskViewController.currentStepViewController!, identifier)
+        }
         return nil
     }
     
@@ -511,6 +536,9 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     // called when you hit the cancel button
     func taskViewControllerSupportsSaveAndRestore(_ taskViewController: ORKTaskViewController) -> Bool {
         // print("\ntaskViewController 7 \(taskViewController.currentStepViewController?.step?.identifier)\n")
+        if let identifier = taskViewController.currentStepViewController?.step?.identifier {
+            self.handleRequiredQuestion(taskViewController.currentStepViewController!, identifier)
+        }
         return false
     }
 
@@ -520,24 +548,25 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     func taskViewController(_ taskViewController: ORKTaskViewController, stepViewControllerWillAppear stepViewController: ORKStepViewController) {
         // print("\ntaskViewController 8 \(taskViewController.currentStepViewController?.step?.identifier)\n")
         
-        // stepViewController.navigationController // exists UINavigationController
-        // stepViewController.navigationController?.navigationBar // exists, UINavigationBar
-        
         // set up the card's UI properties
         // stepViewController.navigationController?.navigationBar.barStyle = UIBarStyle.black  // pretty confident this does nothing
         stepViewController.navigationController?.presentTransparentNavigationBar() // fixes the invisible cancel and back buttons background color
         // stepViewController.navigationController?.hideTransparentNavigationBar()  // makes the buttons actually go away (not desireable)
         // stepViewController.navigationController?.navigationBar.titleTextAttributes = [NSAttributedString.Key.foregroundColor: UIColor.black] // sets the title text ("1 of 6") color - undesireable, we want the dark-mode-aware version
         // stepViewController.view.backgroundColor = UIColor.clear // makes the entire thing transparent - obviously wrong
-
+        // stepViewController.navigationController // exists UINavigationController
+        // stepViewController.navigationController?.navigationBar // exists, UINavigationBar
+        
         // set up start screen
         self.currentQuestion = nil
         if stepViewController.continueButtonTitle == NSLocalizedString("get_started", comment: "") {
             stepViewController.continueButtonTitle = NSLocalizedString("continue_button_title", comment: "")
         }
-
-        // get the step (the question), get its id
-        if let identifier = stepViewController.step?.identifier {
+        
+        if let identifier = stepViewController.step?.identifier { // question identifier is all we need
+            // run the required questions logic first
+            self.handleRequiredQuestion(stepViewController, identifier)
+            
             switch identifier {
             case "finished":
                 // executed when the card with the finished survey button is _loaded_ - not when the done button is pressed
@@ -550,6 +579,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                 _ = StudyManager.sharedInstance.updateActiveSurveys(true)
                 stepViewController.cancelButtonItem = nil
                 // stepViewController.backButtonItem = nil // this doesn't do anything
+            
             default:
                 // load the question
                 if let question = questionIdToQuestion[identifier] {
@@ -557,6 +587,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                     if self.activeSurvey?.bwAnswers[identifier] == nil {
                         self.activeSurvey?.bwAnswers[identifier] = ""
                     }
+                    
                     var currentValue = self.activeSurvey!.bwAnswers[identifier]
                     self.addTimingsEvent("present", question: question)
                     var delay = 0.0
@@ -572,14 +603,17 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                         }
                     }
                 }
+                
                 if self.lastQuestion[identifier] ?? false {
                     stepViewController.continueButtonTitle = NSLocalizedString("submit_survey_title", comment: "")
                 }
             }
         }
     }
-
+    
     deinit {
         _ = DataStorageManager.sharedInstance.closeStore(timingsName)
+        self.the_continue_button = nil
+        self.the_internal_continue_button = nil
     }
 }
