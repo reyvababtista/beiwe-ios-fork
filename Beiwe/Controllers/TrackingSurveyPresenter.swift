@@ -333,6 +333,12 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         case .Slider:
             if let minValue = question.minValue, let maxValue = question.maxValue {
                 optionsString = "min = " + String(minValue) + "; max = " + String(maxValue)
+                // this first comparison here expects the answer value from storeAnswer for slider questiions,
+                // but it looks like it doesn't work? The second appears to be the functional logic.
+                // If you ever work out why comparison 1 is wrong please document it or correct it.
+                if Int(answersString) == (minValue - 1) || Int(answersString) == nil {
+                    answersString = "NO_ANSWER_SELECTED"
+                }
             }
         case .Date, .Time, .DateTime:
             break // fully formatted in storeAnswer
