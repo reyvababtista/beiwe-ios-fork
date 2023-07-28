@@ -439,6 +439,12 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         if identifier != "finished", let question = questionIdToQuestion[identifier] {
             // InformationText questions cannot be required and do not have skip buttons.
             if question.required && question.questionType != SurveyQuestionType.InformationText {
+                // TODO: fix this bug, maybe it is specific to
+                // setting the step as optional Doesn't work reliably. At least for the first question, if it is a radio button question,
+                // the next button will be clickable all subsequent times after the first time it is answered. (this is at least true for
+                // always available surveys)
+                // stepViewController.step?.isOptional = false
+                
                 // If you don't remove both internal and regular buttons then they will suddenly reappear
                 // after the participant interacts with the question answers. (Same for the continue button.)
                 stepViewController.skipButtonItem = nil
