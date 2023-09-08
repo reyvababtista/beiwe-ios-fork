@@ -4,7 +4,7 @@
 
 /* Welcome screen */
 "welcome_screen_title" = "Willkommen in der Beiwe-App";
-"welcome_screen_body_text" = "Willkommen bei Beiwe. Um den Registrierungsprozess zu starten, geben Sie bitte den Benutzername und das Passwort ein, die Sie von Ihrem Studienpersonal erhalten haben.";
+"welcome_screen_body_text" = "Willkommen in der Beiwe-App. Um die Einrichtung der App zu erleichtern, halten Sie bitte die schriftliche App-Anleitung mit Benutzername, Passwort und anderen für die Registrierung erforderlichen Informationen bereit.";
 "welcome_screen_go_to_registration_button_text" = "Anmelden";
 
 /* Registration screen */
