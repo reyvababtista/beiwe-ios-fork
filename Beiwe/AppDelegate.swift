@@ -61,7 +61,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     }
 
     func appStartLog() {
-        print("AppUUID: \(PersistentAppUUID.sharedInstance.uuid)")
+        // print("AppUUID: \(PersistentAppUUID.sharedInstance.uuid)")
         let uiDevice = UIDevice.current
         // let modelVersionId = UIDevice.current.model + "/" + UIDevice.current.systemVersion  // this used to be a (completely usused class variable)
         print("name: \(uiDevice.name)")
@@ -213,6 +213,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                 self.handleSurveyNotification(userInfo: notification.request.content.userInfo)
             }
         }
+        
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         if let timeEnteredBackground = timeEnteredBackground,
            let currentStudy = StudyManager.sharedInstance.currentStudy,
