@@ -14,7 +14,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     static let surveyDataType = "surveyAnswers"
     static let timingDataType = "surveyTimings"
     
-    // no clue
+    // no clue - probably a memory retention thing?
     var retainSelf: AnyObject?
     
     // info
@@ -24,17 +24,21 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     var activeSurvey: ActiveSurvey? // live information for this survey
     var survey: Survey? // points to the json information for the survey
     
-    // UI studd
+    // UI stuff
     var parent: UIViewController?
     var surveyViewController: BWORKTaskViewController?
+    
+    // its a user input slow-downer, only functionally necessary for slider questions afaik.
+    var valueChangeHandler: Debouncer<String>?
     
     // state
     var isComplete = false
     var questionIdToQuestion: [String: GenericSurveyQuestion] = [:] // questions have IDs, map of IDs to question objects
-    var lastQuestion: [String: Bool] = [:] // I think this is the final question to be displayed, used to go to done-with-survey card. (poorly named, ambiguous with previous or prior question)
-    /// uh what are these 2?
-    var task: ORKTask? // well its the researchkit task...
-    var valueChangeHandler: Debouncer<String>? // its a user input slow-downer, only functionally necessary for slider questions afaik.
+    var questionTypes = [String: SurveyQuestionType]() // we aren't using this anymore, but if anything is ever changed for logic it coulde be helpful
+    var finalQuestionId: String?
+    
+    // well its the researchkit task...
+    var task: ORKTask?
     
     // survey timings information
     let timingsName: String
@@ -71,27 +75,46 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
             return
         }
         
-        // determine question count
+        // question count may be less than number of questions
         let numQuestions = survey.randomize ? min(questions.count, survey.numberOfRandomQuestions ?? 999) : questions.count
-
-        var hasOptionalSteps: Bool = false
-        var steps = [ORKStep]()
+        var questionSteps = [ORKStep]()
         
+        // make a question id lookup dict of question types, we need it for question logic
+        for question in questions {
+            self.questionTypes[question.questionId] = question.questionType
+            self.questionIdToQuestion[question.questionId] = question
+        }
+        
+        // setup the questions
+        let hasOptionalSteps = self.setupQuestionSteps(survey, numQuestions, stepOrder, &questionSteps)
+        self.setupSkipLogic(survey: survey, hasOptionalSteps: hasOptionalSteps, questionSteps: questionSteps)
+    }
+    
+    /// create all the ORKSteps for the survey
+    func setupQuestionSteps(_ survey: Survey, _ numQuestions: Int, _ stepOrder: [Int], _ questionSteps: inout [ORKStep]) -> Bool {
+        let questions = survey.questions
+        var hasOptionalSteps = false // flag for whether there is logic to display this question
+        
+        // iterate over questions in step order
         for i in 0 ..< numQuestions {
-            // iterate over questions in step order
             let question: GenericSurveyQuestion = questions[stepOrder[i]]
             if let _ = question.displayIf {
-                hasOptionalSteps = true // flag for whether there is logic to display this question
+                hasOptionalSteps = true
             }
             
             // different logic for every question type (for some reason question type is optional)
             if let questionType = question.questionType {
-                var step: ORKStep?
+                // Weird typing problem - we need a list of [subclasses of] ORKSteps, but you cannot do the following
+                //   step = ORKQuestionStep(identifier: question.questionId)
+                // when step is defiined as an ORK step.  Instead we need to create an explicit "questionStep" variable
+                // and then do `step = questionStep` in order to update the ORKStep pointer... except you can do it
+                // for the ORKInstructionStep class.  This is annoying.
+                var step: ORKStep
                 
                 switch questionType {
                 case .Checkbox, .RadioButton:
                     let questionStep = ORKQuestionStep(identifier: question.questionId)
-                    step = questionStep // swift weirdness? you cannot do step = ORKQuestionStep(identifier: question.questionId)
+                    step = questionStep
                     // set up the question and its answers
                     questionStep.answerFormat = ORKTextAnswerFormat.choiceAnswerFormat(
                         with: questionType == .RadioButton ? .singleChoice : .multipleChoice,
@@ -136,7 +159,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                             questionStep.answerFormat = singleline_text
                         case .Numeric:
                             questionStep.answerFormat = ORKNumericAnswerFormat(
-                                // numeric answers have min and max ranges, "unit" is ua localizeable field for like miles vs kilometers.
+                                // numeric answers have min and max ranges, "unit" is a localizeable field for like miles vs kilometers.
                                 style: .decimal, unit: nil, minimum: question.minValue as NSNumber?, maximum: question.maxValue as NSNumber?
                             )
                         }
@@ -144,27 +167,26 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                     
                 case .InformationText:
                     step = ORKInstructionStep(identifier: question.questionId)
-                    break // this SHOULD break the switch statement? which means it does nothing, but I'm not changeing it or testing it, have funn!
                 
                 case .Slider:
-                    if let minValue = question.minValue, let maxValue = question.maxValue {
-                        let questionStep = ORKQuestionStep(identifier: question.questionId)
-                        step = questionStep
-                        questionStep.answerFormat = BWORKScaleAnswerFormat(
-                            // setting default value to minValue - 1 should result in a default value that is not visible
-                            maximumValue: maxValue, minimumValue: minValue, defaultValue: minValue - 1, step: 1
-                        )
-                    }
+                    // if somehow there are no values we default to 1 and 10
+                    let minValue = question.minValue ?? 1
+                    let maxValue = question.maxValue ?? 10
+                    let questionStep = ORKQuestionStep(identifier: question.questionId)
+                    step = questionStep
+                    // setting default value to minValue - 1 should result in a default value that is not visible
+                    questionStep.answerFormat = BWORKScaleAnswerFormat(
+                        maximumValue: maxValue, minimumValue: minValue, defaultValue: minValue - 1, step: 1
+                    )
                 }
                 
-                if let step = step {
-                    // set to true if this question is the last item, based on numQuestions - which is the number of questions to display.
-                    // (which is rarely the last item in the list when randomizing)
-                    self.lastQuestion[question.questionId] = (i == numQuestions - 1)
-                    step.text = question.prompt
-                    steps += [step] // append to steps list
-                    self.questionIdToQuestion[question.questionId] = question // update the question lookup dict
+                // set to true if this question is the last item, based on numQuestions - which is the number of questions to display.
+                // (which is rarely the last item in the list when randomizing)
+                if i == (numQuestions - 1) {
+                    self.finalQuestionId = question.questionId
                 }
+                step.text = question.prompt
+                questionSteps.append(step)
             }
         }
         
@@ -172,27 +194,32 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         let finishStep = ORKInstructionStep(identifier: "finished")
         finishStep.title = NSLocalizedString("survey_completed", comment: "")
         finishStep.text = StudyManager.sharedInstance.currentStudy?.studySettings?.submitSurveySuccessText
-        steps += [finishStep]
-        
-        // Set Up quostion skip logic
+        questionSteps.append(finishStep)
+                
+        return hasOptionalSteps
+    }
+    
+    /// Add question skip logic to each question
+    func setupSkipLogic(survey: Survey, hasOptionalSteps: Bool, questionSteps: [ORKStep]) {
         // (only if its not randomized and if there are no optional steps, e.g. you cannot randomize surveys with logic)
-        // create a BWNavigatableTask, hand it the steps (ORKSteps), and attach a skip rule if the the question has skip logic.
         if !survey.randomize && hasOptionalSteps {
-            let navTask = BWNavigatableTask(identifier: "SurveyTask", steps: steps)
-            for step in steps {
+            // Create a BWNavigatableTask, hand it the steps (ORKSteps), and attach a skip rule if the the question has skip logic.
+            let navTask = BWNavigatableTask(identifier: "SurveyTask", steps: questionSteps)
+            for step in questionSteps {
                 let question = self.questionIdToQuestion[step.identifier]
                 if let displayIf = question?.displayIf {
-                    let navRule = BWSkipStepNavigationRule(displayIf: displayIf)
+                    let navRule = BWSkipStepNavigationRule(displayIf: displayIf, questionTypes: self.questionTypes)
+                    // print("\n\n\nI think we are on a next question now \n\n\n\n")
                     navTask.setSkip(navRule, forStepIdentifier: step.identifier)
                 }
             }
             self.task = navTask
         } else {
             // case: no skip logic setup, just pass it in (can be factored out but whatever)
-            self.task = BWOrderedTask(identifier: "SurveyTask", steps: steps)
+            self.task = BWOrderedTask(identifier: "SurveyTask", steps: questionSteps)
         }
     }
-
+    
     /// function is called when the survey card is initially brought up.
     func present(_ parent: UIViewController) {
         self.parent = parent
@@ -211,7 +238,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         self.surveyViewController!.displayDiscard = false
         parent.present(self.surveyViewController!, animated: true, completion: nil)
     }
-
+    
     // almost unreadable function that handles unpacking answers and saving them to a file
     func storeAnswer(_ identifier: String, result: ORKTaskResult) {
         guard let question = questionIdToQuestion[identifier], let stepResult = result.stepResult(forStepIdentifier: identifier) else {
@@ -524,7 +551,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     // called when next/skip button is pressed, once with the 'current' question, once with the next question
     // called when survey is initially opened, once with nil and once with a question id (possibly differs if you don't have an informational text box question)
     func taskViewController(_ taskViewController: ORKTaskViewController, hasLearnMoreFor step: ORKStep) -> Bool {
-        // print("\ntaskViewController 5 \(taskViewController.currentStepViewController?.step?.identifier)\n")
+        // print("\ntaskViewController 4 \(taskViewController.currentStepViewController?.step?.identifier)\n")
         if let identifier = taskViewController.currentStepViewController?.step?.identifier {
             self.handleRequiredQuestion(taskViewController.currentStepViewController!, identifier)
         }
@@ -535,7 +562,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     // called when back button is pressed, once with the 'current' question, BUT TWICE with the previous question
     // called when next/skip button is pressed, once with the 'current' question, BUT TWICE with the next question
     func taskViewController(_ taskViewController: ORKTaskViewController, viewControllerFor step: ORKStep) -> ORKStepViewController? {
-        // print("\ntaskViewController 6 \(taskViewController.currentStepViewController?.step?.identifier)\n")
+        // print("\ntaskViewController 5 \(taskViewController.currentStepViewController?.step?.identifier)\n")
         if let identifier = taskViewController.currentStepViewController?.step?.identifier {
             self.handleRequiredQuestion(taskViewController.currentStepViewController!, identifier)
         }
@@ -547,7 +574,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     // called when next/skip button is pressed, once with the 'current' question, once with the next question
     // called when you hit the cancel button
     func taskViewControllerSupportsSaveAndRestore(_ taskViewController: ORKTaskViewController) -> Bool {
-        // print("\ntaskViewController 7 \(taskViewController.currentStepViewController?.step?.identifier)\n")
+        // print("\ntaskViewController 6 \(taskViewController.currentStepViewController?.step?.identifier)\n")
         if let identifier = taskViewController.currentStepViewController?.step?.identifier {
             self.handleRequiredQuestion(taskViewController.currentStepViewController!, identifier)
         }
@@ -558,7 +585,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     // called when back button is pressed, once with the 'current' question, once with the previous question
     // called when next/skip button is pressed, once with the 'current' question, once with the next question
     func taskViewController(_ taskViewController: ORKTaskViewController, stepViewControllerWillAppear stepViewController: ORKStepViewController) {
-        // print("\ntaskViewController 8 \(taskViewController.currentStepViewController?.step?.identifier)\n")
+        // print("\ntaskViewController 7 \(taskViewController.currentStepViewController?.step?.identifier)\n")
         
         // set up the card's UI properties
         // stepViewController.navigationController?.navigationBar.barStyle = UIBarStyle.black  // pretty confident this does nothing
@@ -616,7 +643,8 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                     }
                 }
                 
-                if self.lastQuestion[identifier] ?? false {
+                // if this is the final question set the button text correctly.
+                if let finalQuestionId = self.finalQuestionId, finalQuestionId == identifier {
                     stepViewController.continueButtonTitle = NSLocalizedString("submit_survey_title", comment: "")
                 }
             }
