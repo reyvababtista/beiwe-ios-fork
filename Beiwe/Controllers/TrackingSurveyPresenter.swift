@@ -208,7 +208,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
             for step in questionSteps {
                 let question = self.questionIdToQuestion[step.identifier]
                 if let displayIf = question?.displayIf {
-                    let navRule = BWSkipStepNavigationRule(displayIf: displayIf, questionTypes: self.questionTypes)
+                    let navRule = BWSkipStepNavigationRule(displayIf: displayIf)
                     // print("\n\n\nI think we are on a next question now \n\n\n\n")
                     navTask.setSkip(navRule, forStepIdentifier: step.identifier)
                 }

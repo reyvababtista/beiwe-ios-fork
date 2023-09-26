@@ -1,11 +1,40 @@
 import Foundation
 
+/**
+ This file was an unholy mess of absolute crap. It implemented 3 classes, had a dictionary lookup mapped to a set of unreadable
+ closures that depended on two of those classes. The original dev clearly gave up and worked out a clever hack to reusing his
+ code by wrapping everything in an extra "and" evaluation instead of making a clear entry point.
+ 
+ Oh and the closure dict was dynamically generated at runtime. ...
+ 
+ This code runs whenever:
+ - the initial survey card pops up
+ - an answer to any question is updated
+ - an answer to any question is cleared
+ - the next, cancel, or skip buttons are pressed. Everything but submit.
+ - and SOMETIMES IT JUST RUNS IN THE BACKGROUND FOR NO REASON (this is a bug, at time of documenting I don't know where or why)
+ 
+ When this code runs it runs for ALL QUESTIONS IN THE CURRENT SURVEY.
+ Unless you are Very VERY thorough and careful you cannot read print statements in this file, because they will be
+ clogged up with hundres of other print statements from logic running for all your other questions.
+ 
+ SO.
+ DO. NOT. try to condense this file.
+ DO. NOT. litter the code with typing casts that aren't tested and use fatalError with a Very clear error message.
+ DO. NOT. commit unnecessary print statements, the ones here are probably sufficient.
+ 
+ And finally.
+                                                  TEST YOUR CODE.
+ 
+ -Eli
+ */
+
+
 /// Skip logic
 class BWSkipStepNavigationRule: ORKSkipStepNavigationRule {
     let DOUBLE = "double"
     let INT = "int"
     var displayIf: [String: AnyObject] = [:] // it gets reassigned
-    var questionTypes: [String: SurveyQuestionType] = [:]
     
     // convenience init with the nscoder populated - I don't know what its for but it was here before me.
     required init(coder: NSCoder) {
@@ -13,10 +42,9 @@ class BWSkipStepNavigationRule: ORKSkipStepNavigationRule {
     }
     
     // convenience init with displayIf populated
-    convenience init(displayIf: [String: AnyObject]?, questionTypes: [String: SurveyQuestionType]) {
+    convenience init(displayIf: [String: AnyObject]?) {
         self.init(coder: NSCoder())
         self.displayIf = displayIf ?? [:]
-        self.questionTypes = questionTypes // oh woops we aren't even using this anymore...
     }
     
     override func stepShouldSkip(with taskResult: ORKTaskResult) -> Bool {
@@ -36,50 +64,90 @@ class BWSkipStepNavigationRule: ORKSkipStepNavigationRule {
         return !self.evaluateSingleLogicPair(self.displayIf.keys.first!, self.displayIf.values.first!, taskResult)
     }
     
-    /// consumes
-    func evaluateSingleLogicPair(_ operation: String, _ payload: AnyObject, _ taskResult: ORKTaskResult) -> Bool {
-        // print("evaluateSingleLogicPair start")
-        // print("operation: \(operation)")
-        // print("type of payload: \(payload.classForCoder)")
-        // defer {
-        //     print("evaluateSingleLogicPair end")
-        // }
+    /// The negation code is very verbose for the error messages, it gets its own function.
+    func dispatch_negation(_ payload: AnyObject, _ taskResult: ORKTaskResult) -> Bool {
+        // for these operators the payload will be a list of other logic pairs, assert that the class is as expected
+        guard let payload_dict = payload as? NSDictionary else {
+            fatalError("Encountered invalid type of payload dict: \(payload.classForCoder)")
+        }
+        // assert that these values are not nil (might have redundant checks here, don't care.)
+        if payload_dict.allKeys.first == nil || payload_dict.allValues.first == nil {
+            fatalError("Encountered invalid contents of a payload dict: \(payload.classForCoder), key 1:\(payload_dict.allKeys.first), value 1:\(payload_dict.allValues.first)")
+        }
+        guard let first_key = payload_dict.allKeys.first as? String else {
+            fatalError("bad first key \(payload_dict.allKeys.first)")
+        }
+        guard let first_value = payload_dict.allValues.first as? NSArray else {
+            fatalError("bad first value \(payload_dict.allValues.first)")
+        }
+        // paylaod is a list of length 1
+        if payload_dict.count != 1 {
+            fatalError("Encountered invalid size of payload_dict for inversion: \(payload_dict.count)")
+        }
+        return !self.evaluateSingleLogicPair(first_key, first_value, taskResult)
+    }
+    
+    /// `and` and `or` are very fiddly due to error messages, they get their own function.
+    func dispatch_and_or(_ operation: String, _ payload: AnyObject, _ taskResult: ORKTaskResult) -> Bool {
+        // its an array of any number of NSDictionaries
+        guard let payload_list = payload as? NSArray else {
+            fatalError("Encountered invalid type of payload dict: \(payload.classForCoder), \(payload)")
+        }
         
-        if ["not", "or", "and"].contains(operation) {
-            // for these operators the payload will be a list of other logic pairs, assert that the class is as expected
-            guard let payload_dict = payload as? [String: AnyObject] else {
-                fatalError("Encountered invalid type of payload dict: \(payload.classForCoder)")
-            }
-            
-            // assert that these values are not nil
-            if payload_dict.keys.first == nil || payload_dict.values.first == nil {
-                fatalError("Encountered invalid contents of a payload dict: \(payload.classForCoder), key 1:\(payload_dict.keys.first), value 1:\(payload_dict.values.first)")
-            }
-            
-            if operation == "not" {
-                // paylaod is a list of length 1
-                if payload_dict.count != 1 {
-                    fatalError("Encountered invalid size of payload_dict for inversion: \(payload_dict.count)")
+        // validate the list of dicts and throw useful errors
+        for dict in payload_list {
+            if let dict = dict as? NSDictionary {
+                if let _ = dict.allKeys.first as? String {} else {
+                    fatalError("Encountered invalid type in payload_list for and/or: \((dict.allKeys.first as AnyObject).classForCoder)")
                 }
-                return !self.evaluateSingleLogicPair(payload_dict.keys.first!, payload_dict.values.first!, taskResult)
+                if let _ = dict.allValues.first as? NSArray {} else {
+                    fatalError("Encountered invalid type in payload_list for and/or: \((dict.allValues.first as AnyObject).classForCoder)")
+                }
+            } else {
+                fatalError("Encountered invalid type in payload_list for and/or: \((dict as AnyObject).classForCoder)")
             }
-            
-            // 'and' and 'or' should work fine on any size payload_dict
-            if operation == "or" {
-                for (key, value) in payload_dict {
-                    if self.evaluateSingleLogicPair(key, value, taskResult) {
+        }
+        
+        // 'and' and 'or' should work fine on any size payload_list - and the NSDictionary cast has already been tested above so we don't need to catch it.
+        if operation == "or" {
+            for dict in payload_list {
+                if let dict = dict as? NSDictionary {
+                    if self.evaluateSingleLogicPair(dict.allKeys.first as! String, dict.allValues.first as! NSArray, taskResult) {
                         return true
                     }
                 }
             }
-            if operation == "and" {
-                for (key, value) in payload_dict {
-                    if !self.evaluateSingleLogicPair(key, value, taskResult) {
+            return false // only after everything has returned false do we return false
+        }
+        
+        if operation == "and" {
+            // if there are any falses return false, otherwise return true
+            for dict in payload_list {
+                if let dict = dict as? NSDictionary {
+                    if !self.evaluateSingleLogicPair(dict.allKeys.first as! String, dict.allValues.first as! NSArray, taskResult) {
                         return false
                     }
                 }
-                return true
             }
+            return true // nothing failed, so it passed!
+        }
+        
+        fatalError("unknown operation '\(operation)' inside and/or -- really should be unreachable")
+    }
+    
+    /// consumes
+    func evaluateSingleLogicPair(_ operation: String, _ payload: AnyObject, _ taskResult: ORKTaskResult) -> Bool {
+        // print("evaluateSingleLogicPair start - operation: \(operation), type of payload: \(payload.classForCoder)")
+        // defer {
+        //     print("\t evaluateSingleLogicPair end")
+        // }
+        
+        if operation == "not" {
+            return dispatch_negation(payload, taskResult)
+        }
+        
+        if ["or", "and"].contains(operation) {
+            return dispatch_and_or(operation, payload, taskResult)
         }
         
         // numerical oporation dispatch with USEFUL ERROR MESSAGES.
@@ -107,28 +175,40 @@ class BWSkipStepNavigationRule: ORKSkipStepNavigationRule {
     /// extracts the answer value to a given question result, indicates via a string the type of logical evaluation required.
     func extractAnswer(_ stepResult: ORKStepResult) -> ([NSNumber], String) {
         // there were no answers to the question, numerical type is irrelevant
-        guard let results = stepResult.results, results.count == 0 else {
+        guard let results = stepResult.results else {
+            // print("no results, returning empty - \(stepResult.results)")
+            return ([NSNumber](), self.DOUBLE)
+        }
+        
+        if results.count == 0 {
+            // print("\t results count is 0?")
             return ([NSNumber](), self.DOUBLE)
         }
         
         // I think results[0] is sufficient because we only ever have single answers to questions.
         switch results[0] {
         case let choiceResult as ORKChoiceQuestionResult:
+            // print("case - choiceResult")
             // choice (radio button and checkbox) questions
             return self.do_choice_stuff(choiceResult)
             
         case let questionResult as ORKQuestionResult:
+            // print("case - questionResult")
             // numerical open response questions can provide floating-point answers, so need doubles
             if let answer = questionResult.answer {
                 // this magically converts only valid numerical strings - apparently
+                // '.' gets interpreted as zero, fine.
                 if let number = Double(String(describing: answer)) {
                     return ([number as NSNumber], self.DOUBLE)
                 }
                 return ([NSNumber](), self.DOUBLE)
             }
+            // questionResult.answer was null, can happen on numeric open response
+            return ([NSNumber](), self.DOUBLE)
             
         case let scaleResult as ORKScaleQuestionResult:
-            // slider questions use ints
+            // print("case - scaleResult")
+            // don't know what uses this.....
             if let answer: NSNumber = scaleResult.scaleAnswer {
                 return ([answer], self.INT)
             }
@@ -137,14 +217,15 @@ class BWSkipStepNavigationRule: ORKSkipStepNavigationRule {
         default:
             fatalError("invalid step result type: \(results[0].classForCoder)")
         }
-        // um, unreachable
-        fatalError("unreachable code in extractAnswer")
+        // um, unreachable?
+        // fatalError("unreachable code in extractAnswer \(results)")
     }
     
     /// choice question logic (radio buttons and checkboxes) operates on the selected answer number, rather
     /// than the value of the answer itself. They are slightly more cumbersome so have their own function.
     /// Choice question answers should be interpreted as ints.
     func do_choice_stuff(_ choiceResult: ORKChoiceQuestionResult) -> ([NSNumber], String) {
+        // print("do_choice_stuff")
         guard let choiceAnswers = choiceResult.choiceAnswers else {
             return ([NSNumber](), self.INT)
         }
@@ -155,6 +236,7 @@ class BWSkipStepNavigationRule: ORKSkipStepNavigationRule {
                 selected_answers.append(num)
             }
         }
+        // print("selected_answers:", selected_answers)
         return (selected_answers, self.INT)
     }
     
@@ -188,18 +270,20 @@ class BWSkipStepNavigationRule: ORKSkipStepNavigationRule {
         for num in numbers {
             answer_numbers.append(num.doubleValue)
         }
+        // print("double - operator: \(operation), compare value: \(compare_me), answer values: \(answer_numbers)")
         
         if operation == "==" {
-            for num in answer_numbers { if compare_me == num { return true } }
+            for num in answer_numbers { if num == compare_me { return true } }
         } else if operation == "<" {
-            for num in answer_numbers { if compare_me < num { return true } }
+            for num in answer_numbers { if num < compare_me { return true } }
         } else if operation == "<=" {
-            for num in answer_numbers { if compare_me <= num { return true } }
+            for num in answer_numbers { if num <= compare_me { return true } }
         } else if operation == ">" {
-            for num in answer_numbers { if compare_me > num { return true } }
+            for num in answer_numbers { if num > compare_me { return true } }
         } else if operation == ">=" {
-            for num in answer_numbers { if compare_me >= num { return true } }
+            for num in answer_numbers { if num >= compare_me { return true } }
         }
+        // print("\t nope")
         return false
     }
     
@@ -209,18 +293,20 @@ class BWSkipStepNavigationRule: ORKSkipStepNavigationRule {
         for num in numbers {
             answer_numbers.append(num.intValue)
         }
+        // print("int - operator: \(operation), compare value: \(compare_me), answer values: \(answer_numbers)")
         
         if operation == "==" {
-            for num in answer_numbers { if compare_me == num { return true } }
+            for num in answer_numbers { if num == compare_me { return true } }
         } else if operation == "<" {
-            for num in answer_numbers { if compare_me < num { return true } }
+            for num in answer_numbers { if num < compare_me { return true } }
         } else if operation == "<=" {
-            for num in answer_numbers { if compare_me <= num { return true } }
+            for num in answer_numbers { if num <= compare_me { return true } }
         } else if operation == ">" {
-            for num in answer_numbers { if compare_me > num { return true } }
+            for num in answer_numbers { if num > compare_me { return true } }
         } else if operation == ">=" {
-            for num in answer_numbers { if compare_me >= num { return true } }
+            for num in answer_numbers { if num >= compare_me { return true } }
         }
+        // print("\t nope")
         return false
     }
 }
