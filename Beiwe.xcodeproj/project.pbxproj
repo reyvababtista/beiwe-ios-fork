@@ -27,7 +27,6 @@
 		832FFC351CCED80200F2E1EF /* AudioQuestionViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 832FFC341CCED80200F2E1EF /* AudioQuestionViewController.swift */; };
 		833482F71CA2EF7E00A37B35 /* RegisterViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 833482F61CA2EF7E00A37B35 /* RegisterViewController.swift */; };
 		833765681DED200D00E1B883 /* BWOrderedTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 833765671DED200D00E1B883 /* BWOrderedTask.swift */; };
-		8337656A1DED26B100E1B883 /* BWStepNavigationRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 833765691DED26B100E1B883 /* BWStepNavigationRule.swift */; };
 		8337656C1DED27B200E1B883 /* BWNavigatableTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8337656B1DED27B200E1B883 /* BWNavigatableTask.swift */; };
 		8337656E1DED321C00E1B883 /* BWSkipStepNavigationRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8337656D1DED321C00E1B883 /* BWSkipStepNavigationRule.swift */; };
 		833765701DEE04D500E1B883 /* ORKStepNavigationRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8337656F1DEE04D500E1B883 /* ORKStepNavigationRule.swift */; };
@@ -121,7 +120,6 @@
 		832FFC341CCED80200F2E1EF /* AudioQuestionViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AudioQuestionViewController.swift; sourceTree = "<group>"; };
 		833482F61CA2EF7E00A37B35 /* RegisterViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RegisterViewController.swift; sourceTree = "<group>"; };
 		833765671DED200D00E1B883 /* BWOrderedTask.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BWOrderedTask.swift; sourceTree = "<group>"; };
-		833765691DED26B100E1B883 /* BWStepNavigationRule.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BWStepNavigationRule.swift; sourceTree = "<group>"; };
 		8337656B1DED27B200E1B883 /* BWNavigatableTask.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BWNavigatableTask.swift; sourceTree = "<group>"; };
 		8337656D1DED321C00E1B883 /* BWSkipStepNavigationRule.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BWSkipStepNavigationRule.swift; sourceTree = "<group>"; };
 		8337656F1DEE04D500E1B883 /* ORKStepNavigationRule.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ORKStepNavigationRule.swift; sourceTree = "<group>"; };
@@ -259,7 +257,6 @@
 			children = (
 				83B2BDF61CC1DCBA007FAE91 /* BWORKScaleAnswerFormat.swift */,
 				833765671DED200D00E1B883 /* BWOrderedTask.swift */,
-				833765691DED26B100E1B883 /* BWStepNavigationRule.swift */,
 				8337656B1DED27B200E1B883 /* BWNavigatableTask.swift */,
 				8337656D1DED321C00E1B883 /* BWSkipStepNavigationRule.swift */,
 				8337656F1DEE04D500E1B883 /* ORKStepNavigationRule.swift */,
@@ -705,7 +702,6 @@
 				832FFC241CC863F400F2E1EF /* AppColors.swift in Sources */,
 				83B2BDF31CC1D5AA007FAE91 /* UIColor.swift in Sources */,
 				83AF042F1CB0D48D00A37225 /* MagnetometerManager.swift in Sources */,
-				8337656A1DED26B100E1B883 /* BWStepNavigationRule.swift in Sources */,
 				83E3DE8E1CA477D200EB5349 /* ApiManager.swift in Sources */,
 				83AF04291CAF748C00A37225 /* PowerStateManager.swift in Sources */,
 				83AF04351CB0E2BB00A37225 /* ReachabilityManager.swift in Sources */,

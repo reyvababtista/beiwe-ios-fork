@@ -76,7 +76,7 @@ class ActiveSurvey: Mappable {
             }
             
             // If we have a repeat in the first X steps, move it to the end and try again..
-            log.info("proposed order \(order)")
+            // log.info("proposed order \(order)")
             var index: Int = numQuestions - 1
             while index > 0 {
                 let val = order[index]

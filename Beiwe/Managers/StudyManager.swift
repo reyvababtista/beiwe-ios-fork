@@ -678,7 +678,7 @@ class StudyManager {
         let promiseChain: Promise<Bool> = Recline.shared.compact().then { (_: Void) -> Promise<Bool> in
             // run prepare for upload
             DataStorageManager.sharedInstance.prepareForUpload().then { (_: Void) -> Promise<Bool> in
-                print("prepareForUpload finished")
+                // print("prepareForUpload finished")
                 return .value(true)
             }
         }
@@ -707,7 +707,7 @@ class StudyManager {
                     uploadChain = uploadChain.then { (_: Bool) -> Promise<Bool> in
                         // do an upload
                         ApiManager.sharedInstance.makeMultipartUploadRequest(uploadRequest, file: filePath).then { (_: (UploadRequest.ApiReturnType, Int)) -> Promise<Bool> in
-                            print("Finished uploading: \(filename), deleting.")
+                            // print("Finished uploading: \(filename), deleting.")
                             AppEventManager.sharedInstance.logAppEvent(event: "uploaded", msg: "Uploaded data file", d1: filename)
                             numFiles = numFiles + 1
                             try FileManager.default.removeItem(at: filePath) // ok I guess this can fail...?
@@ -715,14 +715,14 @@ class StudyManager {
                         }
                     }.recover { (_: Error) -> Promise<Bool> in
                         // in case of errors...
-                        log.warning("upload failed: \(filename)")
+                        // log.warning("upload failed: \(filename)")
                         AppEventManager.sharedInstance.logAppEvent(event: "upload_file_failed", msg: "Failed Uploaded data file", d1: filename)
                         return .value(true)
                     }
                 }
                 return uploadChain
             } else {
-                log.info("Skipping upload, processing only")
+                // log.info("Skipping upload, processing only")
                 return .value(true)
             }
             // the rest of this is logging and then marking isUploading as false using ensure

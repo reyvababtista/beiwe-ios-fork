@@ -29,7 +29,26 @@ class SurveyCell: Cell, CellType {
         } else {
             desc = NSLocalizedString("survey_type_tracking", comment: "")
         }
+        
+        // if we have a survey name append it to the cell text.
+        if let name = cellmodel.activeSurvey.survey?.name {
+            if !(name.isEmpty) {
+                desc = desc + " - " + name
+            }
+        }
         self.descriptionLabel.text = desc
+        
+        // Originally this was 40, needed to make it larger to contain survey names.
+        cellmodel.height = 90
+        
+        // descriptionLabel.showsExpansionTextWhenTruncated = true // nothing obvious
+        // descriptionLabel.adjustsFontForContentSizeCategory = true // already true
+        self.descriptionLabel.allowsDefaultTighteningForTruncation = true
+        
+        // some other explored ui properties
+        // cellmodel.dynamicHeightEnabled = true - ok, uh, this causes a crash on the NSLocalizedString lookup? wtf?
+        // descriptionLabel.numberOfLines = 10  // set to 4 in the main storyboard, does not automatically resiize
+        // descriptionLabel.adjustsFontSizeToFitWidth = true  // this is too clunky, we've made it bigger.
         
         // always-available survey status
         if cellmodel.activeSurvey.survey?.alwaysAvailable ?? false {

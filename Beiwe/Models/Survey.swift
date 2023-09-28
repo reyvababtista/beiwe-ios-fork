@@ -9,6 +9,7 @@ enum SurveyTypes: String {
 struct Survey: Mappable {
     var surveyId: String?
     var surveyType: SurveyTypes?
+    var name = ""
     var timings: [[Int]] = []
     var triggerOnFirstDownload: Bool = false
     var randomize: Bool = false
@@ -26,6 +27,7 @@ struct Survey: Mappable {
     mutating func mapping(map: Map) {
         self.surveyId <- map["_id"]
         self.surveyType <- map["survey_type"]
+        self.name <- map["name"]
         self.timings <- map["timings"]
         self.triggerOnFirstDownload <- map["settings.trigger_on_first_download"]
         self.randomize <- map["settings.randomize"]
