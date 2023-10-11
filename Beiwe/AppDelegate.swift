@@ -22,15 +22,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     // dev stuff
     var transition_count = 0
     let debugEnabled = false
-
+    
     // constants
     let gcmMessageIDKey = "gcm.message_id"
-
+    
     // ui stuff
     var window: UIWindow? // this needs to be present according to docs
     var storyboard: UIStoryboard?
     var currentRootView: String? = "launchScreen"
-
+    
     // app capability stuff (why do these need to be here? at all?
     let motionManager = CMMotionManager()
     var reachability: Reachability? // tells us about our network access
@@ -38,13 +38,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     var canOpenTel = false
     var locationPermission = false
     let locManager: CLLocationManager = CLLocationManager()
-
+    
     // app state
     var isLoggedIn: Bool = false
     var timeEnteredBackground: Date?
-
+    
     // this is a weird location for an object, its used in powerstatemanager, unclear why this is here.
     let lockEvent = EmitterKit.Event<Bool>()
+    
+    // device info statuses
+    var notification_permission: String?
+    var locationServicesEnabledDescription: String?
     
     func setupLogging() {
         // Create a destination for the system console log (via NSLog), add the destination to the logger
@@ -59,7 +63,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         systemLogDestination.showDate = true
         log.add(destination: systemLogDestination)
     }
-
+    
     func appStartLog() {
         // print("AppUUID: \(PersistentAppUUID.sharedInstance.uuid)")
         let uiDevice = UIDevice.current
@@ -70,7 +74,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("model: \(uiDevice.model)")
         print("platform: \(platform())")
     }
-
+    
     /// starts reachability
     func initializeReachability() {
         do {
@@ -80,7 +84,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             print("Unable to create or start Reachability")
         }
     }
-
+    
     func printLoadedStudyInfo() {
         print("\n\n\n")
         print("patient id: '\(String(describing: ApiManager.sharedInstance.patientId))'")
@@ -91,11 +95,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("firebase app: '\(String(describing: FirebaseApp.app()))'")
         print("\n\n\n")
     }
-
+    
     static func sharedInstance() -> AppDelegate {
         return UIApplication.shared.delegate as! AppDelegate
     }
-
+    
     /// The AppDelegate started function
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // initialize Sentry IMMEDIATELY
@@ -106,14 +110,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // appStartLog()  // this is very verbose
         self.initializeReachability()
         self.initializeUI()
-
+        
         // determine whether phone call bump is available (should be true ios 10+? or is there a permission you have to ask for?)
         self.canOpenTel = UIApplication.shared.canOpenURL(URL(string: "tel:6175551212")!)
-
+        
         // Start the database, eg LOAD STUDY STUFF
         Recline.shared.open().then { (_: Bool) -> Promise<Bool> in
-            print("Database opened")
-            return StudyManager.sharedInstance.loadDefaultStudy()
+            // print("Database opened")
+            StudyManager.sharedInstance.loadDefaultStudy()
         }.done { (_: Bool) in
             // IF A NOTIFICATION WAS RECEIVED while app was in killed state there will be launch options!
             if launchOptions != nil {
@@ -134,11 +138,39 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         }.catch { (_: Error) in
             print("Database open failed, probably should just crash the app tbh")
         }
-
+        
         self.firebaseLoop()
+        self.deviceInfoUpdateLoop()
+        
+        self.isLoggedIn = true // uncomment to auto log in
+        
         return true
     }
-
+    
+    func deviceInfoUpdateLoop() {
+        // update the variable for notification status eeryy
+        Constants.NOTIFICATION_STATUS_QUEUE.async(qos: .background) {
+            // locationServicesEnabledDescription and notification_permission are device info datapoints taht need to be checked on periiodically
+            // because they require async calls to get their values, and we can't wait on them every time we do a network request.
+            self.locationServicesEnabledDescription = CLLocationManager.locationServicesEnabled().description
+            
+            UNUserNotificationCenter.current().getNotificationSettings(completionHandler: { settings in
+                self.notification_permission = switch settings.authorizationStatus {
+                case .notDetermined: "not_determined"
+                case .denied: "denied"
+                case .authorized: "authorized"
+                case .provisional: "provisional"
+                case .ephemeral: "ephemeral"
+                @unknown default: "unknown: '\(settings.authorizationStatus.rawValue)'"
+                }
+            })
+            
+            // run this every 60 seconds
+            sleep(60)
+            self.deviceInfoUpdateLoop()
+        }
+    }
+    
     /// anything that depends on app state at initialization time needs to go after this has run
     func transitionToLoadedAppState() {
         self.transition_count += 1
@@ -507,7 +539,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     func firebaseLoop() {
-        print("firebaseLoop called")
+        // print("firebaseLoop called")
         // Thue app cannot register with firebase until it gets a token, which only occurs at registration time, and it needs access to the appIelegate
         // This must be called after FirebaseApp.configure(), so we dispatch it and wait until the app is initialized from RegistrationViewController...
         DispatchQueue.global(qos: .background).async {
@@ -556,7 +588,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         DispatchQueue.main.async {
             // this used to depend on what version of beiwe (with or without pre-filled server url)
             FirebaseApp.configure(options: options)
-            print("Configured Firebase")
+            // print("Configured Firebase")
         }
     }
 
@@ -580,7 +612,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     }
 
     func sendFCMToken(fcmToken: String) {
-        print("FCM Token: \(fcmToken)")
+        // print("FCM Token: \(fcmsToken)")
         if fcmToken != "" {
             let fcmTokenRequest = FCMTokenRequest(fcmToken: fcmToken)
             ApiManager.sharedInstance.makePostRequest(fcmTokenRequest).catch { (error: Error) in

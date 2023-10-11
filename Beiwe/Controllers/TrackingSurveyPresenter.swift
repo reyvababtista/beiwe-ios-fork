@@ -375,7 +375,11 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
 
     // stores survey answers on the DataStorage
     func finalizeSurveyAnswers() {
-        guard let activeSurvey = activeSurvey, let survey = activeSurvey.survey, let surveyId = surveyId, let patientId = StudyManager.sharedInstance.currentStudy?.patientId, let publicKey = StudyManager.sharedInstance.currentStudy?.studySettings?.clientPublicKey else {
+        guard let activeSurvey = activeSurvey,
+              let survey = activeSurvey.survey,
+              let surveyId = surveyId,
+              let patientId = StudyManager.sharedInstance.currentStudy?.patientId,
+              let publicKey = StudyManager.sharedInstance.currentStudy?.studySettings?.clientPublicKey else {
             return
         }
         guard let stepOrder = activeSurvey.stepOrder, survey.questions.count > 0 else {

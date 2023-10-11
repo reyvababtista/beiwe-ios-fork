@@ -13,7 +13,7 @@ class ActiveSurvey: Mappable {
     
     // state information
     var isComplete: Bool = false // set to true when the particiant has completed the survey
-    var received: TimeInterval = 0 // time the suurvey was rceived by the app?
+    var received: TimeInterval = 0 // time the survey was received by the app?
     var stepOrder: [Int]? // sorting for randomizing questions
     
     // the data!

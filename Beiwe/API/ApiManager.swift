@@ -52,23 +52,68 @@ class ApiManager {
     var fcmToken: String?
     var patientId: String = ""
     var customApiUrl: String?
-
+    
     // get the url
     var baseApiUrl: String {
         return self.customApiUrl ?? self.defaultBaseApiUrl
     }
-
+    
     func setDefaultParameters(_ parameters: inout [String: Any], skip_password: Bool = false) {
         // credential parameters
         if !skip_password {
             parameters["password"] = self.hashedPassword
         }
-        parameters["device_id"] = PersistentAppUUID.sharedInstance.uuid
         parameters["patient_id"] = self.patientId
-        // tracking info
+        
+        parameters["device_id"] = PersistentAppUUID.sharedInstance.uuid  // deprecated?
+        
+        // basic device info, will be displayed on the participant page
         parameters["version_code"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         // parameters["version_name"] =  // There isn't really anything to stick into this one for ios
         parameters["os_version"] = UIDevice.current.systemVersion
+        parameters["timezone"] = TimeZone.current.identifier
+        
+        // various device metrics to be improved on over time, meant for developer use to debug issues.
+        var device_status_report = [String: String]()
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm E, d MMM y"
+        device_status_report["timestamp"] = formatter.string(from: Date()) + " " + TimeZone.current.identifier
+        
+        // UIDevice... Stuff?
+        device_status_report["battery_level"] = String(UIDevice.current.batteryLevel)
+        device_status_report["battery_state"] = String(UIDevice.current.batteryState.rawValue)
+        device_status_report["device_model"] = UIDevice.current.model
+        device_status_report["proximity_monitoring_enabled"] = UIDevice.current.isProximityMonitoringEnabled.description
+        
+        // Location services configuration
+        device_status_report["location_services_enabled"] = (UIApplication.shared.delegate as! AppDelegate).locationServicesEnabledDescription ?? "not populated, this is an app bug"
+        device_status_report["location_permission"] = switch CLLocationManager.authorizationStatus() {
+        case .notDetermined: "not_determined"
+        case .restricted: "restricted"
+        case .denied: "denied"
+        case .authorizedAlways: "authorized_always"
+        case .authorizedWhenInUse: "authorized_when_in_use"
+        @unknown default: "unknown: '\(CLLocationManager.authorizationStatus().rawValue)'"
+        }
+        device_status_report["location_significant_change_monitoring_enabled"] = CLLocationManager.significantLocationChangeMonitoringAvailable().description
+        
+        
+        // notification permissions, can be one of not_determined, denied, authorized, provisional, or ephemeral.
+        device_status_report["notification_permission"] = (UIApplication.shared.delegate as! AppDelegate).notification_permission ?? "not populated, this is an app bug"
+        
+        // background refresh
+        device_status_report["background_refresh_status"] = switch UIApplication.shared.backgroundRefreshStatus {
+        case .available: "available"
+        case .denied: "denied"
+        case .restricted: "restricted"
+        @unknown default: "unknown: '\(UIApplication.shared.backgroundRefreshStatus.rawValue)'"
+        }
+        
+        // object cannot fail to be serialized, data types are valid.
+        // stupid. We need to convert a [String:String] to a json object, which is a Data (bytes) and then we need to convert THAT to a string.
+        let statusAsJsonDictData = try! JSONSerialization.data(withJSONObject: device_status_report, options: [])
+        parameters["device_status_report"] = String(data: statusAsJsonDictData, encoding: .utf8)!
     }
 
     /// This looks like it does literally nothing?
@@ -80,7 +125,7 @@ class ApiManager {
     func makePostRequest<T: ApiRequest>(_ requestObject: T, password: String? = nil) -> Promise<(T.ApiReturnType, Int)> where T: Mappable {
         var parameters = requestObject.toJSON()
         parameters["password"] = (password == nil) ? self.hashedPassword : Crypto.sharedInstance.sha256Base64URL(password!) // I don't know what this line does
-        setDefaultParameters(&parameters, skip_password: true)
+        self.setDefaultParameters(&parameters, skip_password: true)
 
         return Promise { (resolver: Resolver<(T.ApiReturnType, Int)>) in
             let request = Alamofire.request(baseApiUrl + T.apiEndpoint, method: .post, parameters: parameters)
@@ -173,7 +218,6 @@ class ApiManager {
                     resolver.reject(error)
 
                 case .success:
-                    let x = response
                     let statusCode = response.response?.statusCode
                     // bad status codes
                     if let statusCode = statusCode, statusCode < 200 || statusCode >= 400 {
@@ -245,7 +289,7 @@ class ApiManager {
                                     
                                     // If its a BodyResponse, attempt a cast of response.result.value, which is an optional String. (is T.ApiReturnType is usually a text encoding?)
                                     // If its not a BodyResponse, process response.result.value as a json string.
-                                    if T.ApiReturnType.self == BodyResponse.self {  // Type.self is the [compile-time] value of a class type.
+                                    if T.ApiReturnType.self == BodyResponse.self { // Type.self is the [compile-time] value of a class type.
                                         returnObject = BodyResponse(body: response.result.value) as? T.ApiReturnType
                                     } else {
                                         returnObject = Mapper<T.ApiReturnType>().map(JSONString: response.result.value ?? "")
