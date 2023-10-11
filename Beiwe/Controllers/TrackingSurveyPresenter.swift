@@ -619,7 +619,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
                 self.activeSurvey?.rkAnswers = taskViewController.restorationData
                 self.activeSurvey?.isComplete = true
                 self.isComplete = true
-                _ = StudyManager.sharedInstance.updateActiveSurveys(true)
+                StudyManager.sharedInstance.updateActiveSurveys(true)
                 stepViewController.cancelButtonItem = nil
                 // stepViewController.backButtonItem = nil // this doesn't do anything
             

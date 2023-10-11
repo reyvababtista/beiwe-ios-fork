@@ -6,7 +6,8 @@ import ObjectMapper
 import PromiseKit
 import ReachabilitySwift
 
-let DEVICE_SETTINGS_INTERVAL: Int64 = 30 * 60  // hardcoded thirty minutes
+let DEVICE_SETTINGS_INTERVAL: Int64 = 30 * 60 // hardcoded thirty minutes
+let DEFAULT_INTERVAL: Double = 15.0 * 60.0
 
 /// Contains all sorts of miiscellaneous study related functionality - this is badly factored and should be refactored into classes that contain their own well-defirned things
 class StudyManager {
@@ -30,6 +31,40 @@ class StudyManager {
     
     var isStudyLoaded: Bool { // returns true if self.currentStudy is populated
         return self.currentStudy != nil
+    }
+    
+    // Common getters
+    
+    /// getters, mutators all the ids of active surveys - not used (anymore?
+    func getActiveSurveyIds() -> [String] {
+        guard let study = self.currentStudy else {
+            return []
+        }
+        return Array(study.activeSurveys.keys)
+    }
+    
+    /// iterates over all the surveys IN THE DATABASE, gives you survey ids
+    func getAllSurveyIds() -> [String] {
+        guard let study = self.currentStudy else {
+            return []
+        }
+        var allSurveyIds: [String] = []
+        for survey in study.surveys where survey.surveyId != nil { // this comes from a mappable in RecLine
+            allSurveyIds.append(survey.surveyId!)
+        }
+        return allSurveyIds
+    }
+    
+    /// saves study data....?
+    /// FIXME: I need to work out what these emmitters are
+    func emit_survey_updates_save_study_data() {
+        guard let study = self.currentStudy else {
+            return
+        }
+        self.surveysUpdatedEvent.emit(0) // what is this>?
+        Recline.shared.save(study).catch { _ in
+            log.error("Failed to save study after processing surveys")
+        }
     }
     
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -180,7 +215,7 @@ class StudyManager {
         }
     }
     
-    /// takes a(n active) survey and creates the suvey answers file
+    /// takes a(n active) survey and creates the survey answers file
     func submitSurvey(_ activeSurvey: ActiveSurvey, surveyPresenter: TrackingSurveyPresenter? = nil) {
         // only run if this stuff exists and it is a TrackingSurvey, but then later there is checking of the survey type so maybe not.
         if let survey = activeSurvey.survey, let surveyId = survey.surveyId, let surveyType = survey.surveyType, surveyType == .TrackingSurvey {
@@ -225,110 +260,225 @@ class StudyManager {
     
     /// updates the list of surveys in the app ui based on the study timers,
     /// updates the badge count, submits completed surveys, and updates the relevant survey timer.
-    /// (this is a mess, it should be broken down some, but it does all that needs to happen at this time)
-    /// Called from GpsManager.pollServices, AudioQuestionsViewController.saveButtonPressed, StudyManager.checkSurveys,
+    /// Called from, AudioQuestionsViewController.saveButtonPressed, StudyManager.checkSurveys,
     ///  and inside TrackingSurveyPresenter when the survey is completed.
-    // FIXME: this function needs to be rewritten, it is horribly overloaded and used in unrelated locations.
-    func updateActiveSurveys(_ forceSave: Bool = false) -> TimeInterval {
+    func updateActiveSurveys(_ forceSave: Bool = false) {
         // if for some reason we don't have a current study, return 15 minutes (used when surveys are scheduled tells something to wait 15 minutes)
         guard let study = currentStudy else {
-            return Date().addingTimeInterval(15.0 * 60.0).timeIntervalSince1970
+            return
         }
         
-        log.info("Updating active surveys...")
-        let currentDate = Date()
-        let currentTime = currentDate.timeIntervalSince1970
-        // let currentDay = (calendar as NSCalendar).component(.weekday, from: currentDate) - 1
-        var nowDateComponents: DateComponents = (calendar as NSCalendar).components(
-            [NSCalendar.Unit.day, NSCalendar.Unit.year, NSCalendar.Unit.month, NSCalendar.Unit.timeZone], from: currentDate
-        )
-        nowDateComponents.hour = 0
-        nowDateComponents.minute = 0
-        nowDateComponents.second = 0
+        // logic that refreshes survey list
+        var activeSurveysModified = clear_out_submitted_surveys()
+        activeSurveysModified = activeSurveysModified && self.ensure_active_surveys()
+        activeSurveysModified = activeSurveysModified && self.removeOldSurveys()
+        self.updateBadgerCount()
+        
+        // save survey data
+        if activeSurveysModified || forceSave {
+            self.emit_survey_updates_save_study_data()
+        }
+    }
+    
+    func clear_out_submitted_surveys() -> Bool {
+        guard let study = currentStudy else {
+            // if there was no
+            return false
+        }
         
         // For all active surveys that aren't complete, but have expired, submit them. (id is a string)
         var surveyDataModified = false
-        for (id, activeSurvey) in study.activeSurveys {
-            // case: always displayed survey
-            // almost the same as the else-if statement below, except we are resetting the survey, so that we reset the state for a permananent
-            // survey. If we don't the survey stays in the "done" stage after it is completed and you can't retake it.  It loads the survey to
-            // the done page, which will resave a new version of the data in a file.
-            if activeSurvey.survey?.alwaysAvailable ?? false && activeSurvey.isComplete {
-                log.info("ActiveSurvey \(id) expired.")
-                // activeSurvey.isComplete = true
+        for activeSurvey in study.activeSurveys.values where activeSurvey.survey != nil {
+            // case: always available survey
+            // reset the survey, behavior if we don't is the survey stays in the "done" stage you can't retake it.
+            // (It loads the survey to the done page, which will resave a new version of the data in a file.)
+            if activeSurvey.survey!.alwaysAvailable && activeSurvey.isComplete {
                 surveyDataModified = true
-                //  adding submitSurvey creates a new file; therefore we get 2 files of data- one when you
-                //  hit the confirm button and one when this code executes. we DO NOT KNOW why this is in the else if statement
-                //  below - however we are not keeping it in this if statement for the aforementioned problem.
-                // submitSurvey(activeSurvey)
                 activeSurvey.reset(activeSurvey.survey)
-            }
-            // submits ALL permanent surveys when ANY permanent survey loads. <- (I think that's ok, it doesn't create a file unless opened - I think.
-            //   No data bugs because of it, possibly due to the deduplication step.)
-            // case: If the survey not been completed, but it is time for the next survey
-            // TODO: why don't we have nextScheduleTime on active (or normal) surveys? oh we have no schedule inspection logic riiight.
-            else if !activeSurvey.isComplete /* && activeSurvey.nextScheduledTime > 0 && activeSurvey.nextScheduledTime <= currentTime */ {
-                log.info("ActiveSurvey \(id) expired.")
-                // activeSurvey.isComplete = true;
+            } else if activeSurvey.isComplete {
+                // case normal survey, is complete
                 surveyDataModified = true
                 self.submitSurvey(activeSurvey)
             }
         }
         
-        // for each survey from the server, check on the scheduling
-        var allSurveyIds: [String] = []
-        for survey in study.surveys {
-            if let id = survey.surveyId {
-                allSurveyIds.append(id)
-                // If we don't know about this survey already, add it in there for TRIGGERONFIRSTDOWNLOAD surverys
-                if study.activeSurveys[id] == nil && (survey.triggerOnFirstDownload /* || next > 0 */ ) {
-                    log.info("Adding survey  \(id) to active surveys")
-                    let newActiveSurvey = ActiveSurvey(survey: survey)
-                    study.activeSurveys[id] = newActiveSurvey
-                    surveyDataModified = true
-                }
-                // We want to display permanent surveys as active, and expect to change some details below (currently
-                // identical to the actions we take on a regular active survey)
-                else if study.activeSurveys[id] == nil && (survey.alwaysAvailable) {
-                    log.info("Adding survey  \(id) to active surveys")
-                    let newActiveSurvey = ActiveSurvey(survey: survey)
-                    study.activeSurveys[id] = newActiveSurvey
-                    surveyDataModified = true
-                }
-            }
-        }
-        
-        /* Set the badge, and remove surveys no longer on server from our active surveys list */
-        var badgeCnt = 0
-        for (id, activeSurvey) in study.activeSurveys {
-            if activeSurvey.isComplete && !allSurveyIds.contains(id) {
-                self.cleanupSurvey(activeSurvey)
-                study.activeSurveys.removeValue(forKey: id)
-                surveyDataModified = true
-            } else if !activeSurvey.isComplete {
-                // if (activeSurvey.nextScheduledTime > 0) {
-                //     closestNextSurveyTime = min(closestNextSurveyTime, activeSurvey.nextScheduledTime);
-                // }
-                badgeCnt += 1
-            }
-        }
-        log.info("Badge Count: \(badgeCnt)")
-        UIApplication.shared.applicationIconBadgeNumber = badgeCnt
-        
-        // save survey data
-        if surveyDataModified || forceSave {
-            self.surveysUpdatedEvent.emit(0)
-            Recline.shared.save(study).catch { _ in
-                log.error("Failed to save study after processing surveys")
-            }
-        }
-        
-        // calculate the duration the survey can be active/not be reset for (always 1 week) and return that time.
-        // FIXME: it was in trying to track down why on earth this was hardcoded to 1 week that I discovered there is no code to parse the survey schedules
-        let closestNextSurveyTime: TimeInterval = currentTime + (60.0 * 60.0 * 24.0 * 7)
-        self.timerManager.resetNextSurveyUpdate(closestNextSurveyTime)
-        return closestNextSurveyTime
+        // the old code reset a survey timer by 1 week, but that's not even correct because absolute time and relative schedules exist.
+        return surveyDataModified
     }
+    
+    // func buggy_submit_survey() -> (TimeInterval, Bool) {
+    //     guard let study = currentStudy else {
+    //         return (Date().addingTimeInterval(15.0 * 60.0).timeIntervalSince1970, false)
+    //     }
+    //     
+    //     let currentDate = Date()
+    //     let currentTime = currentDate.timeIntervalSince1970
+    //     // let currentDay = (calendar as NSCalendar).component(.weekday, from: currentDate) - 1
+    //     var nowDateComponents: DateComponents = (calendar as NSCalendar).components(
+    //         [NSCalendar.Unit.day, NSCalendar.Unit.year, NSCalendar.Unit.month, NSCalendar.Unit.timeZone], from: currentDate
+    //     )
+    //     nowDateComponents.hour = 0
+    //     nowDateComponents.minute = 0
+    //     nowDateComponents.second = 0
+    //     
+    //     // For all active surveys that aren't complete, but have expired, submit them. (id is a string)
+    //     var surveyDataModified = false
+    //     for (surveyId, activeSurvey) in study.activeSurveys {
+    //         // case: always displayed survey
+    //         // almost the same as the else-if statement below, except we are resetting the survey, so that we reset the state for a permananent
+    //         // survey. If we don't the survey stays in the "done" stage after it is completed and you can't retake it.  It loads the survey to
+    //         // the done page, which will resave a new version of the data in a file.
+    //         if activeSurvey.survey?.alwaysAvailable ?? false && activeSurvey.isComplete {
+    //             print("\nActiveSurvey \(surveyId) expired, this means the file is getting reset.\n")
+    //             // activeSurvey.isComplete = true
+    //             surveyDataModified = true
+    //             //  adding submitSurvey creates a new file; therefore we get 2 files of data- one when you
+    //             //  hit the confirm button and one when this code executes. we DO NOT KNOW why this is in the else if statement
+    //             //  below - however we are not keeping it in this if statement for the aforementioned problem.
+    //             // submitSurvey(activeSurvey)
+    //             activeSurvey.reset(activeSurvey.survey)
+    //         }
+    //         // submits ALL permanent surveys when ANY permanent survey loads. <- (I think that's ok, it doesn't create a file unless opened - I think.
+    //         //   No data bugs because of it, possibly due to the deduplication step.)
+    //         // case: If the survey not been completed, but it is time for the next survey
+    //         // TODO: why don't we have nextScheduleTime on active (or normal) surveys? oh we have no schedule inspection logic riiight.
+    //         else if !activeSurvey.isComplete /* && activeSurvey.nextScheduledTime > 0 && activeSurvey.nextScheduledTime <= currentTime */ {
+    //             log.info("ActiveSurvey \(surveyId) expired.")
+    //             // activeSurvey.isComplete = true;
+    //             surveyDataModified = true
+    //             self.submitSurvey(activeSurvey)
+    //         }
+    //     }
+    //     
+    //     // calculate the duration the survey can be active/not be reset for (always 1 week) and return that time.
+    //     // FIXME: it was in trying to track down why on earth this was hardcoded to 1 week that I discovered there is no code to parse the survey schedules
+    //     let closestNextSurveyTime: TimeInterval = currentTime + (60.0 * 60.0 * 24.0 * 7)
+    //     self.timerManager.resetNextSurveyUpdate(closestNextSurveyTime)
+    //     return (closestNextSurveyTime, surveyDataModified)
+    // }
+    
+    /// Checks the database for surveys that should exist, removes active surveys that are not in that list.
+    // FIXME: This does not do anything if surveys are not removed from the database when the app checks for new surveys. NEED TO TEST.
+    func removeOldSurveys() -> Bool {
+        guard let study = self.currentStudy else {
+            return false
+        }
+        var surveyDataModified = false
+        let allSurveyIds = self.getAllSurveyIds() // this is, in-fact, sourced from RecLine
+        for (surveyId, activeSurvey) in study.activeSurveys {
+            if activeSurvey.isComplete && !allSurveyIds.contains(surveyId) {
+                study.activeSurveys.removeValue(forKey: surveyId)
+                surveyDataModified = true
+            }
+        }
+        return surveyDataModified
+    }
+    
+    /// Set the badger count - a count of untaken surveys, excluding always-available surveys.
+    func updateBadgerCount() {
+        guard let study = self.currentStudy else {
+            return
+        }
+        
+        var bdgrCnt = 0
+        for activeSurvey in study.activeSurveys.values where activeSurvey.survey != nil {
+            // if survey is not complete and the survey is not an always available survey
+            if !activeSurvey.isComplete && !activeSurvey.survey!.alwaysAvailable {
+                bdgrCnt += 1
+            }
+        }
+        // print("Setting badge count to: \(bdgrCnt)")
+        UIApplication.shared.applicationIconBadgeNumber = bdgrCnt
+    }
+    
+    // /// Has some very incoherent logical statements.
+    // func updateBadgerCount_old() -> Bool {
+    //     guard let study = self.currentStudy else {
+    //         return false
+    //     }
+    //     
+    //     // Set the badge, and remove surveys no longer on server from our active surveys list
+    //     let allSurveyIds = self.getAllSurveyIds()
+    //     var surveyDataModified = false
+    //     var badgeCnt = 0
+    //     for (id, activeSurvey) in study.activeSurveys {
+    //         if activeSurvey.isComplete && !allSurveyIds.contains(id) {
+    //             self.cleanupSurvey(activeSurvey)
+    //             study.activeSurveys.removeValue(forKey: id)
+    //             surveyDataModified = true
+    //         } else if !activeSurvey.isComplete {
+    //             // if (activeSurvey.nextScheduledTime > 0) {
+    //             //     closestNextSurveyTime = min(closestNextSurveyTime, activeSurvey.nextScheduledTime);
+    //             // }
+    //             badgeCnt += 1
+    //         }
+    //     }
+    //     // print("Setting badge count to: \(badgeCnt)")
+    //     UIApplication.shared.applicationIconBadgeNumber = badgeCnt
+    //     return surveyDataModified
+    // }
+    
+    /// changes from check_surveys_old
+    /// radically simplified equivalent logic
+    /// doesn't generate list of survey ids
+    /// we have no effective scheduling logic here ANYWAY
+    /// FIXME: there is no way this is not bugged even though the logic is equivalent to the old version, because always available and triggerOnFirstDownload are treated identically
+    func ensure_active_surveys() -> Bool {
+        guard let study = self.currentStudy else {
+            return false
+        }
+        print("new check_surveys")
+        var surveyDataModified = false
+        
+        // for each survey, check on its availability
+        for survey in study.surveys where survey.surveyId != nil {
+            // `study.activeSurveys[id] == nil` means the study is not activated...
+            // If so and the survey is a triggerOnFirstDownload or alwaysAvailable survey, add it to active surveys list
+            if study.activeSurveys[survey.surveyId!] == nil && (survey.triggerOnFirstDownload || survey.alwaysAvailable) {
+                print("Adding survey \(survey.name) to active surveys survey.triggerOnFirstDownload: \(survey.triggerOnFirstDownload), survey.alwaysAvailable: \(survey.alwaysAvailable)")
+                study.activeSurveys[survey.surveyId!] = ActiveSurvey(survey: survey)
+                surveyDataModified = true
+            }
+        }
+        return surveyDataModified
+    }
+    
+    /// This is the old version of the code that checked survey properties and status for adding them to activeSurveys.
+    /// The original comments have been preservered, the logic has been radically simplified in check_surveys_new above.
+    /// This code is real dumb, I don't think it logically makes sense. I don't understand how the ios app workd with this
+    /// degree of crappy, wrote checks checks for which surveys should be active - triggerOnFirstDownload has the exact
+    /// same activation logic as alwaysAvailable
+    // func ensure_active_surveys_old() -> Bool {
+    //     guard let study = self.currentStudy else {
+    //         return false
+    //     }
+    //     print("new check_surveys")
+    //     var surveyDataModified = false
+    //     
+    //     // for each survey from the server, check on the scheduling
+    //     var allSurveyIds: [String] = []
+    //     for survey in study.surveys {
+    //         if let id = survey.surveyId {
+    //             allSurveyIds.append(id)
+    //             // If we don't know about this survey already, add it in there for TRIGGERONFIRSTDOWNLOAD surverys
+    //             if study.activeSurveys[id] == nil && (survey.triggerOnFirstDownload /* || next > 0 */ ) {
+    //                 print("Adding survey  \(id) to active surveys")
+    //                 let newActiveSurvey = ActiveSurvey(survey: survey)
+    //                 study.activeSurveys[id] = newActiveSurvey
+    //                 surveyDataModified = true
+    //             }
+    //             // We want to display permanent surveys as active, and expect to change some details below (currently
+    //             // identical to the actions we take on a regular active survey)
+    //             else if study.activeSurveys[id] == nil && (survey.alwaysAvailable) {
+    //                 print("Adding survey  \(id) to active surveys")
+    //                 let newActiveSurvey = ActiveSurvey(survey: survey)
+    //                 study.activeSurveys[id] = newActiveSurvey
+    //                 surveyDataModified = true
+    //             }
+    //         }
+    //     }
+    //     return surveyDataModified
+    // }
     
     ///
     /// Timers! They do what they say and aren't even complicated! Holy !#*&$@#*!
@@ -450,7 +600,7 @@ class StudyManager {
             return Recline.shared.save(study).asVoid()
         }.then { _ -> Promise<Bool> in // its an error type
             // then update the active surveys because the surveys may have just changed
-            _ = self.updateActiveSurveys()
+            self.updateActiveSurveys()
             return .value(true)
         }.recover { _ -> Promise<Bool> in // _ is of some error type
             // and if anything went wrong return false  --  IT IS NEVER USED
@@ -679,7 +829,7 @@ class StudyManager {
             // run prepare for upload
             DataStorageManager.sharedInstance.prepareForUpload().then { (_: Void) -> Promise<Bool> in
                 // print("prepareForUpload finished")
-                return .value(true)
+                .value(true)
             }
         }
         
@@ -707,7 +857,7 @@ class StudyManager {
                     uploadChain = uploadChain.then { (_: Bool) -> Promise<Bool> in
                         // do an upload
                         ApiManager.sharedInstance.makeMultipartUploadRequest(uploadRequest, file: filePath).then { (_: (UploadRequest.ApiReturnType, Int)) -> Promise<Bool> in
-                            // print("Finished uploading: \(filename), deleting.")
+                            print("Finished uploading: \(filename), deleting.")
                             AppEventManager.sharedInstance.logAppEvent(event: "uploaded", msg: "Uploaded data file", d1: filename)
                             numFiles = numFiles + 1
                             try FileManager.default.removeItem(at: filePath) // ok I guess this can fail...?

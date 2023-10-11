@@ -139,13 +139,20 @@ class TimerManager {
         // run update survey logic
         // FIXME: this logic provides an incorrect timestamp, or at least it assumes that the correct time to set is for one week from now, hardcoded.
         if now > self.nextSurveyUpdate {
-            self.nextSurveyUpdate = StudyManager.sharedInstance.updateActiveSurveys()
+            StudyManager.sharedInstance.updateActiveSurveys()
+            // this is just the survey update timer 10 minutes is excessively short so is probably fine, I think.
+            self.nextSurveyUpdate = ten_minutes_from_now()
         }
         
         // update timer
         self.setNextPolltimer()
     }
 
+    func ten_minutes_from_now() -> TimeInterval {
+        // this is a placeholder?
+        return Date().timeIntervalSince1970 + (10 * 60)  // I guess the default is a ten minute timer?
+    }
+    
     /// set timer for the next survey update event? - called only from StudyManager
     func resetNextSurveyUpdate(_ time: Double) {
         self.nextSurveyUpdate = time
