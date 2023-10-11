@@ -8,13 +8,6 @@ enum DataStorageErrors: Error {
     case notInitialized
 }
 
-let DELIMITER = "," // csv separator character, named for legible code reasons
-let KEYLENGTH = 128 // encryption key length for any given line of encrypted data.
-
-// settings for functions that have retry logic
-let RECUR_SLEEP_DURATION = 0.05 // 50 milliseconds
-let RECUR_DEPTH = 3
-
 // TODO: convert All fatalError calls to sentry error reports with real error information.
 
 //////////////////////////////////////////////////////////// DataStorage Manager //////////////////////////////////////////////////////
@@ -50,7 +43,7 @@ class DataStorageManager {
     }
 
     /// creates the currentData and upload directories. app crashes if this fails because that is a fundamental app failure.
-    func createDirectories(recur: Int = RECUR_DEPTH) {
+    func createDirectories(recur: Int = Constants.RECUR_DEPTH) {
         do {
             try FileManager.default.createDirectory(
                 atPath: DataStorageManager.currentDataDirectory().path,
@@ -65,7 +58,7 @@ class DataStorageManager {
         } catch {
             if recur > 0 {
                 log.error("create_directories recur at \(recur).")
-                Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                 return self.createDirectories(recur: recur - 1)
             }
             log.error("Failed to create directories.")
@@ -160,13 +153,13 @@ class DataStorageManager {
     }
     
     // move file function with retry logic, fails silently but that is ok because it is only used prepareForUpload_actual
-    private func moveFile(_ src: URL, dst: URL, recur: Int = RECUR_DEPTH) {
+    private func moveFile(_ src: URL, dst: URL, recur: Int = Constants.RECUR_DEPTH) {
         do {
             try FileManager.default.moveItem(at: src, to: dst)
         } catch {
             if recur > 0 {
                 log.error("moveFile recur at \(recur).")
-                Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                 return self.moveFile(src, dst: dst, recur: recur - 1)
             }
             log.error("Error moving \(src) to \(dst)")
@@ -227,6 +220,9 @@ class DataStorage {
     var lock_exists = NSLock() // locks on the exists check
     var lock_file_level_operation = NSLock()
     
+    // flag used to implement lazy file creation on at the first write operation.
+    var lazy_reset_active = false
+    
     init(type: String, headers: [String], patientId: String, publicKey: String, moveOnClose: Bool = false, keyRef: SecKey?) {
         self.type = type
         self.patientId = patientId
@@ -236,11 +232,11 @@ class DataStorage {
         self.secKeyRef = keyRef
 
         // these need to be instantiated to allow non-optional typings, but they are immediately reset in self.reset()
-        self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
+        self.aesKey = Crypto.sharedInstance.newAesKey(Constants.KEYLENGTH)
         self.realFilename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
         self.filename = self.realFilename
 
-        self.reset() // properly creates mutables
+        self.reset() // properly creates new mutables, sets lazy_reset_active to TRUE
     }
     
     ////////////////////////////////////// Locking, public functions ///////////////////////////////////////
@@ -251,6 +247,7 @@ class DataStorage {
             self.lock_file_level_operation.unlock()
         }
         self.lock_file_level_operation.lock()
+        lazy_new_file_setup() // tests for whether lazy new file operations need to occur.
         self._store(data)
     }
     
@@ -263,10 +260,26 @@ class DataStorage {
         self.lock_file_level_operation.lock()
     }
     
+    /// To reduce junk file creation we have lazy initial file write.
+    /// This function is called only inside store(), which is the only external function that should be called for writes.
+    private func lazy_new_file_setup() {
+        // do nothing if lazy_reset_active is not true - we could fatalError on that - this works because reset is actually called during init.
+        if self.lazy_reset_active {
+            // clear the flag
+            self.lazy_reset_active = false
+            // generate and write encryptiion key
+            self.aesKey = Crypto.sharedInstance.newAesKey(Constants.KEYLENGTH)
+            self.write_raw_to_end_of_file(self.get_rsa_line())
+            self.encrypted_write(self.headers.joined(separator: Constants.DELIMITER))
+            // log creating new file.
+            self.conditionalApplog(event: "file_init", msg: "Init new data file", d1: self.name)
+        }
+    }
+    
     /// synchronized function to ensure that a file exists
     // Keep _ensure_file_exists function from overlapping with itself, keep lock logic clean.
     // The inner recursive call should be to _ensure_file_exists.
-    private func ensure_file_exists(recur: Int = RECUR_DEPTH) {
+    private func ensure_file_exists(recur: Int = Constants.RECUR_DEPTH) {
         defer {
             self.lock_exists.unlock()
         }
@@ -300,6 +313,7 @@ class DataStorage {
     /// returns boolean about whether a file exists on the file system for self.
     private func check_file_exists() -> Bool {
         // operation profiled on an iphone 8 plus to take roughly 400-450us average/rms, standard deviation of 200us
+        // print("checking that '\(self.filename.path)' exists...")
         return FileManager.default.fileExists(atPath: self.filename.path)
     }
     
@@ -314,19 +328,25 @@ class DataStorage {
     
     // generally resets all object assets and creates a new filename.
     // called when max filesize is reached, and inside resetAll.
-    private func _reset(recur: Int = RECUR_DEPTH) {
+    private func _reset(recur: Int = Constants.RECUR_DEPTH) {
+        // we don't want to lazy reset while pending a new file due to an existing lazy reset.
+        // (this is the singular file io condition under which we actually want to not do anything.)
+        if self.lazy_reset_active {
+            return
+        }
+            
         // log.info("DataStorage.reset called on \(self.name)...")
         if self.moveOnClose == true {
             do {
                 if self.check_file_exists() {
                     try FileManager.default.moveItem(at: self.filename, to: self.realFilename)
-                    // log.info("moved temp data file \(self.filename) to \(self.realFilename)")
+                    print("moved temp data file \(self.filename) to \(self.realFilename)")
                 }
             } catch {
                 log.error("Error moving temp data \(self.filename) to \(self.realFilename)")
                 if recur > 0 {
                     log.error("reset recur at \(recur).")
-                    Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                    Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                     return self._reset(recur: recur - 1)
                 }
                 fatalError("Error moving temp data \(self.filename) to \(self.realFilename)")
@@ -341,19 +361,18 @@ class DataStorage {
         } else {
             self.filename = self.realFilename
         }
-
-        // generate and write encryptiion key
-        self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
-        self.write_raw_to_end_of_file(self.get_rsa_line())
-        self.encrypted_write(self.headers.joined(separator: DELIMITER))
-        // log creating new file.
-        self.conditionalApplog(event: "file_init", msg: "Init new data file", d1: self.name)
+        
+        // In an attempt to reduce file spam, the automatic creation of the next file when reset is called
+        // is getting scrapped, we are going to set a flag and only generate and write that next line when
+        // store is called.
+        self.lazy_reset_active = true
     }
     
     /// unlocked function to ensure that a file exists.
     private func _ensure_file_exists(recur: Int) {
         // if there is no file, create it with these permissions and no data
         if !self.check_file_exists() {
+            print("creating file '\(self.filename.path)'...")
             let created = FileManager.default.createFile(
                 atPath: self.filename.path,
                 contents: "".data(using: String.Encoding.utf8),
@@ -365,13 +384,13 @@ class DataStorage {
             } else {
                 message = "Could not create new data file"
             }
-            // log.error("\(message): \(filename)")
             self.conditionalApplog(event: "file_create", msg: message, d1: self.name)
             if !created {
                 // TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
                 if recur > 0 {
                     log.error("ensure_file_exists recur at \(recur).")
-                    Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                    print("COULD NOT CREATE FILE FILE '\(self.filename.path)'...")
+                    Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                     return self._ensure_file_exists(recur: recur - 1) // needs to actually call the _ version of the function (2.3.1 was incorrect, oops)
                 }
                 fatalError(message)
@@ -396,7 +415,7 @@ class DataStorage {
     }
 
     /// Writes a line of data to the end of the current file, has locks to handle single-line-level write contention.
-    private func write_raw_to_end_of_file(_ data: Data, recur: Int = RECUR_DEPTH) {
+    private func write_raw_to_end_of_file(_ data: Data, recur: Int = Constants.RECUR_DEPTH) {
         self.ensure_file_exists()
         // if file handle instantiated (file open) append data (a line) to the end of the file.
         // it appears to be the case that lines are constructed ending with \n, so we don't handle that here.
@@ -421,7 +440,7 @@ class DataStorage {
             if recur > 0 {
                 self._reset() // must call _reset() because we could be inside a locked reset()
                 log.error("write_raw_to_end_of_file recur at \(recur).")
-                Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                 return self.write_raw_to_end_of_file(data, recur: recur - 1)
             }
             // retry failed, time to crash :c
@@ -429,7 +448,7 @@ class DataStorage {
             self.conditionalApplog(event: "file_err", msg: "Error writing to file", d1: self.name, d2: "Error opening file for writing")
             fatalError("unable to open file \(self.filename)")
         }
-        if recur != RECUR_DEPTH {
+        if recur != Constants.RECUR_DEPTH {
             log.error("write_raw_to_end_of_file recur SUCCESS at \(recur).")
         }
     }
@@ -452,7 +471,7 @@ class DataStorage {
         } else {
             sanitizedData = data
         }
-        self.encrypted_write(sanitizedData.joined(separator: DELIMITER))
+        self.encrypted_write(sanitizedData.joined(separator: Constants.DELIMITER))
     }
 }
 
@@ -493,7 +512,7 @@ class EncryptedStorage {
         self.eventualFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.debug_shortname + suffix)
         self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.debug_shortname + suffix)
         // encryption setup
-        self.aesKey = Crypto.sharedInstance.newAesKey(KEYLENGTH)
+        self.aesKey = Crypto.sharedInstance.newAesKey(Constants.KEYLENGTH)
         self.iv = Crypto.sharedInstance.randomBytes(16)
         self.publicKey = publicKey
         self.secKeyRef = keyRef!
@@ -531,7 +550,7 @@ class EncryptedStorage {
         }
     }
 
-    private func open_actual(recur: Int = RECUR_DEPTH) {
+    private func open_actual(recur: Int = Constants.RECUR_DEPTH) {
         // open file
         if !self.fileManager.createFile(
             atPath: self.filename.path,
@@ -540,7 +559,7 @@ class EncryptedStorage {
         {
             if recur > 0 {
                 log.error("open_actual recur at \(recur).")
-                Thread.sleep(forTimeInterval: RECUR_SLEEP_DURATION)
+                Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                 return self.open_actual(recur: recur - 1)
             }
             fatalError("could not create file?")
