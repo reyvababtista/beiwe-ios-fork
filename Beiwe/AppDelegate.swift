@@ -46,10 +46,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     // this is a weird location for an object, its used in powerstatemanager, unclear why this is here.
     let lockEvent = EmitterKit.Event<Bool>()
     
-    // device info statuses
-    var notification_permission: String?
-    var locationServicesEnabledDescription: String?
-    
     func setupLogging() {
         // Create a destination for the system console log (via NSLog), add the destination to the logger
         let systemLogDestination = AppleSystemLogDestination(owner: log, identifier: "advancedLogger.systemLogDestination")
@@ -142,20 +138,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         self.firebaseLoop()
         self.deviceInfoUpdateLoop()
         
-        self.isLoggedIn = true // uncomment to auto log in
-        
+        // self.isLoggedIn = true // uncomment to auto log in
         return true
     }
     
+    /// Run this function once at app boot and it will rerun itself every minute, updating some stored values that are in turn reported to the server.
     func deviceInfoUpdateLoop() {
-        // update the variable for notification status eeryy
-        Constants.NOTIFICATION_STATUS_QUEUE.async(qos: .background) {
-            // locationServicesEnabledDescription and notification_permission are device info datapoints taht need to be checked on periiodically
-            // because they require async calls to get their values, and we can't wait on them every time we do a network request.
-            self.locationServicesEnabledDescription = CLLocationManager.locationServicesEnabled().description
+        Constants.BACKGROUND_DEVICE_INFO_QUEUE.async(qos: .background) {
             
+            // This takes an amount of time to run / must be run ~asynchronously
             UNUserNotificationCenter.current().getNotificationSettings(completionHandler: { settings in
-                self.notification_permission = switch settings.authorizationStatus {
+                Ephemerals.notification_permission = switch settings.authorizationStatus {
                 case .notDetermined: "not_determined"
                 case .denied: "denied"
                 case .authorized: "authorized"
@@ -164,6 +157,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                 @unknown default: "unknown: '\(settings.authorizationStatus.rawValue)'"
                 }
             })
+
+            // locationServicesEnabledDescription and notification_permission are device info datapoints taht need to be checked on periiodically
+            // because they require async calls to get their values, and we can't wait on them every time we do a network request.
+            Ephemerals.locationServicesEnabledDescription = CLLocationManager.locationServicesEnabled().description
+            Ephemerals.significantLocationChangeMonitoringAvailable = CLLocationManager.significantLocationChangeMonitoringAvailable().description
+            
+            // backgroundRefreshStatus needs to be run on the main thread, but we can do this asynchronously somehow? and that's better? hunh?
+            DispatchQueue.main.async {
+                Ephemerals.backgroundRefreshStatus = switch UIApplication.shared.backgroundRefreshStatus {
+                case .available: "available"
+                case .denied: "denied"
+                case .restricted: "restricted"
+                @unknown default: "unknown: '\(UIApplication.shared.backgroundRefreshStatus.rawValue)'"
+                }
+            }
             
             // run this every 60 seconds
             sleep(60)

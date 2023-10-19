@@ -206,8 +206,8 @@ class DataStorage {
     // file settings
     var headers: [String] // csv file header line
     var type: String // data stream type
-    var name = "" // name of this data storage object
-    var sanitize = false // flag for the store function, replace commas with semicolons. TODO: factor out
+    var name: String // name of this data storage object
+    var sanitize: Bool // flag for the store function, replace commas with semicolons. TODO: factor out
     let moveOnClose: Bool // flag for whether to move the file (to the upload folder) when it is reset.
     
     // file state
@@ -230,13 +230,17 @@ class DataStorage {
         self.headers = headers
         self.moveOnClose = moveOnClose
         self.secKeyRef = keyRef
+        self.sanitize = false
 
-        // these need to be instantiated to allow non-optional typings, but they are immediately reset in self.reset()
+        // these need to be instantiated due to rules about all values getting instantiated in the init function,
+        // but they are immediately reset in self.reset()
         self.aesKey = Crypto.sharedInstance.newAesKey(Constants.KEYLENGTH)
+        self.name = self.patientId + "_" + self.type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
         self.realFilename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
         self.filename = self.realFilename
 
         self.reset() // properly creates new mutables, sets lazy_reset_active to TRUE
+        
     }
     
     ////////////////////////////////////// Locking, public functions ///////////////////////////////////////
@@ -389,7 +393,7 @@ class DataStorage {
                 // TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
                 if recur > 0 {
                     log.error("ensure_file_exists recur at \(recur).")
-                    print("COULD NOT CREATE FILE FILE '\(self.filename.path)'...")
+                    print("COULD NOT CREATE FILE '\(self.filename.path)'...")
                     Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                     return self._ensure_file_exists(recur: recur - 1) // needs to actually call the _ version of the function (2.3.1 was incorrect, oops)
                 }

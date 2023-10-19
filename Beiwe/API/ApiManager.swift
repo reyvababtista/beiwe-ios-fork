@@ -87,7 +87,8 @@ class ApiManager {
         device_status_report["proximity_monitoring_enabled"] = UIDevice.current.isProximityMonitoringEnabled.description
         
         // Location services configuration
-        device_status_report["location_services_enabled"] = (UIApplication.shared.delegate as! AppDelegate).locationServicesEnabledDescription ?? "not populated, this is an app bug"
+        device_status_report["location_services_enabled"] = Ephemerals.locationServicesEnabledDescription
+        device_status_report["location_significant_change_monitoring_enabled"] = Ephemerals.significantLocationChangeMonitoringAvailable
         device_status_report["location_permission"] = switch CLLocationManager.authorizationStatus() {
         case .notDetermined: "not_determined"
         case .restricted: "restricted"
@@ -96,19 +97,12 @@ class ApiManager {
         case .authorizedWhenInUse: "authorized_when_in_use"
         @unknown default: "unknown: '\(CLLocationManager.authorizationStatus().rawValue)'"
         }
-        device_status_report["location_significant_change_monitoring_enabled"] = CLLocationManager.significantLocationChangeMonitoringAvailable().description
-        
         
         // notification permissions, can be one of not_determined, denied, authorized, provisional, or ephemeral.
-        device_status_report["notification_permission"] = (UIApplication.shared.delegate as! AppDelegate).notification_permission ?? "not populated, this is an app bug"
+        device_status_report["notification_permission"] = Ephemerals.notification_permission
         
         // background refresh
-        device_status_report["background_refresh_status"] = switch UIApplication.shared.backgroundRefreshStatus {
-        case .available: "available"
-        case .denied: "denied"
-        case .restricted: "restricted"
-        @unknown default: "unknown: '\(UIApplication.shared.backgroundRefreshStatus.rawValue)'"
-        }
+        device_status_report["background_refresh_status"] = Ephemerals.backgroundRefreshStatus
         
         // object cannot fail to be serialized, data types are valid.
         // stupid. We need to convert a [String:String] to a json object, which is a Data (bytes) and then we need to convert THAT to a string.

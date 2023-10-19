@@ -84,6 +84,7 @@
 		AA63EFB729C2E0FE0074F735 /* DataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA63EFB629C2E0FE0074F735 /* DataService.swift */; };
 		AA774E3B29DFA9440085BDF8 /* UpdateDeviceSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA774E3A29DFA9440085BDF8 /* UpdateDeviceSettings.swift */; };
 		AA92FB6729D5D1800009F620 /* TimerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA92FB6629D5D1800009F620 /* TimerManager.swift */; };
+		AA94758C2AE07C8A00C07819 /* AppInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA94758B2AE07C8A00C07819 /* AppInfo.swift */; };
 		ED3081F77ECC8C876F5EF53A /* Pods_Beiwe.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A42DC84D7FED35C57E1B1EE0 /* Pods_Beiwe.framework */; };
 /* End PBXBuildFile section */
 
@@ -188,6 +189,7 @@
 		AA63EFB629C2E0FE0074F735 /* DataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataService.swift; sourceTree = "<group>"; };
 		AA774E3A29DFA9440085BDF8 /* UpdateDeviceSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateDeviceSettings.swift; sourceTree = "<group>"; };
 		AA92FB6629D5D1800009F620 /* TimerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerManager.swift; sourceTree = "<group>"; };
+		AA94758B2AE07C8A00C07819 /* AppInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfo.swift; sourceTree = "<group>"; };
 		B58A34E5862CE908C83EB133 /* Pods-Beiwe.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Beiwe.release.xcconfig"; path = "Target Support Files/Pods-Beiwe/Pods-Beiwe.release.xcconfig"; sourceTree = "<group>"; };
 		C222DB6B2786C1ED00ACB3EC /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		E949EF7428480E59009E183F /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Main.strings; sourceTree = "<group>"; };
@@ -305,6 +307,7 @@
 				83C295F31CB831330016DD95 /* GenericSurveyQuestion.swift */,
 				83C295F51CB8AF160016DD95 /* OneSelection.swift */,
 				83C295F71CBA048F0016DD95 /* ActiveSurvey.swift */,
+				AA94758B2AE07C8A00C07819 /* AppInfo.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -673,6 +676,7 @@
 				8337656E1DED321C00E1B883 /* BWSkipStepNavigationRule.swift in Sources */,
 				83AF04151CAB556800A37225 /* GPSManager.swift in Sources */,
 				83AF042D1CB0D21700A37225 /* GyroManager.swift in Sources */,
+				AA94758C2AE07C8A00C07819 /* AppInfo.swift in Sources */,
 				AA774E3B29DFA9440085BDF8 /* UpdateDeviceSettings.swift in Sources */,
 				83C295F21CB817AD0016DD95 /* Survey.swift in Sources */,
 				83C7D37A1CB4E30C00BC7285 /* UploadRequest.swift in Sources */,
@@ -851,7 +855,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2.4.2;
+				CURRENT_PROJECT_VERSION = 2.4.7;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6M52R5C7FT;
 				ENABLE_BITCODE = NO;
@@ -860,7 +864,7 @@
 				INFOPLIST_PREPROCESS = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 2.4.2;
+				MARKETING_VERSION = 2.4.7;
 				PRODUCT_BUNDLE_IDENTIFIER = harvard.lab.onnela.beiwe.ios;
 				PRODUCT_NAME = Beiwe2;
 				PROVISIONING_PROFILE = "";
@@ -946,9 +950,8 @@
 				BUNDLE_ID_SUFFIX = "";
 				CODE_SIGN_ENTITLEMENTS = Beiwe/Beiwe2Release2.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution: Onnela Lab LLC (6M52R5C7FT)";
-				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2.4.2;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2.4.7;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6M52R5C7FT;
 				ENABLE_BITCODE = NO;
@@ -957,11 +960,11 @@
 				INFOPLIST_PREPROCESS = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 2.4.2;
+				MARKETING_VERSION = 2.4.7;
 				PRODUCT_BUNDLE_IDENTIFIER = harvard.lab.onnela.beiwe.ios;
 				PRODUCT_NAME = Beiwe2;
 				PROVISIONING_PROFILE = "";
-				PROVISIONING_PROFILE_SPECIFIER = "Provisioning Profile created by Eli, July 29 2022";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRIP_INSTALLED_PRODUCT = NO;
 				STRIP_SWIFT_SYMBOLS = NO;
 				SWIFT_OBJC_BRIDGING_HEADER = "./Beiwe/Beiwe-Bridging-Header.h";
@@ -1111,7 +1114,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2.4.2;
+				CURRENT_PROJECT_VERSION = 2.4.7;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6M52R5C7FT;
 				ENABLE_BITCODE = NO;
@@ -1120,7 +1123,7 @@
 				INFOPLIST_PREPROCESS = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 2.4.2;
+				MARKETING_VERSION = 2.4.7;
 				PRODUCT_BUNDLE_IDENTIFIER = lab.onnela.beiwe.ios;
 				PRODUCT_NAME = Beiwe;
 				PROVISIONING_PROFILE = "";
@@ -1145,7 +1148,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Distribution";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution: Onnela Lab LLC (6M52R5C7FT)";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2.4.2;
+				CURRENT_PROJECT_VERSION = 2.4.7;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6M52R5C7FT;
 				ENABLE_BITCODE = NO;
@@ -1154,7 +1157,7 @@
 				INFOPLIST_PREPROCESS = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 2.4.2;
+				MARKETING_VERSION = 2.4.7;
 				PRODUCT_BUNDLE_IDENTIFIER = lab.onnela.beiwe.ios;
 				PRODUCT_NAME = Beiwe;
 				PROVISIONING_PROFILE = "";
