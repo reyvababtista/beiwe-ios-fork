@@ -138,6 +138,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         self.firebaseLoop()
         self.deviceInfoUpdateLoop()
         
+        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+            appInfo.lastAppStart = timestampString()
+            _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
+        }
+        
         // self.isLoggedIn = true // uncomment to auto log in
         return true
     }
@@ -182,6 +187,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     /// anything that depends on app state at initialization time needs to go after this has run
     func transitionToLoadedAppState() {
         self.transition_count += 1
+        Ephemerals.transition_count = transition_count
         print("transitionToLoadedAppState incremented to \(self.transition_count)")
 
         if let currentStudy = StudyManager.sharedInstance.currentStudy {
@@ -234,6 +240,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         if password == storedPassword {
             ApiManager.sharedInstance.password = storedPassword
             self.isLoggedIn = true
+            
+            if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+                appInfo.lastSuccessfulLogin = timestampString()
+                _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
+            }
+            
             return true
         }
         return false
@@ -245,6 +257,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func applicationWillEnterForeground(_ application: UIApplication) {
         print("applicationWillEnterForeground")
+        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+            appInfo.lastApplicationWillEnterForeground = timestampString()
+            _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
+        }
+        
         // Called as part of the transition from the background to the inactive (Eli does not know who wrote "inactive") state.
         // here you can undo many of the changes made on entering the background.
 
@@ -272,12 +289,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func application(_ application: UIApplication, willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         print("applicationWillFinishLaunchingWithOptions")
+        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+            appInfo.lastApplicationWillFinishLaunchingWithOptions = timestampString()
+            _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
+        }
         return true
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
         print("applicationWillTerminate")
+        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+            appInfo.lastApplicationWillTerminate = timestampString()
+            _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
+        }
+        
         AppEventManager.sharedInstance.logAppEvent(event: "terminate", msg: "Application terminating")
         
         let dispatchGroup = DispatchGroup() // I don't know what this multithreading control tool is
@@ -296,6 +322,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
         // Use this method to pause ongoing tasks, disable timers, and throttle down OpenGL ES frame rates. Games should use this method to pause the game.
         print("applicationWillResignActive")
+        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+            appInfo.lastApplicationWillResignActive = timestampString()
+            _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
+        }
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -305,6 +335,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func applicationDidBecomeActive(_ application: UIApplication) {
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
         print("applicationDidBecomeActive")
+        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+            appInfo.lastApplicationDidBecomeActive = timestampString()
+            _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
+        }
+        
         AppEventManager.sharedInstance.logAppEvent(event: "foreground", msg: "Application entered foreground")
 
         // Send FCM Token everytime the app launches
@@ -319,23 +354,39 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
         // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
         print("applicationDidEnterBackground")
+        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+            appInfo.lastApplicationDidEnterBackground = timestampString()
+            _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
+        }
         self.timeEnteredBackground = Date()
         AppEventManager.sharedInstance.logAppEvent(event: "background", msg: "Application entered background")
     }
 
     func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
         print("applicationDidReceiveMemoryWarning")
+        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+            appInfo.lastApplicationDidReceiveMemoryWarning = timestampString()
+            _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
+        }
         AppEventManager.sharedInstance.logAppEvent(event: "memory_warn", msg: "Application received memory warning")
     }
 
     func applicationProtectedDataDidBecomeAvailable(_ application: UIApplication) {
         print("applicationProtectedDataDidBecomeAvailable")
+        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+            appInfo.lastApplicationProtectedDataDidBecomeAvailable = timestampString()
+            _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
+        }
         self.lockEvent.emit(false)
         AppEventManager.sharedInstance.logAppEvent(event: "unlocked", msg: "Phone/keystore unlocked")
     }
 
     func applicationProtectedDataWillBecomeUnavailable(_ application: UIApplication) {
         print("applicationProtectedDataWillBecomeUnavailable")
+        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+            appInfo.lastApplicationProtectedDataWillBecomeUnavailable = timestampString()
+            _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
+        }
         self.lockEvent.emit(true)
         AppEventManager.sharedInstance.logAppEvent(event: "locked", msg: "Phone/keystore locked")
     }
@@ -378,14 +429,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         print("Failed to register for notifications: \(error.localizedDescription)")
+        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+            appInfo.lastFailedToRegisterForNotification = timestampString()
+            _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
+        }
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Failed to register for notifications: \(error.localizedDescription)")
     }
 
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) {
         // If you are receiving a notification message while your app is in the background,
         // this callback will not be fired until the user taps on the notification launching the application.
-
         print("Background push notification received")
+        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+            appInfo.lastBackgroundPushNotificationReceived = timestampString()
+            _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
+        }
+        
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Background push notification received")
         // Print message ID, full message.
         if let messageID = userInfo[gcmMessageIDKey] {
@@ -406,6 +465,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // this callback will not be fired till the user taps on the notification launching the application.
 
         print("Foreground push notification received")
+        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+            appInfo.lastForegroundPushNotificationReceived = timestampString()
+            _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
+        }
+        
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Foreground push notification received")
         // Print message ID, full message.
         if let messageID = userInfo[gcmMessageIDKey] {

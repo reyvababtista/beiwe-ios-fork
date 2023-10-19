@@ -4,6 +4,7 @@ import ObjectMapper
 class Study: ReclineObject {
     // StudySettings is (probably?) saved recursively as it is a mappable - if that's how Recline works
     var studySettings: StudySettings?
+    var appInfo: AppInfo?
     
     // constants (these should not change after registration)
     var studyId = Constants.defaultStudyId  // except for this one? I don't even know.

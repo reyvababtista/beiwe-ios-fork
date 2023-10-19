@@ -12,7 +12,7 @@ struct Constants {
     
     static let BACKGROUND_DEVICE_INFO_QUEUE = DispatchQueue(label: "org.beiwe.background_device_info_queue", attributes: [])
     
-    
+    static let DEFAULT_UNPOPULATED_APPINFO = "never_populated"
 }
 
 struct Ephemerals {
@@ -21,4 +21,15 @@ struct Ephemerals {
     static var locationServicesEnabledDescription = "not populated, this is an app bug"
     static var significantLocationChangeMonitoringAvailable = "not populated, this is an app bug"
     static var backgroundRefreshStatus = "not populated, this is an app bug"
+    static var transition_count = 0
+}
+
+func dateFormat(_ date: Date) -> String {
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateFormat = "HH:mm E, d MMM y"
+    return dateFormatter.string(from: date) + " " + TimeZone.current.identifier
+}
+
+func timestampString() -> String {
+    return dateFormat(Date())
 }

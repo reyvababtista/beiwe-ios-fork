@@ -78,7 +78,26 @@ class ApiManager {
         
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm E, d MMM y"
-        device_status_report["timestamp"] = formatter.string(from: Date()) + " " + TimeZone.current.identifier
+        device_status_report["timestamp"] = timestampString()
+        
+        device_status_report["transition_count"] = Ephemerals.transition_count.description
+        
+        if let appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
+            device_status_report["last_application_will_enter_foreground"] = appInfo.lastApplicationWillEnterForeground
+            device_status_report["last_application_will_finish_launching_with_options"] = appInfo.lastApplicationWillFinishLaunchingWithOptions
+            device_status_report["last_application_will_terminate"] = appInfo.lastApplicationWillTerminate
+            device_status_report["last_application_will_resign_active"] = appInfo.lastApplicationWillResignActive
+            device_status_report["last_application_did_become_active"] = appInfo.lastApplicationDidBecomeActive
+            device_status_report["last_application_did_enter_background"] = appInfo.lastApplicationDidEnterBackground
+            device_status_report["last_application_did_receive_memory_warning"] = appInfo.lastApplicationDidReceiveMemoryWarning
+            device_status_report["last_application_protected_data_did_become_available"] = appInfo.lastApplicationProtectedDataDidBecomeAvailable
+            device_status_report["last_application_protected_data_will_become_unavailable"] = appInfo.lastApplicationProtectedDataWillBecomeUnavailable
+            device_status_report["last_app_start"] = appInfo.lastAppStart
+            device_status_report["last_successful_login"] = appInfo.lastSuccessfulLogin
+            device_status_report["last_failed_to_register_for_notification"] = appInfo.lastFailedToRegisterForNotification
+            device_status_report["last_background_push_notification_received"] = appInfo.lastBackgroundPushNotificationReceived
+            device_status_report["last_foreground_push_notification_received"] = appInfo.lastForegroundPushNotificationReceived
+        }
         
         // UIDevice... Stuff?
         device_status_report["battery_level"] = String(UIDevice.current.batteryLevel)
