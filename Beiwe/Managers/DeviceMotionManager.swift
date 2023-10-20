@@ -104,7 +104,7 @@ class DeviceMotionManager: DataServiceProtocol {
     }
 
     func finishCollecting() -> Promise<Void> {
-        print("Finishing \(self.storeType) collecting")
+        print("Stopping Devicemotion collecting")
         self.pauseCollecting()
         self.store = nil
         return DataStorageManager.sharedInstance.closeStore(self.storeType)

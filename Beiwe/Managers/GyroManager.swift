@@ -64,7 +64,7 @@ class GyroManager: DataServiceProtocol {
 
     /// protocol instruction
     func finishCollecting() -> Promise<Void> {
-        print("Finishing \(self.storeType) collecting")
+        print("Stopping gyro collecting")
         self.pauseCollecting()
         self.store = nil
         return DataStorageManager.sharedInstance.closeStore(self.storeType)

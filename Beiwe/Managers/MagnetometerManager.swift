@@ -63,7 +63,7 @@ class MagnetometerManager: DataServiceProtocol {
 
     /// protocol function
     func finishCollecting() -> Promise<Void> {
-        print("Finishing \(self.storeType) collecting")
+        print("Stopping Magnetometer collecting")
         self.pauseCollecting()
         self.store = nil
         return DataStorageManager.sharedInstance.closeStore(self.storeType)

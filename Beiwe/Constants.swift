@@ -8,7 +8,7 @@ struct Constants {
     
     // settings for functions that have retry logic
     static let RECUR_SLEEP_DURATION = 0.05 // 50 milliseconds
-    static let RECUR_DEPTH = 3
+    static let RECUR_DEPTH = 6
     
     static let BACKGROUND_DEVICE_INFO_QUEUE = DispatchQueue(label: "org.beiwe.background_device_info_queue", attributes: [])
     

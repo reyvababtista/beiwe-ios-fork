@@ -271,13 +271,13 @@ class StudyManager {
         }
         
         // logic that refreshes survey list
-        var activeSurveysModified = clear_out_submitted_surveys()
-        activeSurveysModified = activeSurveysModified || self.ensure_active_surveys()
-        activeSurveysModified = activeSurveysModified || self.removeOldSurveys()
+        let activeSurveysModified_1 = clear_out_submitted_surveys()
+        let activeSurveysModified_2 = self.ensure_active_surveys()
+        let activeSurveysModified_3 = self.removeOldSurveys()
         self.updateBadgerCount()
         
         // save survey data
-        if activeSurveysModified || forceSave {
+        if activeSurveysModified_1 || activeSurveysModified_2 || activeSurveysModified_3 || forceSave {
             self.emit_survey_updates_save_study_data()
         }
     }
