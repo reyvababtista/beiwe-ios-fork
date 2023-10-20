@@ -82,21 +82,21 @@ class ApiManager {
         
         device_status_report["transition_count"] = Ephemerals.transition_count.description
         
-        if let appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-            device_status_report["last_application_will_enter_foreground"] = appInfo.lastApplicationWillEnterForeground
-            device_status_report["last_application_will_finish_launching_with_options"] = appInfo.lastApplicationWillFinishLaunchingWithOptions
-            device_status_report["last_application_will_terminate"] = appInfo.lastApplicationWillTerminate
-            device_status_report["last_application_will_resign_active"] = appInfo.lastApplicationWillResignActive
-            device_status_report["last_application_did_become_active"] = appInfo.lastApplicationDidBecomeActive
-            device_status_report["last_application_did_enter_background"] = appInfo.lastApplicationDidEnterBackground
-            device_status_report["last_application_did_receive_memory_warning"] = appInfo.lastApplicationDidReceiveMemoryWarning
-            device_status_report["last_application_protected_data_did_become_available"] = appInfo.lastApplicationProtectedDataDidBecomeAvailable
-            device_status_report["last_application_protected_data_will_become_unavailable"] = appInfo.lastApplicationProtectedDataWillBecomeUnavailable
-            device_status_report["last_app_start"] = appInfo.lastAppStart
-            device_status_report["last_successful_login"] = appInfo.lastSuccessfulLogin
-            device_status_report["last_failed_to_register_for_notification"] = appInfo.lastFailedToRegisterForNotification
-            device_status_report["last_background_push_notification_received"] = appInfo.lastBackgroundPushNotificationReceived
-            device_status_report["last_foreground_push_notification_received"] = appInfo.lastForegroundPushNotificationReceived
+        if let study = StudyManager.sharedInstance.currentStudy {
+            device_status_report["last_application_will_enter_foreground"] = study.lastApplicationWillEnterForeground
+            device_status_report["last_application_will_finish_launching_with_options"] = study.lastApplicationWillFinishLaunchingWithOptions
+            device_status_report["last_application_will_terminate"] = study.lastApplicationWillTerminate
+            device_status_report["last_application_will_resign_active"] = study.lastApplicationWillResignActive
+            device_status_report["last_application_did_become_active"] = study.lastApplicationDidBecomeActive
+            device_status_report["last_application_did_enter_background"] = study.lastApplicationDidEnterBackground
+            device_status_report["last_application_did_receive_memory_warning"] = study.lastApplicationDidReceiveMemoryWarning
+            device_status_report["last_application_protected_data_did_become_available"] = study.lastApplicationProtectedDataDidBecomeAvailable
+            device_status_report["last_application_protected_data_will_become_unavailable"] = study.lastApplicationProtectedDataWillBecomeUnavailable
+            device_status_report["last_app_start"] = study.lastAppStart
+            device_status_report["last_successful_login"] = study.lastSuccessfulLogin
+            device_status_report["last_failed_to_register_for_notification"] = study.lastFailedToRegisterForNotification
+            device_status_report["last_background_push_notification_received"] = study.lastBackgroundPushNotificationReceived
+            device_status_report["last_foreground_push_notification_received"] = study.lastForegroundPushNotificationReceived
         }
         
         // UIDevice... Stuff?

@@ -26,7 +26,7 @@ struct Ephemerals {
 
 func dateFormat(_ date: Date) -> String {
     let dateFormatter = DateFormatter()
-    dateFormatter.dateFormat = "HH:mm E, d MMM y"
+    dateFormatter.dateFormat = "y-MM-dd HH:mm:ss"
     return dateFormatter.string(from: date) + " " + TimeZone.current.identifier
 }
 

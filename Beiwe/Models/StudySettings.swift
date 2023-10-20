@@ -198,7 +198,8 @@ struct StudySettings: Mappable {
 }
 
 
-/// we need a Mappable for study settings, this isn't Quite a copy paste, have to remove clientPublicKey and use different keys in the mapping function
+/// we need a Mappable for UpdateDeviceSettingsRequest, this isn't Quite a copy-paste of StudySettings, we
+/// have to remove clientPublicKey and use different keys in the mapping function.
 struct JustStudySettings: Mappable {
     init() {}
     init?(map: Map) {}

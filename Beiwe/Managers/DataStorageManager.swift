@@ -443,7 +443,7 @@ class DataStorage {
             // error opening file, reset and try again
             if recur > 0 {
                 self._reset() // must call _reset() because we could be inside a locked reset()
-                log.error("write_raw_to_end_of_file recur at \(recur).")
+                log.error("write_raw_to_end_of_file ERROR recur at \(recur).")
                 Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                 return self.write_raw_to_end_of_file(data, recur: recur - 1)
             }

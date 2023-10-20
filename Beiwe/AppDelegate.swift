@@ -138,8 +138,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         self.firebaseLoop()
         self.deviceInfoUpdateLoop()
         
-        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-            appInfo.lastAppStart = timestampString()
+        if var study = StudyManager.sharedInstance.currentStudy {
+            study.lastAppStart = timestampString()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -218,9 +218,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     /// the password is for show/getting the app through the original IRB/participant security theater.
     func checkPasswordAndLogin(_ password: String) -> Bool {
         // uncomment these lines to make login always succeed, useful for debugging patterns.
-        // ApiManager.sharedInstance.password = PersistentPasswordManager.sharedInstance.passwordForStudy() ?? ""
-        // self.isLoggedIn = true
-        // return true
+        ApiManager.sharedInstance.password = PersistentPasswordManager.sharedInstance.passwordForStudy() ?? ""
+        self.isLoggedIn = true
+        return true
         
         // 2.2.1: there was a bug where access of passwordForStudy using the optional-force operoter (then line 169), e.g.
         //    PersistentPasswordManager.sharedInstance.passwordForStudy()!
@@ -241,8 +241,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             ApiManager.sharedInstance.password = storedPassword
             self.isLoggedIn = true
             
-            if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-                appInfo.lastSuccessfulLogin = timestampString()
+            if var study = StudyManager.sharedInstance.currentStudy {
+                study.lastSuccessfulLogin = timestampString()
                 _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
             }
             
@@ -257,8 +257,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func applicationWillEnterForeground(_ application: UIApplication) {
         print("applicationWillEnterForeground")
-        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-            appInfo.lastApplicationWillEnterForeground = timestampString()
+        if var study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationWillEnterForeground = timestampString()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -289,8 +289,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func application(_ application: UIApplication, willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         print("applicationWillFinishLaunchingWithOptions")
-        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-            appInfo.lastApplicationWillFinishLaunchingWithOptions = timestampString()
+        if var study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationWillFinishLaunchingWithOptions = timestampString()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         return true
@@ -299,8 +299,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func applicationWillTerminate(_ application: UIApplication) {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
         print("applicationWillTerminate")
-        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-            appInfo.lastApplicationWillTerminate = timestampString()
+        if var study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationWillTerminate = timestampString()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -322,8 +322,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
         // Use this method to pause ongoing tasks, disable timers, and throttle down OpenGL ES frame rates. Games should use this method to pause the game.
         print("applicationWillResignActive")
-        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-            appInfo.lastApplicationWillResignActive = timestampString()
+        if var study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationWillResignActive = timestampString()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
     }
@@ -335,8 +335,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func applicationDidBecomeActive(_ application: UIApplication) {
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
         print("applicationDidBecomeActive")
-        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-            appInfo.lastApplicationDidBecomeActive = timestampString()
+        if var study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationDidBecomeActive = timestampString()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -354,8 +354,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
         // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
         print("applicationDidEnterBackground")
-        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-            appInfo.lastApplicationDidEnterBackground = timestampString()
+        if var study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationDidEnterBackground = timestampString()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         self.timeEnteredBackground = Date()
@@ -364,8 +364,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
         print("applicationDidReceiveMemoryWarning")
-        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-            appInfo.lastApplicationDidReceiveMemoryWarning = timestampString()
+        if var study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationDidReceiveMemoryWarning = timestampString()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         AppEventManager.sharedInstance.logAppEvent(event: "memory_warn", msg: "Application received memory warning")
@@ -373,8 +373,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func applicationProtectedDataDidBecomeAvailable(_ application: UIApplication) {
         print("applicationProtectedDataDidBecomeAvailable")
-        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-            appInfo.lastApplicationProtectedDataDidBecomeAvailable = timestampString()
+        if var study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationProtectedDataDidBecomeAvailable = timestampString()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         self.lockEvent.emit(false)
@@ -383,8 +383,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func applicationProtectedDataWillBecomeUnavailable(_ application: UIApplication) {
         print("applicationProtectedDataWillBecomeUnavailable")
-        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-            appInfo.lastApplicationProtectedDataWillBecomeUnavailable = timestampString()
+        if var study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationProtectedDataWillBecomeUnavailable = timestampString()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         self.lockEvent.emit(true)
@@ -429,8 +429,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         print("Failed to register for notifications: \(error.localizedDescription)")
-        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-            appInfo.lastFailedToRegisterForNotification = timestampString()
+        if var study = StudyManager.sharedInstance.currentStudy {
+            study.lastFailedToRegisterForNotification = timestampString()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Failed to register for notifications: \(error.localizedDescription)")
@@ -440,8 +440,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // If you are receiving a notification message while your app is in the background,
         // this callback will not be fired until the user taps on the notification launching the application.
         print("Background push notification received")
-        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-            appInfo.lastBackgroundPushNotificationReceived = timestampString()
+        if var study = StudyManager.sharedInstance.currentStudy {
+            study.lastBackgroundPushNotificationReceived = timestampString()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -465,8 +465,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // this callback will not be fired till the user taps on the notification launching the application.
 
         print("Foreground push notification received")
-        if var appInfo = StudyManager.sharedInstance.currentStudy?.appInfo {
-            appInfo.lastForegroundPushNotificationReceived = timestampString()
+        if var study = StudyManager.sharedInstance.currentStudy {
+            study.lastForegroundPushNotificationReceived = timestampString()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         

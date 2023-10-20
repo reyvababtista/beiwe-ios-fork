@@ -91,7 +91,9 @@ class StudyManager {
                 // print("self.currentStudy.patientId: \(self.currentStudy?.patientId)")
                 // AppDelegate.sharedInstance().setDebuggingUser(self.currentStudy?.patientId ?? "unknown") // this doesn't do anything...
                 StudyManager.real_study_loaded = true
+                self.updateActiveSurveys()
             }
+            
             return .value(true)
         }
     }
@@ -270,8 +272,8 @@ class StudyManager {
         
         // logic that refreshes survey list
         var activeSurveysModified = clear_out_submitted_surveys()
-        activeSurveysModified = activeSurveysModified && self.ensure_active_surveys()
-        activeSurveysModified = activeSurveysModified && self.removeOldSurveys()
+        activeSurveysModified = activeSurveysModified || self.ensure_active_surveys()
+        activeSurveysModified = activeSurveysModified || self.removeOldSurveys()
         self.updateBadgerCount()
         
         // save survey data
@@ -282,7 +284,6 @@ class StudyManager {
     
     func clear_out_submitted_surveys() -> Bool {
         guard let study = currentStudy else {
-            // if there was no
             return false
         }
         
@@ -379,7 +380,6 @@ class StudyManager {
         guard let study = self.currentStudy else {
             return
         }
-        
         var bdgrCnt = 0
         for activeSurvey in study.activeSurveys.values where activeSurvey.survey != nil {
             // if survey is not complete and the survey is not an always available survey
@@ -427,7 +427,7 @@ class StudyManager {
         guard let study = self.currentStudy else {
             return false
         }
-        print("new check_surveys")
+        
         var surveyDataModified = false
         
         // for each survey, check on its availability
