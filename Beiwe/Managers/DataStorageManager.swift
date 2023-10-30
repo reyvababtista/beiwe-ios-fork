@@ -56,13 +56,14 @@ class DataStorageManager {
                 attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
             )
         } catch {
+            print("\(error)")
             if recur > 0 {
                 log.error("create_directories recur at \(recur).")
                 Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                 return self.createDirectories(recur: recur - 1)
             }
-            log.error("Failed to create directories.")
-            fatalError("Failed to create directories.")
+            log.error("Failed to create directories. \(error)")
+            fatalError("Failed to create directories. \(error)")
         }
     }
 
@@ -163,6 +164,7 @@ class DataStorageManager {
                 return self.moveFile(src, dst: dst, recur: recur - 1)
             }
             log.error("Error moving \(src) to \(dst)")
+            print("\(error)")
         }
     }
     
@@ -347,13 +349,14 @@ class DataStorage {
                     print("moved temp data file \(self.filename) to \(self.realFilename)")
                 }
             } catch {
+                print("\(error)")
                 log.error("Error moving temp data \(self.filename) to \(self.realFilename)")
                 if recur > 0 {
                     log.error("reset recur at \(recur).")
                     Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                     return self._reset(recur: recur - 1)
                 }
-                fatalError("Error moving temp data \(self.filename) to \(self.realFilename)")
+                fatalError("Error moving temp data \(self.filename) to \(self.realFilename) \(error)")
             }
         }
         
@@ -382,12 +385,8 @@ class DataStorage {
                 contents: "".data(using: String.Encoding.utf8),
                 attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
             )
-            var message: String
-            if created {
-                message = "Create new data file"
-            } else {
-                message = "Could not create new data file"
-            }
+            
+            var message = if created { "Create new data file" } else { "Could not create new data file" }
             self.conditionalApplog(event: "file_create", msg: message, d1: self.name)
             if !created {
                 // TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
