@@ -56,7 +56,7 @@ class TimerManager {
         for dataStatus in self.dataCollectionServices {
             // use .done because not returning anything - wutchutalkinbout Tuck, we return an empty promise!
             promise = promise.done(on: globalQueue) { (_: ()) in  // this is a very stupid type declaration, _ is an unused Void-returning callable that takes no arguments.
-                dataStatus.handler.finishCollecting().then(on: self.globalQueue) { (_: Void) -> Promise<Void> in  // need to explicitly state return type
+                dataStatus.dataService.finishCollecting().then(on: self.globalQueue) { (_: Void) -> Promise<Void> in  // need to explicitly state return type
                     return Promise()
                 }.catch(on: DispatchQueue.global(qos: .default)) { _ in
                     print("err from finish collecting")
@@ -91,11 +91,11 @@ class TimerManager {
             if var possible_time = dataStatus.nextToggleTime?.timeIntervalSince1970 {  // get toggle time
                 if possible_time <= now {  // if its in the past, toggle!
                     if dataStatus.currentlyOn {  // toggle it off
-                        dataStatus.handler.pauseCollecting()
+                        dataStatus.dataService.pauseCollecting()
                         dataStatus.currentlyOn = false
                         dataStatus.nextToggleTime = Date(timeIntervalSince1970: now + dataStatus.offDurationSeconds)
                     } else {  // toggle it on
-                        dataStatus.handler.startCollecting()
+                        dataStatus.dataService.startCollecting()
                         dataStatus.currentlyOn = true
                         // If there is no off time, we run forever... (some things don't need to be turned off?)
                         if dataStatus.offDurationSeconds == 0 {

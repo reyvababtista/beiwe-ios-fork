@@ -14,12 +14,12 @@ class DataServiceStatus {
     let offDurationSeconds: Double
     var currentlyOn: Bool
     var nextToggleTime: Date?
-    let handler: DataServiceProtocol
+    let dataService: DataServiceProtocol
 
     init(onDurationSeconds: Int, offDurationSeconds: Int, handler: DataServiceProtocol) {
         self.onDurationSeconds = Double(onDurationSeconds)
         self.offDurationSeconds = Double(offDurationSeconds)
-        self.handler = handler
+        self.dataService = handler
         self.currentlyOn = false
         self.nextToggleTime = Date()
     }
