@@ -22,18 +22,18 @@ class TimerManager {
     var nextServicesCheck: TimeInterval = 0
     
     /// a core function that enables many sensor managers (DataServiceProtocols)
-    func addDataService(on_duration: Int, off_duration: Int, handler: DataServiceProtocol) {
+    func addDataService(on_duration: Int, off_duration: Int, dataService: DataServiceProtocol) {
         let dataServiceStatus = DataServiceStatus(
-            onDurationSeconds: on_duration, offDurationSeconds: off_duration, handler: handler
+            onDurationSeconds: on_duration, offDurationSeconds: off_duration, dataService: dataService
         )
-        if handler.initCollecting() {
+        if dataService.initCollecting() {
             self.dataCollectionServices.append(dataServiceStatus)
         }
     }
     
     /// a core function that enables the other half of the data services (data streams)
-    func addDataService(_ handler: DataServiceProtocol) {
-        self.addDataService(on_duration: 1, off_duration: 0, handler: handler)
+    func addDataService(_ dataService: DataServiceProtocol) {
+        self.addDataService(on_duration: 1, off_duration: 0, dataService: dataService)
     }
     
     ///

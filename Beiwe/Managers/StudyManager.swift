@@ -140,10 +140,10 @@ class StudyManager {
         
         // every sensor, which for unfathomable reasons are contained inside the gps manager, activate them
         if studySettings.gps && studySettings.gpsOnDurationSeconds > 0 {
-            self.timerManager.addDataService(on_duration: studySettings.gpsOnDurationSeconds, off_duration: studySettings.gpsOffDurationSeconds, handler: self.gpsManager!)
+            self.timerManager.addDataService(on_duration: studySettings.gpsOnDurationSeconds, off_duration: studySettings.gpsOffDurationSeconds, dataService: self.gpsManager!)
         }
         if studySettings.accelerometer && studySettings.gpsOnDurationSeconds > 0 {
-            self.timerManager.addDataService(on_duration: studySettings.accelerometerOnDurationSeconds, off_duration: studySettings.accelerometerOffDurationSeconds, handler: AccelerometerManager())
+            self.timerManager.addDataService(on_duration: studySettings.accelerometerOnDurationSeconds, off_duration: studySettings.accelerometerOffDurationSeconds, dataService: AccelerometerManager())
         }
         if studySettings.powerState {
             self.timerManager.addDataService(PowerStateManager())
@@ -155,13 +155,13 @@ class StudyManager {
             self.timerManager.addDataService(ReachabilityManager())
         }
         if studySettings.gyro {
-            self.timerManager.addDataService(on_duration: studySettings.gyroOnDurationSeconds, off_duration: studySettings.gyroOffDurationSeconds, handler: GyroManager())
+            self.timerManager.addDataService(on_duration: studySettings.gyroOnDurationSeconds, off_duration: studySettings.gyroOffDurationSeconds, dataService: GyroManager())
         }
         if studySettings.magnetometer && studySettings.magnetometerOnDurationSeconds > 0 {
-            self.timerManager.addDataService(on_duration: studySettings.magnetometerOnDurationSeconds, off_duration: studySettings.magnetometerOffDurationSeconds, handler: MagnetometerManager())
+            self.timerManager.addDataService(on_duration: studySettings.magnetometerOnDurationSeconds, off_duration: studySettings.magnetometerOffDurationSeconds, dataService: MagnetometerManager())
         }
         if studySettings.motion && studySettings.motionOnDurationSeconds > 0 {
-            self.timerManager.addDataService(on_duration: studySettings.motionOnDurationSeconds, off_duration: studySettings.motionOffDurationSeconds, handler: DeviceMotionManager())
+            self.timerManager.addDataService(on_duration: studySettings.motionOnDurationSeconds, off_duration: studySettings.motionOffDurationSeconds, dataService: DeviceMotionManager())
         }
         self.gpsManager!.startGps()
         self.timerManager.start()
