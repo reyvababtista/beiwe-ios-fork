@@ -31,7 +31,7 @@ class TimerManager {
         }
     }
     
-    /// a core function that enables the other half of the data services (data streams)
+    /// a core function that enables the other half of the data services (data streams with no timers)
     func addDataService(_ dataService: DataServiceProtocol) {
         self.addDataService(on_duration: 1, off_duration: 0, dataService: dataService)
     }
@@ -130,7 +130,7 @@ class TimerManager {
         }
 
         /// set the next service date (its a timeInterval object) to the next event time
-        self.nextServicesCheck = self.dispatchToServices()
+        self.nextServicesCheck = self.runDataCollectionServicesToggleLogic()
         let now = Date().timeIntervalSince1970 // from before the network tasks execute
         
         // conditionally runs any network operations, handles reachability

@@ -27,9 +27,33 @@ struct Ephemerals {
 func dateFormat(_ date: Date) -> String {
     let dateFormatter = DateFormatter()
     dateFormatter.dateFormat = "y-MM-dd HH:mm:ss"
-    return dateFormatter.string(from: date) + " " + TimeZone.current.identifier
+    return dateFormatter.string(from: date)
 }
+
+func timeFormat(_ date: Date) -> String {
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateFormat = "HH:mm:ss"
+    return dateFormatter.string(from: date)
+}
+
+// Swift can't work out how to call the Date-typed version of the call from inside the TimeInterval-typed version of the call.
+func _swift_sucks_explicit_function_type_dateFormat(_ date: Date) -> String {
+    return dateFormat(date)
+}
+func _swift_sucks_explicit_function_type_timeFormat(_ date: Date) -> String {
+    return timeFormat(date)
+}
+
+func dateformat(_ unix_timestamp: TimeInterval) -> String {
+    return _swift_sucks_explicit_function_type_dateFormat(Date(timeIntervalSince1970: unix_timestamp))
+}
+
+func timeformat(_ unix_timestamp: TimeInterval) -> String {
+    return _swift_sucks_explicit_function_type_timeFormat(Date(timeIntervalSince1970: unix_timestamp))
+}
+
 
 func timestampString() -> String {
     return dateFormat(Date())
 }
+

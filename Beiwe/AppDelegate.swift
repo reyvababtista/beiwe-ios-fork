@@ -139,7 +139,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         self.deviceInfoUpdateLoop()
         
         if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastAppStart = timestampString()
+            study.lastAppStart = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -218,9 +218,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     /// the password is for show/getting the app through the original IRB/participant security theater.
     func checkPasswordAndLogin(_ password: String) -> Bool {
         // uncomment these lines to make login always succeed, useful for debugging patterns.
-        ApiManager.sharedInstance.password = PersistentPasswordManager.sharedInstance.passwordForStudy() ?? ""
-        self.isLoggedIn = true
-        return true
+        // ApiManager.sharedInstance.password = PersistentPasswordManager.sharedInstance.passwordForStudy() ?? ""
+        // self.isLoggedIn = true
+        // return true
         
         // 2.2.1: there was a bug where access of passwordForStudy using the optional-force operoter (then line 169), e.g.
         //    PersistentPasswordManager.sharedInstance.passwordForStudy()!
@@ -242,7 +242,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             self.isLoggedIn = true
             
             if var study = StudyManager.sharedInstance.currentStudy {
-                study.lastSuccessfulLogin = timestampString()
+                study.lastSuccessfulLogin = timestampString() + " " + TimeZone.current.identifier
                 _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
             }
             
@@ -258,7 +258,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func applicationWillEnterForeground(_ application: UIApplication) {
         print("applicationWillEnterForeground")
         if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationWillEnterForeground = timestampString()
+            study.lastApplicationWillEnterForeground = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -290,7 +290,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func application(_ application: UIApplication, willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         print("applicationWillFinishLaunchingWithOptions")
         if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationWillFinishLaunchingWithOptions = timestampString()
+            study.lastApplicationWillFinishLaunchingWithOptions = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         return true
@@ -300,7 +300,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
         print("applicationWillTerminate")
         if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationWillTerminate = timestampString()
+            study.lastApplicationWillTerminate = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -323,7 +323,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // Use this method to pause ongoing tasks, disable timers, and throttle down OpenGL ES frame rates. Games should use this method to pause the game.
         print("applicationWillResignActive")
         if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationWillResignActive = timestampString()
+            study.lastApplicationWillResignActive = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
     }
@@ -336,7 +336,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
         print("applicationDidBecomeActive")
         if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationDidBecomeActive = timestampString()
+            study.lastApplicationDidBecomeActive = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -355,7 +355,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
         print("applicationDidEnterBackground")
         if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationDidEnterBackground = timestampString()
+            study.lastApplicationDidEnterBackground = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         self.timeEnteredBackground = Date()
@@ -365,7 +365,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
         print("applicationDidReceiveMemoryWarning")
         if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationDidReceiveMemoryWarning = timestampString()
+            study.lastApplicationDidReceiveMemoryWarning = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         AppEventManager.sharedInstance.logAppEvent(event: "memory_warn", msg: "Application received memory warning")
@@ -374,7 +374,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func applicationProtectedDataDidBecomeAvailable(_ application: UIApplication) {
         print("applicationProtectedDataDidBecomeAvailable")
         if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationProtectedDataDidBecomeAvailable = timestampString()
+            study.lastApplicationProtectedDataDidBecomeAvailable = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         self.lockEvent.emit(false)
@@ -384,7 +384,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func applicationProtectedDataWillBecomeUnavailable(_ application: UIApplication) {
         print("applicationProtectedDataWillBecomeUnavailable")
         if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationProtectedDataWillBecomeUnavailable = timestampString()
+            study.lastApplicationProtectedDataWillBecomeUnavailable = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         self.lockEvent.emit(true)
@@ -430,7 +430,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         print("Failed to register for notifications: \(error.localizedDescription)")
         if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastFailedToRegisterForNotification = timestampString()
+            study.lastFailedToRegisterForNotification = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Failed to register for notifications: \(error.localizedDescription)")
@@ -441,7 +441,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // this callback will not be fired until the user taps on the notification launching the application.
         print("Background push notification received")
         if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastBackgroundPushNotificationReceived = timestampString()
+            study.lastBackgroundPushNotificationReceived = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -466,7 +466,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
         print("Foreground push notification received")
         if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastForegroundPushNotificationReceived = timestampString()
+            study.lastForegroundPushNotificationReceived = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         

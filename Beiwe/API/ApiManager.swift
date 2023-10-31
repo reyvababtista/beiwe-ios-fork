@@ -76,10 +76,8 @@ class ApiManager {
         // various device metrics to be improved on over time, meant for developer use to debug issues.
         var device_status_report = [String: String]()
         
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm E, d MMM y"
-        device_status_report["timestamp"] = timestampString()
         
+        device_status_report["timestamp"] = timestampString() + " " + TimeZone.current.identifier
         device_status_report["transition_count"] = Ephemerals.transition_count.description
         
         if let study = StudyManager.sharedInstance.currentStudy {
