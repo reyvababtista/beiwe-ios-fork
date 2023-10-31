@@ -996,19 +996,19 @@ class StudyManager {
     
     /// only called from AppDelegate.applicationWillTerminate
     func stop() -> Promise<Bool> {
-        // stop gps because it interacts with app persistence.
+        // stop gps because it interacts with app persistence...?
         if self.gpsManager != nil {
             self.gpsManager!.stopGps()
             self.gpsManager = nil
         }
         
-        // stop all recording, clear registered
+        // stop all recording, clear registered timer events
         self.timerManager.stop()
         self.timerManager.clear()
-        var promise: Promise<Void> = Promise()
+        
         // clear currentStudy
-        return promise.then(on: DispatchQueue.global(qos: .default)) { (_: Void) -> Promise<Bool> in
-            // self.gpsManager = nil  // I guess this is unnecessary?
+        return Promise().then(on: DispatchQueue.global(qos: .default)) { (_: Void) -> Promise<Bool> in
+            // many things depend on current study, lets try a build with this removed.
             self.currentStudy = nil
             StudyManager.real_study_loaded = false
             return .value(true)

@@ -375,11 +375,22 @@ class DataStorage {
         self.lazy_reset_active = true
     }
     
+    
+    /// all file paths in the scope of the app are of this form:
+    /// /var/mobile/Containers/Data/Application/49ECF24B-85A4-40C1-BC57-92B742C6ED64/Library/Caches/currentdat(a/patientid_accel_1698721703289.csv
+    /// the uuid is randomized per installation. We could remove it with a splice, but regex would be better. (not implemented)
+    func shortenPath(_ path_string: String) -> String {
+        return path_string.replacingOccurrences(of: "/var/mobile/Containers/Data/Application/", with: "")
+    }
+    func shortenPath(_ url: URL) -> String {
+        return shortenPath(url.path)
+    }
+    
     /// unlocked function to ensure that a file exists.
     private func _ensure_file_exists(recur: Int) {
         // if there is no file, create it with these permissions and no data
         if !self.check_file_exists() {
-            print("creating file '\(self.filename.path)'...")
+            print("creating file '\(shortenPath(self.filename))'...")
             let created = FileManager.default.createFile(
                 atPath: self.filename.path,
                 contents: "".data(using: String.Encoding.utf8),
@@ -392,7 +403,7 @@ class DataStorage {
                 // TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
                 if recur > 0 {
                     log.error("ensure_file_exists recur at \(recur).")
-                    print("COULD NOT CREATE FILE '\(self.filename.path)'...")
+                    print("COULD NOT CREATE FILE '\(shortenPath(self.filename))'...")
                     Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                     return self._ensure_file_exists(recur: recur - 1) // needs to actually call the _ version of the function (2.3.1 was incorrect, oops)
                 }

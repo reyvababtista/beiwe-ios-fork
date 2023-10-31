@@ -52,8 +52,23 @@ func timeformat(_ unix_timestamp: TimeInterval) -> String {
     return _swift_sucks_explicit_function_type_timeFormat(Date(timeIntervalSince1970: unix_timestamp))
 }
 
+func smartformat(_ d: Date) -> String {
+    if Calendar.current.isDateInToday(d) {
+        return timeFormat(d)
+    } else {
+        return dateFormat(d)
+    }
+}
+
+func smartformat(_ unix_timestamp: TimeInterval) -> String {
+    let d = Date(timeIntervalSince1970: unix_timestamp)
+    if Calendar.current.isDateInToday(d) {
+        return timeFormat(d)
+    } else {
+        return dateFormat(d)
+    }
+}
 
 func timestampString() -> String {
     return dateFormat(Date())
 }
-
