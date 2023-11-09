@@ -392,7 +392,14 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         
         // set up data file
         let name = TrackingSurveyPresenter.surveyDataType + "_" + surveyId
-        let dataFile = DataStorage(type: name, headers: TrackingSurveyPresenter.headers, patientId: patientId, publicKey: publicKey, moveOnClose: true, keyRef: DataStorageManager.sharedInstance.secKeyRef)
+        let dataFile = DataStorage(
+            type: name,
+            headers: TrackingSurveyPresenter.headers,
+            patientId: patientId,
+            publicKey: publicKey,
+            moveOnClose: true,
+            keyRef: StudyManager.sharedInstance.keyRef
+        )
         dataFile.sanitize = true
         
         // no questions

@@ -17,31 +17,103 @@ class DataStorageManager {
     static let sharedInstance = DataStorageManager()
     static let dataFileSuffix = ".csv"
 
-    var publicKey: String?
     var storageTypes: [String: DataStorage] = [:]
-    var study: Study?
     var secKeyRef: SecKey?
+    var initted = false
 
     ///////////////////////////////////////////////// Setup //////////////////////////////////////////////////////
     
     /// instantiates your DataStorage object - called in every manager
     func createStore(_ type: String, headers: [String]) -> DataStorage {
+        //! in order to avoid a race condition we cannot stash data on this object and then access it later, we need to access
+        //! it through the StudyManager
+        if !self.initted {
+            // we tried accessing the keyRef variable on the study manager but that variable would be null.
+            // No real understanding of why this code works, except that we always call the dataStorageManagerInit
+            // externally to set it just before this runs in an external scope? that would be an Extremely
+            // tight time window for a race condition...
+            log.error("createStore called before the DataStorageManager received secKeyRef, app should crash now.")
+        }
+        
         if self.storageTypes[type] == nil {
-            if let publicKey = publicKey, let patientId = study?.patientId {
-                self.storageTypes[type] = DataStorage(
-                    type: type,
-                    headers: headers,
-                    patientId: patientId,
-                    publicKey: publicKey,
-                    keyRef: self.secKeyRef
-                )
+            if let study = StudyManager.sharedInstance.currentStudy {
+                if let patientId = study.patientId { // FIXME: need to identify if this has a patient id that is null or a public key
+                    if let studySettings = study.studySettings {
+                        if let publicKey = studySettings.clientPublicKey {
+                            self.storageTypes[type] = DataStorage(
+                                type: type,
+                                headers: headers,
+                                patientId: patientId,
+                                publicKey: publicKey,
+                                keyRef: self.secKeyRef
+                            )
+                        } else {
+                            fatalError("(createStore) No public key found!")
+                        }
+                    } else {
+                        fatalError("(createStore) No study settings found!")
+                    }
+                } else {
+                    fatalError("(createStore) No patient id found!")
+                }
             } else {
-                fatalError("No public key found! Can't store data")
+                fatalError("(createStore) No study found!")
             }
         }
         return self.storageTypes[type]!
     }
 
+    func dataStorageManagerInit(_ study: Study, secKeyRef: SecKey?) {
+        self.initted = true
+        self.secKeyRef = secKeyRef
+        // this function used to be called setCurrentStudy, but there was a looked-like-a-race-condition
+        // in stashing these variables early on during app start, and then trying to access them later.
+        // Fully removing the stashing of `self.secKeyRef` resulted in
+        //   StudyManager().currentStudy?.keyRef
+        // causing a null access (wrapped in an if-let statement so we know it was exactly .keyRef, not something else)
+        // to occur.
+        // Maybe the call to dataStorageManagerInit and passing the non-nullable study forces the compiler to block
+        // until keyRef exists on StudyManager.currentStudy. Or somehow its the (optional tho?) secKeyRef that's passed in.
+        
+        // OLD CODE:
+        // self.study = study
+        // if let publicKey = study.studySettings?.clientPublicKey {
+        //     self.publicKey = publicKey
+        // }
+    }
+
+    /// see comment about race condition in createStore. We are using the same pattern here because we discovered a race condition
+    /// in very similar code over there.
+    func createEncryptedFile(type: String, suffix: String) -> EncryptedStorage {
+        if !self.initted {
+            log.error("createEncryptedFile called before the DataStorageManager received secKeyRef, app should crash now.")
+        }
+        
+        if let study = StudyManager.sharedInstance.currentStudy {
+            if let patientId = study.patientId {
+                if let studySettings = study.studySettings {
+                    if let publicKey = studySettings.clientPublicKey {
+                        return EncryptedStorage(
+                            data_stream_type: type,
+                            suffix: suffix,
+                            patientId: patientId,
+                            publicKey: PersistentPasswordManager.sharedInstance.publicKeyName(patientId),
+                            keyRef: self.secKeyRef
+                        )
+                    } else {
+                        fatalError("(createEncryptedFile) No public key found!")
+                    }
+                } else {
+                    fatalError("(createEncryptedFile) No study settings found!")
+                }
+            } else {
+                fatalError("(createEncryptedFile) No patient id found!")
+            }
+        } else {
+            fatalError("(createEncryptedFile) No study found!")
+        }
+    }
+    
     /// creates the currentData and upload directories. app crashes if this fails because that is a fundamental app failure.
     func createDirectories(recur: Int = Constants.RECUR_DEPTH) {
         do {
@@ -65,24 +137,6 @@ class DataStorageManager {
             log.error("Failed to create directories. \(error)")
             fatalError("Failed to create directories. \(error)")
         }
-    }
-
-    func setCurrentStudy(_ study: Study, secKeyRef: SecKey?) {
-        self.study = study
-        self.secKeyRef = secKeyRef
-        if let publicKey = study.studySettings?.clientPublicKey {
-            self.publicKey = publicKey
-        }
-    }
-
-    func createEncryptedFile(type: String, suffix: String) -> EncryptedStorage {
-        return EncryptedStorage(
-            data_stream_type: type,
-            suffix: suffix,
-            patientId: self.study!.patientId!,
-            publicKey: PersistentPasswordManager.sharedInstance.publicKeyName(self.study!.patientId!),
-            keyRef: self.secKeyRef
-        )
     }
     
     ///////////////////////////////////////////////// Informational //////////////////////////////////////////////////////
@@ -242,7 +296,6 @@ class DataStorage {
         self.filename = self.realFilename
 
         self.reset() // properly creates new mutables, sets lazy_reset_active to TRUE
-        
     }
     
     ////////////////////////////////////// Locking, public functions ///////////////////////////////////////
@@ -253,7 +306,7 @@ class DataStorage {
             self.lock_file_level_operation.unlock()
         }
         self.lock_file_level_operation.lock()
-        lazy_new_file_setup() // tests for whether lazy new file operations need to occur.
+        self.lazy_new_file_setup() // tests for whether lazy new file operations need to occur.
         self._store(data)
     }
     
@@ -375,22 +428,22 @@ class DataStorage {
         self.lazy_reset_active = true
     }
     
-    
     /// all file paths in the scope of the app are of this form:
     /// /var/mobile/Containers/Data/Application/49ECF24B-85A4-40C1-BC57-92B742C6ED64/Library/Caches/currentdat(a/patientid_accel_1698721703289.csv
     /// the uuid is randomized per installation. We could remove it with a splice, but regex would be better. (not implemented)
     func shortenPath(_ path_string: String) -> String {
         return path_string.replacingOccurrences(of: "/var/mobile/Containers/Data/Application/", with: "")
     }
+
     func shortenPath(_ url: URL) -> String {
-        return shortenPath(url.path)
+        return self.shortenPath(url.path)
     }
     
     /// unlocked function to ensure that a file exists.
     private func _ensure_file_exists(recur: Int) {
         // if there is no file, create it with these permissions and no data
         if !self.check_file_exists() {
-            print("creating file '\(shortenPath(self.filename))'...")
+            print("creating file '\(self.shortenPath(self.filename))'...")
             let created = FileManager.default.createFile(
                 atPath: self.filename.path,
                 contents: "".data(using: String.Encoding.utf8),
@@ -403,7 +456,7 @@ class DataStorage {
                 // TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
                 if recur > 0 {
                     log.error("ensure_file_exists recur at \(recur).")
-                    print("COULD NOT CREATE FILE '\(shortenPath(self.filename))'...")
+                    print("COULD NOT CREATE FILE '\(self.shortenPath(self.filename))'...")
                     Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                     return self._ensure_file_exists(recur: recur - 1) // needs to actually call the _ version of the function (2.3.1 was incorrect, oops)
                 }

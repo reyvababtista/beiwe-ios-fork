@@ -74,13 +74,19 @@ class StudyManager {
     /// sets (but also clears?) the current study, and the gpsManager, sets real_study_loaded to true
     /// called just after registration, and when app is loaded with a registered study
     func loadDefaultStudy() -> Promise<Bool> {
+        // print("(loadDefaultStudy) actual run start")
         self.currentStudy = nil
         self.gpsManager = nil
         
         // mostly sets real_study_loaded to true...
         return firstly { () -> Promise<[Study]> in
-            Recline.shared.queryAll() // this returns a list of all studies as a parameter to the next promise.
+            // print("(loadDefaultStudy) firstly queryall start")
+            return Recline.shared.queryAll() // this returns a list of all studies as a parameter to the next promise.
+            // I don't understand but trying to refactor as follows for a print statement doesn't work?
+            // print(print("(loadDefaultStudy) firstly queryall done"))
+            // return x
         }.then { (studies: [Study]) -> Promise<Bool> in
+            // print("(loadDefaultStudy) then...")
             // if there is more than one study, log a warning? this is pointless
             if studies.count > 1 {
                 log.warning("Multiple Studies: \(studies)")
@@ -88,10 +94,14 @@ class StudyManager {
             // grab the first study and the first study only, set the patient id (but not), real_study_loaded to true
             if studies.count > 0 {
                 self.currentStudy = studies[0]
+                // print("(loadDefaultStudy) WE SET CURRENT STUDY")
                 // print("self.currentStudy.patientId: \(self.currentStudy?.patientId)")
                 // AppDelegate.sharedInstance().setDebuggingUser(self.currentStudy?.patientId ?? "unknown") // this doesn't do anything...
                 StudyManager.real_study_loaded = true
+                // print("(loadDefaultStudy) real_study_loaded = true")
                 self.updateActiveSurveys()
+            } else {
+                // print("(loadDefaultStudy) UHOH STUDY COUNT IS 0")
             }
             
             return .value(true)
@@ -105,7 +115,7 @@ class StudyManager {
             return
         }
         self.setApiCredentials()
-        DataStorageManager.sharedInstance.setCurrentStudy(self.currentStudy!, secKeyRef: self.keyRef)
+        DataStorageManager.sharedInstance.dataStorageManagerInit(self.currentStudy!, secKeyRef: self.keyRef)
         self.prepareDataServices() // okay prepareDataServices is 90% of the function body
         NotificationCenter.default.addObserver(self, selector: #selector(self.reachabilityChanged), name: ReachabilityChangedNotification, object: nil)
     }
@@ -183,7 +193,7 @@ class StudyManager {
         // set consented to true (checked over in AppDelegate)
         study.participantConsented = true
         // some io stuff
-        DataStorageManager.sharedInstance.setCurrentStudy(study, secKeyRef: self.keyRef)
+        DataStorageManager.sharedInstance.dataStorageManagerInit(study, secKeyRef: self.keyRef)
         DataStorageManager.sharedInstance.createDirectories()
         // update study stuff?
         return Recline.shared.save(study).then { (_: Study) -> Promise<Bool> in
@@ -299,7 +309,10 @@ class StudyManager {
             } else if activeSurvey.isComplete {
                 // case normal survey, is complete
                 surveyDataModified = true
-                self.submitSurvey(activeSurvey)
+                // why was this still here... This was supposed to be disabled in 2.4.9 but had to comment it out in 2.4.10.
+                // I guess this is what was causing the race condition bug in 2.4.9, but it also _wasn't_ causing
+                // the extra submitted survey files submitted bug in 2.4.9. This was very confusing.
+                // self.submitSurvey(activeSurvey)
             }
         }
         

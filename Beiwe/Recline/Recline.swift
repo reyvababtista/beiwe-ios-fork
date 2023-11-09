@@ -118,7 +118,7 @@ class Recline {
                     return resolver.fulfill(newObj)
                 }
             }
-            // this is the failure case
+            // this is the failure case?
             return resolver.fulfill(nil)
         }
     }
@@ -148,7 +148,7 @@ class Recline {
             }
             when(fulfilled: promises).done(on: Recline.queue) { results in
                 // resolve([])
-                resolver.fulfill(results.filter { $0 != nil }.map { $0! })  // no. clue.
+                resolver.fulfill(results.filter { $0 != nil }.map { $0! })  // I think this where it has found all the documents and is... making them findable
             }.catch { err in
                 resolver.reject(err)
             }
