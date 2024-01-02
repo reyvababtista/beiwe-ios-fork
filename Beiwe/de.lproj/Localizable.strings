@@ -104,7 +104,7 @@
 "study_welcome_message" = "Willkommen in der Studie";
 "review_consent_text" = "Einverständnis einsehen";
 "review_consent_reason" = "Einwilligung zur Teilnahme am Forschungsprojekt";
-"continue_to_permissions_button_title" = "rlauben";
+"continue_to_permissions_button_title" = "Erlaubnis erteilen";
 
 "survey_notification_text" = "Eine neue Befragung steht bereit";
 "audio_survey_notification_text" = "Eine neue Audiobefragung steht bereit";
