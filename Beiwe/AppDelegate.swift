@@ -150,7 +150,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     /// Run this function once at app boot and it will rerun itself every minute, updating some stored values that are in turn reported to the server.
     func deviceInfoUpdateLoop() {
         Constants.BACKGROUND_DEVICE_INFO_QUEUE.async(qos: .background) {
-            
             // This takes an amount of time to run / must be run ~asynchronously
             UNUserNotificationCenter.current().getNotificationSettings(completionHandler: { settings in
                 Ephemerals.notification_permission = switch settings.authorizationStatus {
@@ -187,7 +186,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     /// anything that depends on app state at initialization time needs to go after this has run
     func transitionToLoadedAppState() {
         self.transition_count += 1
-        Ephemerals.transition_count = transition_count
+        Ephemerals.transition_count = self.transition_count
         print("transitionToLoadedAppState incremented to \(self.transition_count)")
 
         if let currentStudy = StudyManager.sharedInstance.currentStudy {
@@ -197,16 +196,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             
             if !self.isLoggedIn {
                 // Load up the log in view
-                self.changeRootViewControllerWithIdentifier("login")
+                print("transitionToLoadedAppState - isLoggedIn false, setting to login screen")
+                // OK. I think we have a race condition somewhere that causes the black screen bug "here" (it might be the other thread that is the bug itself).
+                // When this code is encapsulated by DispatchQueue.main.async we get an animated transition to the login screen when the login timer expires and the user
+                // opens the app. Without it we get dropped into a no-ui state, a black screen, and the following message:
+                // """ This method can cause UI unresponsiveness if invoked on the main thread. Instead, consider waiting for the `-locationManagerDidChangeAuthorization:` callback and checking `authorizationStatus` first. """
+                // This is probably part of the check for location permissions, which we have interacted with before and tldr: it blocks weirdly, find the code for it to see more.,
+                DispatchQueue.main.async {
+                    self.changeRootViewControllerWithIdentifier("login")
+                }
             } else {
                 // We are logged in, so if we've completed onboarding load main interface, Otherwise continue onboarding.
                 if currentStudy.participantConsented {
+                    // print("transitionToLoadedAppState - isLoggedIn True, setting to main view")
                     self.changeRootViewControllerWithIdentifier("mainView")
                 } else {
+                    // print("transitionToLoadedAppState - isLoggedIn True, setting to consent view")
                     self.changeRootViewController(ConsentManager().consentViewController)
                 }
             }
-            self.initializeFirebase() // this is safe to call
+            self.initializeFirebase()
         } else {
             // If there is no study loaded, then it's obvious.  We need the onboarding flow from the beginning.
             self.changeRootViewController(OnboardingManager().onboardingViewController)
@@ -264,23 +273,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         
         // Called as part of the transition from the background to the inactive (Eli does not know who wrote "inactive") state.
         // here you can undo many of the changes made on entering the background.
-
         UNUserNotificationCenter.current().getDeliveredNotifications { (notifications: [UNNotification]) in
             for notification in notifications {
                 self.handleSurveyNotification(userInfo: notification.request.content.userInfo)
             }
         }
         
+        // clear any notification center items.
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
-        if let timeEnteredBackground = timeEnteredBackground,
-           let currentStudy = StudyManager.sharedInstance.currentStudy,
-           let studySettings = currentStudy.studySettings,
-           isLoggedIn == true {
-            let loginExpires = timeEnteredBackground.addingTimeInterval(Double(studySettings.secondsBeforeAutoLogout))
-            if loginExpires.compare(Date()) == ComparisonResult.orderedAscending {
-                // expired.  Log 'em out
-                self.isLoggedIn = false
-                self.transitionToLoadedAppState()
+        
+        // logout timer check
+        if let timeEnteredBackground = timeEnteredBackground, let currentStudy = StudyManager.sharedInstance.currentStudy, let studySettings = currentStudy.studySettings {
+            if self.isLoggedIn {
+                let loginExpires = timeEnteredBackground.addingTimeInterval(Double(studySettings.secondsBeforeAutoLogout))
+                // old incomprehensible code for identifying if the logout timer has passed. It works, just leave it
+                if loginExpires.compare(Date()) == ComparisonResult.orderedAscending {
+                    // print("expired.  Log 'em out")
+                    self.isLoggedIn = false
+                    self.transitionToLoadedAppState()
+                }
             }
         } else {
             self.isLoggedIn = false
@@ -439,7 +450,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) {
         // If you are receiving a notification message while your app is in the background,
         // this callback will not be fired until the user taps on the notification launching the application.
-        print("Background push notification received")
+        print("Background push notification received NOT IN EXTENSION")
         if var study = StudyManager.sharedInstance.currentStudy {
             study.lastBackgroundPushNotificationReceived = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
@@ -462,9 +473,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         // If you are receiving a notification message while your app is in the background,
-        // this callback will not be fired till the user taps on the notification launching the application.
+        // this callback will not be fired until the user taps on the notification launching the application.
 
-        print("Foreground push notification received")
+        print("Foreground push notification received func application")
         if var study = StudyManager.sharedInstance.currentStudy {
             study.lastForegroundPushNotificationReceived = timestampString() + " " + TimeZone.current.identifier
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
@@ -620,13 +631,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                 sleep(1)
             }
             while FirebaseApp.app() == nil { // FirebaseApp.app() emits the firebase spam log
+                // print("waiting firbase app to be ready")
                 sleep(1)
             }
             Messaging.messaging().delegate = self
             UNUserNotificationCenter.current().delegate = self
             // App crashes if this isn't called on main thread
             DispatchQueue.main.async {
-                // application.registerForRemoteNotifications()
                 UIApplication.shared.registerForRemoteNotifications()
                 if let token = Messaging.messaging().fcmToken {
                     self.sendFCMToken(fcmToken: token)
@@ -713,6 +724,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         if identifier == self.currentRootView {
             return
         }
+        // the parentheses are required for the forced unwrap... why?
         let desiredViewController: UIViewController = (self.storyboard?.instantiateViewController(withIdentifier: identifier))!
         self.changeRootViewController(desiredViewController, identifier: identifier)
     }
@@ -811,28 +823,26 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
     func handleAnySurveys(_ notificationRequest: UNNotificationRequest) {
         // grab the survey ids, call if the notification is for a survey
         let userInfoDict: [AnyHashable: Any] = notificationRequest.content.userInfo
-        if userInfoDict["survey_ids"] != nil {
-            self.handleSurveyNotification(userInfo: userInfoDict)
-        }
+        self.handleSurveyNotification(userInfo: userInfoDict)
     }
 
     // Receive displayed notifications for iOS 10 devices.
-    // Is called when receiving a notification while app is in foreground
+    // THIS ONE is called when RECEIVING a notification while app is in FOREGROUND.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        print("Foreground push notification received in extension")
+        // print("Foreground push notification received in extension 1")
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Foreground push notification received")
         self.printMessageInfo(notification.request)
         self.handleAnySurveys(notification.request)
         completionHandler([]) // Change to preferred presentation option
     }
 
-    // Is called when tapping on notification when app is in background
+    // THIS ONE is called when TAPPING on notification when app is in BACKGROUND.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        print("Background push notification received in extension")
+        // print("Background push notification received in extension 2")
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Background push notification received")
         self.printMessageInfo(response.notification.request)
         self.handleAnySurveys(response.notification.request)
