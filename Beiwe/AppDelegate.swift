@@ -195,16 +195,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             }
             
             if !self.isLoggedIn {
-                // Load up the log in view
-                print("transitionToLoadedAppState - isLoggedIn false, setting to login screen")
-                // OK. I think we have a race condition somewhere that causes the black screen bug "here" (it might be the other thread that is the bug itself).
-                // When this code is encapsulated by DispatchQueue.main.async we get an animated transition to the login screen when the login timer expires and the user
-                // opens the app. Without it we get dropped into a no-ui state, a black screen, and the following message:
-                // """ This method can cause UI unresponsiveness if invoked on the main thread. Instead, consider waiting for the `-locationManagerDidChangeAuthorization:` callback and checking `authorizationStatus` first. """
-                // This is probably part of the check for location permissions, which we have interacted with before and tldr: it blocks weirdly, find the code for it to see more.,
-                DispatchQueue.main.async {
-                    self.changeRootViewControllerWithIdentifier("login")
-                }
+                // Load up the login view - when the animation is working (it used to not work 🙄) the main screen is
+                // visible briefly.  This is fine? we aren't really protecting any data here.
+                self.changeRootViewControllerWithIdentifier("login")
             } else {
                 // We are logged in, so if we've completed onboarding load main interface, Otherwise continue onboarding.
                 if currentStudy.participantConsented {
@@ -249,12 +242,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         if password == storedPassword {
             ApiManager.sharedInstance.password = storedPassword
             self.isLoggedIn = true
-            
             if var study = StudyManager.sharedInstance.currentStudy {
                 study.lastSuccessfulLogin = timestampString() + " " + TimeZone.current.identifier
                 _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
             }
-            
             return true
         }
         return false
@@ -710,9 +701,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     func initializeUI() {
-        // some ui stuff
+        // set up colors for researchkit, set the launch screen view.
         let rkAppearance: UIView = UIView.appearance(whenContainedInInstancesOf: [ORKTaskViewController.self])
         rkAppearance.tintColor = AppColors.tintColor
+        // set core ui to load launch screen - this is only called at app-open, don't wrap in DispatchQueue.main.async
         self.storyboard = UIStoryboard(name: "Main", bundle: Bundle.main)
         self.window = UIWindow(frame: UIScreen.main.bounds)
         self.window?.rootViewController = UIStoryboard(
@@ -720,6 +712,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         self.window!.makeKeyAndVisible()
     }
 
+    /// Helper function for setting root view controller by name
     func changeRootViewControllerWithIdentifier(_ identifier: String!) {
         if identifier == self.currentRootView {
             return
@@ -728,30 +721,31 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         let desiredViewController: UIViewController = (self.storyboard?.instantiateViewController(withIdentifier: identifier))!
         self.changeRootViewController(desiredViewController, identifier: identifier)
     }
-
+    
+    /// Encapsulates the rootviewcontroller update operation in a DispatchQueue.main.async, all transitions like this
+    /// should be in one, the black screen bug was terrible.
     func changeRootViewController(_ desiredViewController: UIViewController, identifier: String? = nil) {
-        self.currentRootView = identifier
-        let snapshot: UIView = (self.window?.snapshotView(afterScreenUpdates: true))!
-        desiredViewController.view.addSubview(snapshot)
-        self.window?.rootViewController = desiredViewController
-        UIView.animate(withDuration: 0.3, animations: { () in
-            snapshot.layer.opacity = 0
-            snapshot.layer.transform = CATransform3DMakeScale(1.5, 1.5, 1.5)
-        }, completion: { (_: Bool) in
-            snapshot.removeFromSuperview()
-        })
-    }
-
-    func displayCurrentMainView() {
-        var view: String
-        if let _ = StudyManager.sharedInstance.currentStudy {
-            view = "initialStudyView"
-        } else {
-            view = "registerView"
+        // OK. I think we have a race condition somewhere that causes the black screen bug "here" (it might be the other thread).
+        // The race condition we encountered was in the call to set the login screen when the login timer expires and the user.
+        // This message always got printed when the bug occurred (I think always, could be wrong about that):
+        //     This method can cause UI unresponsiveness if invoked on the main thread. Instead, consider waiting for the
+        //       `-locationManagerDidChangeAuthorization:` callback and checking `authorizationStatus` first. """
+        // (The referenced code is part of the check for location permissions.)
+        // The fix is to wrap this rootview controller and animation in DispatchQueue.main.async.
+        // This seems so critical and difficult to debug that we will just ALWAYS do it, I guess.
+        DispatchQueue.main.async {
+            self.currentRootView = identifier
+            let snapshot: UIView = (self.window?.snapshotView(afterScreenUpdates: true))!
+            desiredViewController.view.addSubview(snapshot)
+            self.window?.rootViewController = desiredViewController
+            // simple zoom animation for transitions
+            UIView.animate(withDuration: 0.3, animations: { () in
+                snapshot.layer.opacity = 0
+                snapshot.layer.transform = CATransform3DMakeScale(1.5, 1.5, 1.5)
+            }, completion: { (_: Bool) in
+                snapshot.removeFromSuperview()
+            })
         }
-        self.window = UIWindow(frame: UIScreen.main.bounds)
-        self.window?.rootViewController = self.storyboard!.instantiateViewController(withIdentifier: view) as UIViewController?
-        self.window!.makeKeyAndVisible()
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

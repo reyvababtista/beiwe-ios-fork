@@ -45,17 +45,21 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
         if let password = password.text, password.count > 0 {
             // register for notifications (for some reason) and log in
             if AppDelegate.sharedInstance().checkPasswordAndLogin(password) {
+                // This animation has to go after transitionToLoadedAppState and put in a DispatchQueue.main.async otherwise it gets cut off.
+                // This cutting off appears to be caused by adding the DispatchQueue.main.async in changeRootViewController.
+                // These combined might cause the animation to be delayed slightly, it is hard to tell.
+                AppDelegate.sharedInstance().transitionToLoadedAppState()
+                DispatchQueue.main.async {
+                    HUD.flash(.success, delay: 0) // this is the checkbox thingy that flashes on the screen
+                }
                 
-                // ... why does this block login....
+                // includes a network call and used to block login? what? moved this after the animation and transition code
                 AppDelegate.sharedInstance().checkFirebaseCredentials()
                 if let token: String = Messaging.messaging().fcmToken {
                     AppDelegate.sharedInstance().sendFCMToken(fcmToken: token)
                 }
-                AppDelegate.sharedInstance().transitionToLoadedAppState()
-                
-                HUD.flash(.success, delay: 0.5) // this is the checkbox thingy that flashes on the screen
             } else {
-                HUD.flash(.error, delay: 1) // the X box thingy
+                HUD.flash(.error, delay: 1) // the X box thingy. Don't know what the delay does.
             }
         }
     }
