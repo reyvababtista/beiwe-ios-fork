@@ -733,6 +733,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // (The referenced code is part of the check for location permissions.)
         // The fix is to wrap this rootview controller and animation in DispatchQueue.main.async.
         // This seems so critical and difficult to debug that we will just ALWAYS do it, I guess.
+        // UPDATE:
+        //   Based on review of my logs of old black screen bugs that I kept around it looks like the authorizationStatus message
+        //   did NOT always co-occur.  If true (I definitely purged some lines from those logs) then we still have an unknown
+        //   proximate cause / source of the thing I'm going to continue to call a race condition.
         DispatchQueue.main.async {
             self.currentRootView = identifier
             let snapshot: UIView = (self.window?.snapshotView(afterScreenUpdates: true))!
