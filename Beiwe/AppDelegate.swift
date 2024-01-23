@@ -46,6 +46,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     // this is a weird location for an object, its used in powerstatemanager, unclear why this is here.
     let lockEvent = EmitterKit.Event<Bool>()
     
+    static func sharedInstance() -> AppDelegate {
+        return UIApplication.shared.delegate as! AppDelegate
+    }
+    
+    func currentTimestamp() -> String {
+        return timestampString() + " " + TimeZone.current.identifier
+    }
+    
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////// APPLICATION SETUP ////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
     /// The AppDelegate started function
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         self.initialSetup(launchOptions)
@@ -57,7 +69,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         
         // I think this is broken because the database is not set up.
         if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastAppStart = timestampString() + " " + TimeZone.current.identifier
+            study.lastAppStart = self.currentTimestamp()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -111,10 +123,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("\n\n\n")
     }
     
-    static func sharedInstance() -> AppDelegate {
-        return UIApplication.shared.delegate as! AppDelegate
-    }
-    
     /// These are the basics that we need to be able to Use The App At All (or Debug the app).
     /// If your setup does not require the database it can go in here.
     func initialSetup(_ launchOptions: [UIApplication.LaunchOptionsKey: Any]?) {
@@ -129,7 +137,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         self.initializeUI()
         
         // determine whether phone call bump is available - its just a weird flag we should set early
-        self.canOpenTel = UIApplication.shared.canOpenURL(URL(string: "tel:6175551212")!)  // (should be true ios 10+? or is there a permission you have to ask for?)
+        self.canOpenTel = UIApplication.shared.canOpenURL(URL(string: "tel:6175551212")!) // (should be true ios 10+? or is there a permission you have to ask for?)
     }
     
     /// Some of our setup needs to execute inside of promises because it needs to wait on other tasks, specifically setting up the database.
@@ -258,7 +266,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             ApiManager.sharedInstance.password = storedPassword
             self.isLoggedIn = true
             if let study = StudyManager.sharedInstance.currentStudy {
-                study.lastSuccessfulLogin = timestampString() + " " + TimeZone.current.identifier
+                study.lastSuccessfulLogin = self.currentTimestamp()
                 _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
             }
             return true
@@ -273,7 +281,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func applicationWillEnterForeground(_ application: UIApplication) {
         print("applicationWillEnterForeground")
         if let study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationWillEnterForeground = timestampString() + " " + TimeZone.current.identifier
+            study.lastApplicationWillEnterForeground = self.currentTimestamp()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -307,7 +315,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func application(_ application: UIApplication, willFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         print("applicationWillFinishLaunchingWithOptions")
         if let study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationWillFinishLaunchingWithOptions = timestampString() + " " + TimeZone.current.identifier
+            study.lastApplicationWillFinishLaunchingWithOptions = self.currentTimestamp()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         return true
@@ -317,7 +325,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
         print("applicationWillTerminate")
         if let study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationWillTerminate = timestampString() + " " + TimeZone.current.identifier
+            study.lastApplicationWillTerminate = self.currentTimestamp()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -339,8 +347,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
         // Use this method to pause ongoing tasks, disable timers, and throttle down OpenGL ES frame rates. Games should use this method to pause the game.
         print("applicationWillResignActive")
-        if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationWillResignActive = timestampString() + " " + TimeZone.current.identifier
+        if let study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationWillResignActive = self.currentTimestamp()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
     }
@@ -352,8 +360,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func applicationDidBecomeActive(_ application: UIApplication) {
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
         print("applicationDidBecomeActive")
-        if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationDidBecomeActive = timestampString() + " " + TimeZone.current.identifier
+        if let study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationDidBecomeActive = self.currentTimestamp()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -371,8 +379,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
         // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
         print("applicationDidEnterBackground")
-        if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationDidEnterBackground = timestampString() + " " + TimeZone.current.identifier
+        if let study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationDidEnterBackground = self.currentTimestamp()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         self.timeEnteredBackground = Date()
@@ -381,8 +389,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func applicationDidReceiveMemoryWarning(_ application: UIApplication) {
         print("applicationDidReceiveMemoryWarning")
-        if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationDidReceiveMemoryWarning = timestampString() + " " + TimeZone.current.identifier
+        if let study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationDidReceiveMemoryWarning = self.currentTimestamp()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         AppEventManager.sharedInstance.logAppEvent(event: "memory_warn", msg: "Application received memory warning")
@@ -390,8 +398,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func applicationProtectedDataDidBecomeAvailable(_ application: UIApplication) {
         print("applicationProtectedDataDidBecomeAvailable")
-        if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationProtectedDataDidBecomeAvailable = timestampString() + " " + TimeZone.current.identifier
+        if let study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationProtectedDataDidBecomeAvailable = self.currentTimestamp()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         self.lockEvent.emit(false)
@@ -400,8 +408,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func applicationProtectedDataWillBecomeUnavailable(_ application: UIApplication) {
         print("applicationProtectedDataWillBecomeUnavailable")
-        if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastApplicationProtectedDataWillBecomeUnavailable = timestampString() + " " + TimeZone.current.identifier
+        if let study = StudyManager.sharedInstance.currentStudy {
+            study.lastApplicationProtectedDataWillBecomeUnavailable = self.currentTimestamp()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         self.lockEvent.emit(true)
@@ -446,8 +454,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         print("Failed to register for notifications: \(error.localizedDescription)")
-        if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastFailedToRegisterForNotification = timestampString() + " " + TimeZone.current.identifier
+        if let study = StudyManager.sharedInstance.currentStudy {
+            study.lastFailedToRegisterForNotification = self.currentTimestamp()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Failed to register for notifications: \(error.localizedDescription)")
@@ -456,8 +464,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     // eventually called after the participant receives a notification while the participant is in the background
     // this callback will not be fired until the user taps on the notification launching the application.
     func application(_ application: UIApplication, didReceiveRemoteNotification messageInfo: [AnyHashable: Any]) {
-        if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastBackgroundPushNotificationReceived = timestampString() + " " + TimeZone.current.identifier
+        if let study = StudyManager.sharedInstance.currentStudy {
+            study.lastBackgroundPushNotificationReceived = self.currentTimestamp()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -476,10 +484,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func application(_ application: UIApplication,
                      didReceiveRemoteNotification messageInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
-        
         print("Foreground push notification received func application")
-        if var study = StudyManager.sharedInstance.currentStudy {
-            study.lastForegroundPushNotificationReceived = timestampString() + " " + TimeZone.current.identifier
+        if let study = StudyManager.sharedInstance.currentStudy {
+            study.lastForegroundPushNotificationReceived = self.currentTimestamp()
             _ = Recline.shared.save(StudyManager.sharedInstance.currentStudy!)
         }
         
@@ -498,6 +505,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("Push notification message contents:")
         print(messageInfo)
     }
+
     /// alternate type that handles some casting, it works.
     func printMessageInfo(_ notificationRequest: UNNotificationRequest) {
         let messageInfoDict: [AnyHashable: Any] = notificationRequest.content.userInfo
@@ -629,10 +637,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // This must be called after FirebaseApp.configure(), so we dispatch it and wait until the app is initialized from RegistrationViewController...
         DispatchQueue.global(qos: .background).async {
             while !StudyManager.real_study_loaded {
-                sleep(1)  // print("waiting for study to load")
+                sleep(1) // print("waiting for study to load")
             }
             while FirebaseApp.app() == nil { // FirebaseApp.app() emits the firebase spam log
-                sleep(1)  // print("waiting firbase app to be ready")
+                sleep(1) // print("waiting firbase app to be ready")
             }
             Messaging.messaging().delegate = self
             UNUserNotificationCenter.current().delegate = self
@@ -817,7 +825,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
 // ios_10_message_handling
 @available(iOS 10, *)
 extension AppDelegate: UNUserNotificationCenterDelegate {
-
     // Receive displayed notifications for iOS 10 devices.
     // THIS ONE is called when RECEIVING a notification while app is in FOREGROUND.
     /// The method will be called on the delegate only if the application is in the foreground. If the method is not implemented or the handler is not called in a timely
@@ -830,7 +837,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Foreground push notification received")
         self.printMessageInfo(notification.request)
         self.handleSurveyNotification(notification.request)
-        completionHandler([])  // Change to preferred presentation option
+        completionHandler([]) // Change to preferred presentation option
     }
 
     // THIS ONE is called when TAPPING on notification when app is in BACKGROUND.
@@ -846,7 +853,6 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         completionHandler()
     }
 }
-
 
 extension AppDelegate: MessagingDelegate {
     // refresh_token code
@@ -871,6 +877,4 @@ extension AppDelegate: MessagingDelegate {
         log.error("Received data message: \(remoteMessage.appData)")
         // remoteMessage.messageID
     }
-    
-    
 }
