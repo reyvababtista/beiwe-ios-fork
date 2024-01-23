@@ -72,3 +72,20 @@ func smartformat(_ unix_timestamp: TimeInterval) -> String {
 func timestampString() -> String {
     return dateFormat(Date())
 }
+
+
+/// converts the iso time string format to a TimeInterval (integer)
+func isoStringToTimeInterval(timeString: String) -> TimeInterval {
+    let dateFormatter = DateFormatter()
+    dateFormatter.locale = Locale(identifier: "en_US_POSIX") // set locale to reliable US_POSIX
+    dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+    let sentTime = dateFormatter.date(from: timeString)!
+    return sentTime.timeIntervalSince1970
+}
+
+// if you want to hook into the print function uncomment this and go nuts. Don't Commit.
+// public func print(_ items: Any..., separator: String = " ", terminator: String = "\n") {
+//     // Swift.print("[Beiwe2] \(timeFormat(Date()))", terminator: ": ")
+//     // Swift.print(items, separator: separator, terminator: terminator)
+//     log.info(items)
+// }

@@ -443,7 +443,7 @@ class DataStorage {
     private func _ensure_file_exists(recur: Int) {
         // if there is no file, create it with these permissions and no data
         if !self.check_file_exists() {
-            print("creating file '\(self.shortenPath(self.filename))'...")
+            // print("creating file '\(self.shortenPath(self.filename))'...")
             let created = FileManager.default.createFile(
                 atPath: self.filename.path,
                 contents: "".data(using: String.Encoding.utf8),
