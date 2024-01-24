@@ -176,9 +176,7 @@ class DataStorageManager {
     ///////////////////////////////////////////////// Upload //////////////////////////////////////////////////////
     
     func prepareForUpload() -> Promise<Void> {
-        let prepQ = DispatchQueue.global(priority: DispatchQueue.GlobalQueuePriority.default)
-        // let prepQ = DispatchQueue.global(qos: DispatchQoS.QoSClass.utility)  // this is the fix for the warning, not changing atm.
-        return Promise().then(on: prepQ) { _ -> Promise<Void> in
+        return Promise().then(on: DispatchQueues.PRE_UPLOAD_QUEUE) { _ -> Promise<Void> in
             self.prepareForUpload_actual()
             return Promise()
         }

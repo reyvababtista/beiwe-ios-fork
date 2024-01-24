@@ -10,11 +10,22 @@ struct Constants {
     static let RECUR_SLEEP_DURATION = 0.05 // 50 milliseconds
     static let RECUR_DEPTH = 6
     
-    static let BACKGROUND_DEVICE_INFO_QUEUE = DispatchQueue(label: "org.beiwe.background_device_info_queue", attributes: [])
-    
     static let DEFAULT_UNPOPULATED_APPINFO = "never_populated"
 }
 
+// dispatch queues
+struct DispatchQueues {
+    // Dispatch Queue qos options are: default, background, utility, userInitiated, userInteractive, and unspecified.
+    // TODO: document the difference between these.
+    // TODO: research, document the attributes parameter
+    static let GLOBAL_DEFAULT_QUEUE = DispatchQueue.global(qos: .default)
+    static let GLOBAL_BACKGROUND_QUEUE = DispatchQueue.global(qos: .background)
+    static let BACKGROUND_DEVICE_INFO_QUEUE = DispatchQueue(label: "org.beiwe.background_device_info_queue", qos: .background, attributes: [])
+    static let TIMER_QUEUE = DispatchQueue(label: "org.beiwe.timer_queue", attributes: [])
+    static let RECLINE_QUEUE = DispatchQueue(label: "org.beiwe.recline_queue", qos: .userInteractive, attributes: [])  // setting high on this queue because it is the database.
+    static let PRE_UPLOAD_QUEUE = DispatchQueue(label: "org.beiwe.preupload_queue", qos: .default, attributes: [])
+}
+    
 struct Ephemerals {
     // device info statuses
     static var notification_permission = "not populated, this is an app bug"

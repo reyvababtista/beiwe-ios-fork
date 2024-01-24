@@ -173,6 +173,7 @@ class StudyManager {
         if studySettings.motion && studySettings.motionOnDurationSeconds > 0 {
             self.timerManager.addDataService(on_duration: studySettings.motionOnDurationSeconds, off_duration: studySettings.motionOffDurationSeconds, dataService: DeviceMotionManager())
         }
+        
         self.gpsManager!.startGps()
         self.timerManager.start()
         self.sensorsStartedEver = true
@@ -847,7 +848,7 @@ class StudyManager {
         }
         
         // most of the function is after the return statement, duh.
-        return promiseChain.then(on: DispatchQueue.global(qos: .default)) { (_: Bool) -> Promise<Bool> in
+        return promiseChain.then(on: DispatchQueues.GLOBAL_DEFAULT_QUEUE) { (_: Bool) -> Promise<Bool> in
             // if we can't enumerate files, that's insane, crash.
             let fileEnumerator: FileManager.DirectoryEnumerator = FileManager.default.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)!
             var filesToProcess: [String] = []
@@ -912,7 +913,8 @@ class StudyManager {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
     // The reason this code is still present is because we need to handle the case of a user dismissing or exiting the
-    // app during the registration or consent sections stage of registration.
+    // app during the registration or consent sections stage of registration.  We would probably be fine without it,
+    // but this is some free safety so until it becomes a maintenance burden we will keep it.
     
     /// the bulk of the leave study feature.
     func leaveStudy() -> Promise<Bool> {
@@ -1005,7 +1007,7 @@ class StudyManager {
         self.timerManager.clear()
         
         // clear currentStudy
-        return Promise().then(on: DispatchQueue.global(qos: .default)) { (_: Void) -> Promise<Bool> in
+        return Promise().then(on: DispatchQueues.GLOBAL_DEFAULT_QUEUE) { (_: Void) -> Promise<Bool> in
             // many things depend on current study, lets try a build with this removed.
             self.currentStudy = nil
             StudyManager.real_study_loaded = false

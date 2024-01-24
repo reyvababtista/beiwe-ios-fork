@@ -9,9 +9,6 @@ import PromiseKit
 
 /// this class is not a data recording class, it is a manager for the timers that run on the app as a whole.
 class TimerManager {
-    // a queue for potentially long running
-    let globalQueue = DispatchQueue.global(qos: .default)
-    
     // state
     var dataCollectionServices: [DataServiceStatus] = []
     var areServicesRunning = false
@@ -55,12 +52,12 @@ class TimerManager {
         
         // call finishCollecting on every collection service in dataCollectionServices
         for dataStatus in self.dataCollectionServices {
-            // use .done because not returning anything - wutchutalkinbout Tuck, we return an empty promise!
-            
-            promise = promise.done(on: globalQueue) { (_: ()) in  // this is a very stupid type declaration, _ is an unused Void-returning callable that takes no arguments.
-                dataStatus.dataService.finishCollecting().then(on: self.globalQueue) { (_: Void) -> Promise<Void> in  // need to explicitly state return type
+            // (use .done because not returning anything - wutchutalkinbout Tuck, we return an empty promise!)
+            promise = promise.done(on: DispatchQueues.TIMER_QUEUE) { (_: ()) in // its a Void-returning callable that takes no arguments.
+                // need to explicitly state return type
+                dataStatus.dataService.finishCollecting().then(on: DispatchQueues.GLOBAL_DEFAULT_QUEUE) { (_: Void) -> Promise<Void> in
                     return Promise()
-                }.catch(on: DispatchQueue.global(qos: .default)) { _ in
+                }.catch(on: DispatchQueues.TIMER_QUEUE) { _ in
                     print("err from finish collecting")
                 }
             }
