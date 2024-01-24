@@ -240,7 +240,7 @@ class MainViewController: UIViewController {
     //     tapRecognizer.numberOfTouchesRequired = 2
     //     view.addGestureRecognizer(tapRecognizer)
     // }
-    // 
+    //
     // // hey the debug button! I don't think its bound to anything.
     // @objc func debugTap(_ gestureRecognizer: UIGestureRecognizer) {
     //     print("debugtap!")
@@ -248,14 +248,14 @@ class MainViewController: UIViewController {
     //         print("return debug tap doing nothing")
     //         return
     //     }
-    // 
+    //
     //     self.refreshSurveys()
-    // 
+    //
     //     let actionController = BWXLActionController()
     //     actionController.settings.cancelView.backgroundColor = AppColors.highlightColor
-    // 
+    //
     //     actionController.headerData = nil
-    // 
+    //
     //     actionController.addAction(Action(ActionData(title: NSLocalizedString("upload_data_button", comment: "")), style: .default) { _action in
     //         DispatchQueue.main.async {
     //             self.Upload(self)
@@ -266,7 +266,7 @@ class MainViewController: UIViewController {
     //             self.checkSurveys(self)
     //         }
     //     })
-    // 
+    //
     //     present(actionController, animated: true) {}
     // }
 }
