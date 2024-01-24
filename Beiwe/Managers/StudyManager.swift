@@ -81,7 +81,7 @@ class StudyManager {
         // mostly sets real_study_loaded to true...
         return firstly { () -> Promise<[Study]> in
             // print("(loadDefaultStudy) firstly queryall start")
-            return Recline.shared.queryAll() // this returns a list of all studies as a parameter to the next promise.
+            Recline.shared.queryAll() // this returns a list of all studies as a parameter to the next promise.
             // I don't understand but trying to refactor as follows for a print statement doesn't work?
             // print(print("(loadDefaultStudy) firstly queryall done"))
             // return x
@@ -281,7 +281,7 @@ class StudyManager {
         }
         
         // logic that refreshes survey list
-        let activeSurveysModified_1 = clear_out_submitted_surveys()
+        let activeSurveysModified_1 = self.clear_out_submitted_surveys()
         let activeSurveysModified_2 = self.ensure_active_surveys()
         let activeSurveysModified_3 = self.removeOldSurveys()
         self.updateBadgerCount()
@@ -324,7 +324,7 @@ class StudyManager {
     //     guard let study = currentStudy else {
     //         return (Date().addingTimeInterval(15.0 * 60.0).timeIntervalSince1970, false)
     //     }
-    //     
+    //
     //     let currentDate = Date()
     //     let currentTime = currentDate.timeIntervalSince1970
     //     // let currentDay = (calendar as NSCalendar).component(.weekday, from: currentDate) - 1
@@ -334,7 +334,7 @@ class StudyManager {
     //     nowDateComponents.hour = 0
     //     nowDateComponents.minute = 0
     //     nowDateComponents.second = 0
-    //     
+    //
     //     // For all active surveys that aren't complete, but have expired, submit them. (id is a string)
     //     var surveyDataModified = false
     //     for (surveyId, activeSurvey) in study.activeSurveys {
@@ -363,7 +363,7 @@ class StudyManager {
     //             self.submitSurvey(activeSurvey)
     //         }
     //     }
-    //     
+    //
     //     // calculate the duration the survey can be active/not be reset for (always 1 week) and return that time.
     //     // FIXME: it was in trying to track down why on earth this was hardcoded to 1 week that I discovered there is no code to parse the survey schedules
     //     let closestNextSurveyTime: TimeInterval = currentTime + (60.0 * 60.0 * 24.0 * 7)
@@ -409,7 +409,7 @@ class StudyManager {
     //     guard let study = self.currentStudy else {
     //         return false
     //     }
-    //     
+    //
     //     // Set the badge, and remove surveys no longer on server from our active surveys list
     //     let allSurveyIds = self.getAllSurveyIds()
     //     var surveyDataModified = false
@@ -467,7 +467,7 @@ class StudyManager {
     //     }
     //     print("new check_surveys")
     //     var surveyDataModified = false
-    //     
+    //
     //     // for each survey from the server, check on the scheduling
     //     var allSurveyIds: [String] = []
     //     for survey in study.surveys {
@@ -911,10 +911,11 @@ class StudyManager {
     /////////////////////////////////////////////// The Leave Study Code //////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
+    // The reason this code is still present is because we need to handle the case of a user dismissing or exiting the
+    // app during the registration or consent sections stage of registration.
+    
     /// the bulk of the leave study feature.
     func leaveStudy() -> Promise<Bool> {
-        // fatalError("this is not supposed to run")
-        
         // disable gps - gps is special because it interacts with app persistence
         if self.gpsManager != nil {
             self.gpsManager!.stopGps()
@@ -990,22 +991,6 @@ class StudyManager {
     ///
     /// Miscellaneous utility functions
     ///
-    
-    /// returns a tuple of the filetype (data stream name?), the timestamp, and the file extension
-    func parseFilename(_ filename: String) -> (type: String, timestamp: Int64, ext: String) {
-        // I can't tell if this code has extra variables, or if deletingPathExtension mutates the url maybe?
-        let url = URL(fileURLWithPath: filename)
-        let pathExtention = url.pathExtension
-        let pathPrefix = url.deletingPathExtension().lastPathComponent
-        let pieces = pathPrefix.split(separator: "_")
-        var type = ""
-        var timestamp: Int64 = 0
-        if pieces.count > 2 {
-            type = String(pieces[1])
-            timestamp = Int64(String(pieces[pieces.count - 1])) ?? 0
-        }
-        return (type: type, timestamp: timestamp, ext: pathExtention)
-    }
     
     /// only called from AppDelegate.applicationWillTerminate
     func stop() -> Promise<Bool> {

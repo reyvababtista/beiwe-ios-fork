@@ -26,7 +26,6 @@ class RegisterViewController: FormViewController {
     let less_dark_gray = UIColor(red: 0.4, green: 0.4, blue: 0.4, alpha: 1) // darkGray is 0.333, this is much more legible
     let legible_red = UIColor(red: 0.8, green: 0, blue: 0, alpha: 1)
     
-    
     // set the font sizes, colors. Note that the label text is black in light mode and white in dark mode and it seems stuck that way.
     func apply_cell_defaults(_ cell: SVTextCell) {
         cell.backgroundColor = AppColors.Beiwe1 // the lightes "beiwe color'
@@ -211,13 +210,15 @@ class RegisterViewController: FormViewController {
                 
                 // make the post request - this studysettings object is instantiated inside the RegisterStudyRequest.makePostRequest
                 ApiManager.sharedInstance.makePostRequest(registerStudyRequest).then { (studySettings: StudySettings, _: Int) -> Promise<Study> in
-                    // testing three arbitrary response body values to ensure we hit the correct server and not some random server that happened to return a 200
-                    guard studySettings.clientPublicKey != nil, studySettings.wifiLogFrequencySeconds != nil, studySettings.callClinicianButtonEnabled != nil else {
-                        print("this thing")
+                    // we cannot just rely on the request succeeding (200 code), we need to test the data in the response...
+                    // ... but StudySettings only has one optional value without a default.
+                    guard studySettings.clientPublicKey != nil else {
+                          // studySettings.wifiLogFrequencySeconds != nil // old checks?
+                          // studySettings.callClinicianButtonEnabled != nil
                         throw RegistrationError.incorrectServer
                     }
                         
-                    // configure firebase
+                    // configure firebase first
                     if FirebaseApp.app() == nil && studySettings.googleAppID != "" {
                         AppDelegate.sharedInstance().configureFirebase(studySettings: studySettings)
                     }
@@ -236,8 +237,8 @@ class RegisterViewController: FormViewController {
                         study.fuzzGpsLatitudeOffset = self.generateLatitudeOffset()
                         study.fuzzGpsLongitudeOffset = self.generateLongitudeOffset()
                     }
-                        
-                    // delete all other studies? set current study.
+                    
+                    // We keep the call to purge studies to ensure there is no weird data present from possible partial study registrations.
                     return StudyManager.sharedInstance.purgeStudies().then { (_: Bool) in
                         Recline.shared.save(study)
                     }
@@ -260,7 +261,7 @@ class RegisterViewController: FormViewController {
                     
                 }.catch { (error: Error) in
                     // Show error message logic
-                    print("error received from register: \(error)")
+                    print("error received during registration:\n\(error)")
                     var delay = 1.5
                     var err: HUDContentType
                     switch error {

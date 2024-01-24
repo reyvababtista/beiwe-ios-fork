@@ -13,7 +13,7 @@ class MainViewController: UIViewController {
     // a selected survey
     var selectedSurvey: ActiveSurvey?
     
-    // rlabels and buttons
+    // labels and buttons
     @IBOutlet weak var haveAQuestionLabel: UILabel!
     @IBOutlet weak var callClinicianButton: UIButton!
     @IBOutlet weak var footerSeperator: UIView!
@@ -31,7 +31,9 @@ class MainViewController: UIViewController {
             image: leftImage, style: UIBarButtonItem.Style.plain, target: self, action: #selector(self.userButton)
         )
         let rightImage: UIImage? = UIImage(named: "ic-info")!.withRenderingMode(.alwaysOriginal)
-        self.navigationItem.rightBarButtonItem = UIBarButtonItem(image: rightImage, style: UIBarButtonItem.Style.plain, target: self, action: #selector(self.infoButton))
+        self.navigationItem.rightBarButtonItem = UIBarButtonItem(
+            image: rightImage, style: UIBarButtonItem.Style.plain, target: self, action: #selector(self.infoButton)
+        )
         navigationController?.navigationBar.tintColor = UIColor.white
         navigationItem.rightBarButtonItem = nil
 
@@ -42,7 +44,9 @@ class MainViewController: UIViewController {
         self.surveyTableView.backgroundColor = UIColor.clear
         // hakuba.registerCell(SurveyCell)
 
-        var clinicianText: String = StudyManager.sharedInstance.currentStudy?.studySettings?.callClinicianText ?? NSLocalizedString("default_call_clinician_text", comment: "")
+        var clinicianText: String = (
+            StudyManager.sharedInstance.currentStudy?.studySettings?.callClinicianText ?? NSLocalizedString("default_call_clinician_text", comment: "")
+        )
         self.callClinicianButton.setTitle(clinicianText, for: UIControl.State())
         self.callClinicianButton.setTitle(clinicianText, for: UIControl.State.highlighted)
         self.callClinicianButton.setTitle(clinicianText, for: UIControl.State.focused)
@@ -98,7 +102,7 @@ class MainViewController: UIViewController {
             // self.hakuba[0].bump(.fade) // this causes ui glitches
         }
         
-        self.hakuba.bump(.fade) // this applies the animation to the list (hakuba section?) as a whole, clean enough
+        self.hakuba.bump(.fade) // this applies the animation to the list (hakuba section?) as a whole
         
         // set the scrollability based on active_survey_count of surveys, set header.
         // emptySurveyHeader is the box with the string "there are no active surveys to take at this time"
@@ -115,7 +119,10 @@ class MainViewController: UIViewController {
     
     func presentSurvey(_ surveyId: String) {
         // confirm everything necessary is present for the survey button to work
-        guard let activeSurvey = StudyManager.sharedInstance.currentStudy?.activeSurveys[surveyId], let survey = activeSurvey.survey, let surveyType = survey.surveyType else {
+        guard let activeSurvey = StudyManager.sharedInstance.currentStudy?.activeSurveys[surveyId],
+              let survey = activeSurvey.survey,
+              let surveyType = survey.surveyType
+        else {
             return
         }
 
@@ -129,22 +136,18 @@ class MainViewController: UIViewController {
         }
     }
 
-    override func didReceiveMemoryWarning() {
-        super.didReceiveMemoryWarning()
-        // Dispose of any resources that can be recreated.
-    }
-
+    /// This is the menu in the upper left of the main screen
     @objc func userButton() {
+        // create the primary action controller
         let actionController = BWXLActionController()
-        // actionController.settings.cancelView.backgroundColor = AppColors.highlightColor
         actionController.settings.cancelView.backgroundColor = AppColors.Beiwe3
         actionController.headerData = nil // no obvious effect
-        
-        actionController.addAction(Action(ActionData(title: NSLocalizedString("change_password_button", comment: "")), style: .default) { _action in
-            DispatchQueue.main.async {
-                self.changePassword(self)
+        actionController.addAction(
+            Action(ActionData(title: NSLocalizedString("change_password_button", comment: "")), style: .default) { _action in
+                DispatchQueue.main.async {
+                    self.changePassword(self)
+                }
             }
-        }
         )
 
         // Only add Call button if it's enabled by the study
@@ -155,57 +158,31 @@ class MainViewController: UIViewController {
                 }
             })
         }
-
+        // logout
         actionController.addAction(Action(ActionData(title: NSLocalizedString("logout_button", comment: "")), style: .default) { _action in
             DispatchQueue.main.async {
                 self.logout(self)
             }
         })
-        
-        actionController.addAction(Action(ActionData(title: NSLocalizedString("unregister_button", comment: "")), style: .destructive) { _action in
-            DispatchQueue.main.async {
-                self.leaveStudy(self)
-            }
-        })
+        // leave study - disabled as of 2024-1-24
+        // actionController.addAction(Action(ActionData(title: NSLocalizedString("unregister_button", comment: "")), style: .destructive) { _action in
+        //     DispatchQueue.main.async {
+        //         self.leaveStudy(self)
+        //     }
+        // })
         present(actionController, animated: true)
     }
 
-    @objc func infoButton() {
-    }
-
-    @IBAction func Upload(_ sender: AnyObject) {
-        StudyManager.sharedInstance.upload(false)
-    }
-
+    ///
+    /// User Menu actions
+    ///
+    
     @IBAction func callClinician(_ sender: AnyObject) {
-        // Present modal...
-        confirmAndCallClinician(self)
-    }
-
-    @IBAction func checkSurveys(_ sender: AnyObject) {
-        StudyManager.sharedInstance.checkSurveys()
-    }
-
-    // leave study menu option
-    @IBAction func leaveStudy(_ sender: AnyObject) {
-        let alertController = UIAlertController(title: NSLocalizedString("unregister_alert_title", comment: ""), message: NSLocalizedString("unregister_alert_text", comment: ""), preferredStyle: .alert)
-
-        let cancelAction = UIAlertAction(title: NSLocalizedString("cancel_button_text", comment: ""), style: .cancel) { _ in }
-        alertController.addAction(cancelAction)
-
-        let OKAction = UIAlertAction(title: NSLocalizedString("ok_button_text", comment: ""), style: .default) { _ in
-            StudyManager.sharedInstance.leaveStudy().done { _ in
-                AppDelegate.sharedInstance().isLoggedIn = false
-                AppDelegate.sharedInstance().transitionToLoadedAppState()
-            }
-        }
-        alertController.addAction(OKAction)
-
-        present(alertController, animated: true) {
-        }
+        confirmAndCallClinician(self) // Present modal...
     }
 
     @IBAction func changePassword(_ sender: AnyObject) {
+        // this shares code with the forgot password action on the login screen.
         let changePasswordController = ChangePasswordViewController()
         changePasswordController.isForgotPassword = false
         present(changePasswordController, animated: true, completion: nil)
@@ -216,7 +193,7 @@ class MainViewController: UIViewController {
         AppDelegate.sharedInstance().transitionToLoadedAppState()
     }
 
-    // MARK: - Navigation
+    // Navigation
 
     // In a storyboard-based application, you will often want to do a little preparation before navigation
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
@@ -228,10 +205,20 @@ class MainViewController: UIViewController {
         }
     }
     
+    ///
+    /// Literally junk
+    ///
+    
+    @objc func infoButton() {}
+    
+    override func didReceiveMemoryWarning() {
+        super.didReceiveMemoryWarning()
+        // Dispose of any resources that can be recreated.
+    }
+    
     ////////////////////////////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////// Debug Menu ////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////////////
-    
     // func addDebugMenu() {
     //     // adds a debug command? (Keary never told us about this.)
     //     print("adding debugtap")
@@ -268,5 +255,38 @@ class MainViewController: UIViewController {
     //     })
     //
     //     present(actionController, animated: true) {}
+    // }
+    //
+    // @IBAction func Upload(_ sender: AnyObject) {
+    //     StudyManager.sharedInstance.upload(false)
+    // }
+    //
+    // @IBAction func checkSurveys(_ sender: AnyObject) {
+    //     StudyManager.sharedInstance.checkSurveys()
+    // }
+    
+    ///
+    /// Leave study funcitonality - disabled as of 2024-1-24
+    ///
+    // leave study menu option
+    // @IBAction func leaveStudy(_ sender: AnyObject) {
+    //     let alertController = UIAlertController(
+    //         title: NSLocalizedString("unregister_alert_title", comment: ""),
+    //         message: NSLocalizedString("unregister_alert_text", comment: ""),
+    //         preferredStyle: .alert
+    //     )
+    //
+    //     let cancelAction = UIAlertAction(title: NSLocalizedString("cancel_button_text", comment: ""), style: .cancel) { _ in }
+    //     alertController.addAction(cancelAction)
+    //
+    //     let OKAction = UIAlertAction(title: NSLocalizedString("ok_button_text", comment: ""), style: .default) { _ in
+    //         StudyManager.sharedInstance.leaveStudy().done { _ in
+    //             AppDelegate.sharedInstance().isLoggedIn = false
+    //             AppDelegate.sharedInstance().transitionToLoadedAppState()
+    //         }
+    //     }
+    //     alertController.addAction(OKAction)
+    //
+    //     present(alertController, animated: true) {}
     // }
 }
