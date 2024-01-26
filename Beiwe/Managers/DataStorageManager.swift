@@ -176,7 +176,7 @@ class DataStorageManager {
     ///////////////////////////////////////////////// Upload //////////////////////////////////////////////////////
     
     func prepareForUpload() -> Promise<Void> {
-        return Promise().then(on: DispatchQueues.PRE_UPLOAD_QUEUE) { _ -> Promise<Void> in
+        return Promise().then(on: PRE_UPLOAD_QUEUE) { _ -> Promise<Void> in
             self.prepareForUpload_actual()
             return Promise()
         }

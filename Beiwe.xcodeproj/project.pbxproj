@@ -84,6 +84,7 @@
 		AA63EFB729C2E0FE0074F735 /* DataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA63EFB629C2E0FE0074F735 /* DataService.swift */; };
 		AA774E3B29DFA9440085BDF8 /* UpdateDeviceSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA774E3A29DFA9440085BDF8 /* UpdateDeviceSettings.swift */; };
 		AA92FB6729D5D1800009F620 /* TimerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA92FB6629D5D1800009F620 /* TimerManager.swift */; };
+		AAA8A3912B63C22400D20000 /* Common.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAA8A3902B63C22400D20000 /* Common.swift */; };
 		ED3081F77ECC8C876F5EF53A /* Pods_Beiwe.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A42DC84D7FED35C57E1B1EE0 /* Pods_Beiwe.framework */; };
 /* End PBXBuildFile section */
 
@@ -188,6 +189,7 @@
 		AA63EFB629C2E0FE0074F735 /* DataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataService.swift; sourceTree = "<group>"; };
 		AA774E3A29DFA9440085BDF8 /* UpdateDeviceSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateDeviceSettings.swift; sourceTree = "<group>"; };
 		AA92FB6629D5D1800009F620 /* TimerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerManager.swift; sourceTree = "<group>"; };
+		AAA8A3902B63C22400D20000 /* Common.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Common.swift; sourceTree = "<group>"; };
 		B58A34E5862CE908C83EB133 /* Pods-Beiwe.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Beiwe.release.xcconfig"; path = "Target Support Files/Pods-Beiwe/Pods-Beiwe.release.xcconfig"; sourceTree = "<group>"; };
 		C222DB6B2786C1ED00ACB3EC /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		E949EF7428480E59009E183F /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Main.strings; sourceTree = "<group>"; };
@@ -440,6 +442,7 @@
 				83F98C451C923C3600E0B64B /* Info.plist */,
 				59912EBB2311A33A00CAF7EB /* InfoPlist.strings */,
 				83AF20DB1CA3537200D3DF02 /* Constants.swift */,
+				AAA8A3902B63C22400D20000 /* Common.swift */,
 			);
 			path = Beiwe;
 			sourceTree = "<group>";
@@ -655,6 +658,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AAA8A3912B63C22400D20000 /* Common.swift in Sources */,
 				832FFC261CC866AB00F2E1EF /* UINavigationController+transparent.swift in Sources */,
 				832FFC2D1CC889DB00F2E1EF /* SurveyCell.swift in Sources */,
 				83C2BFCC1CB7484B00B2251B /* GetSurveysRequest.swift in Sources */,

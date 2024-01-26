@@ -132,6 +132,31 @@ class ApiManager {
         return NSError(domain: "com.rf.beiwe.studies", code: 2, userInfo: nil)
     }
 
+    /// hits the endpoint once, doesn't do anything with the request object, literally just returns.
+    // assumes endpoint starts with a slash
+    func extremelySimplePostRequest(_ endpoint: String) {
+        var parameters: [String: Any] = [:]
+        self.setDefaultParameters(&parameters)
+        Alamofire.request(baseApiUrl + endpoint, method: .post, parameters: parameters)
+        return
+        // if we want to extend it here's some code to do so - note that this executes asynchronously, so we would need a completion handler pattern
+        // var return_code = 0
+        // let x = request.responseString { (response: DataResponse<String>) in
+        //     switch response.result {
+        //         
+        //     case let .failure(error):
+        //         print("failure in simpleGetRequest, Error: '\(error)', Response: '\(response)', Response.response: '\(String(describing: response.response))'")
+        //         return_code = -1
+        //         
+        //     case .success:
+        //         return_code = response.response!.statusCode
+        //         print("response code:", response.response!.statusCode)
+        //     }
+        // }
+        // print("request.responseString?:", x)
+        // return return_code
+    }
+    
     /// This function is used to Register for a study, it contains special logic for that scenario - WHY IS IT LIKE THAT THAT IS TERRIBLE THIS IS THE WRONG PLACE FOR THAT CODE.
     func makePostRequest<T: ApiRequest>(_ requestObject: T, password: String? = nil) -> Promise<(T.ApiReturnType, Int)> where T: Mappable {
         var parameters = requestObject.toJSON()

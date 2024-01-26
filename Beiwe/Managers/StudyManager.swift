@@ -116,8 +116,10 @@ class StudyManager {
         }
         self.setApiCredentials()
         DataStorageManager.sharedInstance.dataStorageManagerInit(self.currentStudy!, secKeyRef: self.keyRef)
-        self.prepareDataServices() // okay prepareDataServices is 90% of the function body
+        self.prepareDataServices() // prepareDataServices was 90% of the function body
         NotificationCenter.default.addObserver(self, selector: #selector(self.reachabilityChanged), name: ReachabilityChangedNotification, object: nil)
+        // this can block when initiated
+        GLOBAL_BACKGROUND_QUEUE.async { self.heartbeat() }
     }
     
     /// ACTUAL initialization - initializes the weirdly complex self.gpsManager and everything else
@@ -592,6 +594,13 @@ class StudyManager {
         }
     }
     
+    /// dispatches the heartbeat task to run in a loop forever every 5 minutes.
+    func heartbeat() {
+        print("Sending heartbeat...")
+        ApiManager.sharedInstance.extremelySimplePostRequest("/mobile-heartbeat/")
+        GLOBAL_BACKGROUND_QUEUE.asyncAfter(deadline: .now() + Constants.HEARTBEAT_INTERVAL, execute: self.heartbeat)
+    }
+    
     /// called from self.setConsented, periodicNetworkTasks, and a debug menu button (I think)
     /// THE RETURN VALUE IS NOT USED BECAUSE OF COURSE NOT
     func checkSurveys() -> Promise<Bool> {
@@ -848,7 +857,7 @@ class StudyManager {
         }
         
         // most of the function is after the return statement, duh.
-        return promiseChain.then(on: DispatchQueues.GLOBAL_DEFAULT_QUEUE) { (_: Bool) -> Promise<Bool> in
+        return promiseChain.then(on: GLOBAL_DEFAULT_QUEUE) { (_: Bool) -> Promise<Bool> in
             // if we can't enumerate files, that's insane, crash.
             let fileEnumerator: FileManager.DirectoryEnumerator = FileManager.default.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)!
             var filesToProcess: [String] = []
@@ -1007,7 +1016,7 @@ class StudyManager {
         self.timerManager.clear()
         
         // clear currentStudy
-        return Promise().then(on: DispatchQueues.GLOBAL_DEFAULT_QUEUE) { (_: Void) -> Promise<Bool> in
+        return Promise().then(on: GLOBAL_DEFAULT_QUEUE) { (_: Void) -> Promise<Bool> in
             // many things depend on current study, lets try a build with this removed.
             self.currentStudy = nil
             StudyManager.real_study_loaded = false

@@ -23,7 +23,7 @@ class Recline {
 
     /// database open function - called exactly once in AppDelegate
     func open(_ dbName: String = "default") -> Promise<Bool> {
-        return Promise().then(on: DispatchQueues.RECLINE_QUEUE) { _ -> Promise<Bool> in
+        return Promise().then(on: RECLINE_QUEUE) { _ -> Promise<Bool> in
             // safety in case its called twice? sure.
             if self.manager == nil {
                 // it sets the database up as a file, we don't care about the UnsafeMutablePointer its objc junk
@@ -31,7 +31,7 @@ class Recline {
                 let poptions = UnsafeMutablePointer<CBLManagerOptions>.allocate(capacity: 1)
                 poptions.initialize(to: cbloptions)
                 try self.manager = CBLManager(directory: CBLManager.defaultDirectory(), options: poptions)
-                self.manager.dispatchQueue = DispatchQueues.RECLINE_QUEUE
+                self.manager.dispatchQueue = RECLINE_QUEUE
             }
             return self._open(dbName)  // defines database views... in a promise... 🙄
         }
@@ -63,7 +63,7 @@ class Recline {
     /// - ah, the templated type is required because this is called from a templated function inside RegisterViewController/ApiManager
     /// - (This still does not explain or justify why the ONLY CONTENT is factored out into another function with IDENTICAL TEMPLATED TYPING 🙄.)
     func save<T: ReclineObject>(_ obj: T) -> Promise<T> {
-        return Promise().then(on: DispatchQueues.RECLINE_QUEUE) {
+        return Promise().then(on: RECLINE_QUEUE) {
             return self._save(obj)
         }
     }
@@ -97,7 +97,7 @@ class Recline {
 
     /// wraps load in a promise, but its a template function so maybe its okay 🙄.
     func load<T: ReclineObject>(_ docId: String) -> Promise<T?> {
-        return Promise().then(on: DispatchQueues.RECLINE_QUEUE) {
+        return Promise().then(on: RECLINE_QUEUE) {
             self._load(docId)
         }
     }
@@ -124,7 +124,7 @@ class Recline {
 
     /// wraps _queryAll....
     func queryAll<T: ReclineObject>() -> Promise<[T]> {
-        return Promise().then(on: DispatchQueues.RECLINE_QUEUE) {
+        return Promise().then(on: RECLINE_QUEUE) {
             return self._queryAll()
         }
     }
@@ -145,7 +145,7 @@ class Recline {
                     promises.append(load(docId))
                 }
             }
-            when(fulfilled: promises).done(on: DispatchQueues.RECLINE_QUEUE) { results in
+            when(fulfilled: promises).done(on: RECLINE_QUEUE) { results in
                 // resolve([])
                 resolver.fulfill(results.filter { $0 != nil }.map { $0! })  // I think this where it has found all the documents and is... making them findable
             }.catch { err in
@@ -156,7 +156,7 @@ class Recline {
 
     /// wrapper for _purge...
     func purge<T: ReclineObject>(_ obj: T) -> Promise<Bool> {
-        return Promise().then(on: DispatchQueues.RECLINE_QUEUE) {
+        return Promise().then(on: RECLINE_QUEUE) {
             return self._purge(obj)
         }
     }
@@ -174,7 +174,7 @@ class Recline {
 
     /// runs the database compact operation
     func compact() -> Promise<Void> {
-        return Promise<Void>().done(on: DispatchQueues.RECLINE_QUEUE) { _ in
+        return Promise<Void>().done(on: RECLINE_QUEUE) { _ in
             try self.db?.compact()
         }
     }

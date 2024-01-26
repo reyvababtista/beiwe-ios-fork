@@ -53,11 +53,11 @@ class TimerManager {
         // call finishCollecting on every collection service in dataCollectionServices
         for dataStatus in self.dataCollectionServices {
             // (use .done because not returning anything - wutchutalkinbout Tuck, we return an empty promise!)
-            promise = promise.done(on: DispatchQueues.TIMER_QUEUE) { (_: ()) in // its a Void-returning callable that takes no arguments.
+            promise = promise.done(on: TIMER_QUEUE) { (_: ()) in // its a Void-returning callable that takes no arguments.
                 // need to explicitly state return type
-                dataStatus.dataService.finishCollecting().then(on: DispatchQueues.GLOBAL_DEFAULT_QUEUE) { (_: Void) -> Promise<Void> in
+                dataStatus.dataService.finishCollecting().then(on: GLOBAL_DEFAULT_QUEUE) { (_: Void) -> Promise<Void> in
                     return Promise()
-                }.catch(on: DispatchQueues.TIMER_QUEUE) { _ in
+                }.catch(on: TIMER_QUEUE) { _ in
                     print("err from finish collecting")
                 }
             }

@@ -175,7 +175,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     /// Run this function once at app boot and it will rerun itself every minute, updating some stored values that are in turn reported to the server.
     func deviceInfoUpdateLoop() {
-        DispatchQueues.BACKGROUND_DEVICE_INFO_QUEUE.async(qos: .background) {
+        BACKGROUND_DEVICE_INFO_QUEUE.async(qos: .background) {
             // This takes an amount of time to run / must be run ~asynchronously
             UNUserNotificationCenter.current().getNotificationSettings(completionHandler: { settings in
                 Ephemerals.notification_permission = switch settings.authorizationStatus {
@@ -219,6 +219,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             if currentStudy.participantConsented {
                 StudyManager.sharedInstance.startStudyDataServices()
             }
+            
             
             if !self.isLoggedIn {
                 // Load up the login view - when the animation is working (it used to not work 🙄) the main screen is
@@ -337,9 +338,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         let dispatchGroup = DispatchGroup() // I don't know what this multithreading control tool is
         dispatchGroup.enter()
         // call stop on the study, then... leave the dispatch group, which I think means wait for everything to finish (or crash)
-        StudyManager.sharedInstance.stop().done(on: DispatchQueues.GLOBAL_DEFAULT_QUEUE) { (_: Bool) in
+        StudyManager.sharedInstance.stop().done(on: GLOBAL_DEFAULT_QUEUE) { (_: Bool) in
             dispatchGroup.leave()
-        }.catch(on: DispatchQueues.GLOBAL_DEFAULT_QUEUE) { (_: Error) in
+        }.catch(on: GLOBAL_DEFAULT_QUEUE) { (_: Error) in
             dispatchGroup.leave()
         }
         dispatchGroup.wait() // block until the dispatch group is... finished? until the promise is finished?
@@ -638,7 +639,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func firebaseLoop() {
         // The app cannot register with firebase until it gets a token, which only occurs at registration time, and it needs access to the appDelegate.
         // This must be called after FirebaseApp.configure(), so we dispatch it and wait until the app is initialized from RegistrationViewController...
-        DispatchQueues.GLOBAL_BACKGROUND_QUEUE.async {
+        GLOBAL_BACKGROUND_QUEUE.async {
             while !StudyManager.real_study_loaded {
                 sleep(1) // print("waiting for study to load")
             }
@@ -865,7 +866,7 @@ extension AppDelegate: MessagingDelegate {
         // Note: This callback is fired at each app startup and whenever a new token is generated.
 
         // wait until user is registered to send FCM token, runs on background thread
-        DispatchQueues.GLOBAL_BACKGROUND_QUEUE.async {
+        GLOBAL_BACKGROUND_QUEUE.async {
             while ApiManager.sharedInstance.patientId == "" {
                 sleep(1)
             }
