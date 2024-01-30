@@ -119,7 +119,7 @@ class StudyManager {
         self.prepareDataServices() // prepareDataServices was 90% of the function body
         NotificationCenter.default.addObserver(self, selector: #selector(self.reachabilityChanged), name: ReachabilityChangedNotification, object: nil)
         // this can block when initiated
-        GLOBAL_BACKGROUND_QUEUE.async { self.heartbeat() }
+        HEARTBEAT_QUEUE.async { self.heartbeat() }
     }
     
     /// ACTUAL initialization - initializes the weirdly complex self.gpsManager and everything else
@@ -597,8 +597,8 @@ class StudyManager {
     /// dispatches the heartbeat task to run in a loop forever every 5 minutes.
     func heartbeat() {
         print("Sending heartbeat...")
+        HEARTBEAT_QUEUE.asyncAfter(deadline: .now() + Constants.HEARTBEAT_INTERVAL, execute: self.heartbeat)
         ApiManager.sharedInstance.extremelySimplePostRequest("/mobile-heartbeat/")
-        GLOBAL_BACKGROUND_QUEUE.asyncAfter(deadline: .now() + Constants.HEARTBEAT_INTERVAL, execute: self.heartbeat)
     }
     
     /// called from self.setConsented, periodicNetworkTasks, and a debug menu button (I think)
