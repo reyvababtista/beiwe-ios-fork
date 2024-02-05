@@ -118,8 +118,8 @@ class StudyManager {
         DataStorageManager.sharedInstance.dataStorageManagerInit(self.currentStudy!, secKeyRef: self.keyRef)
         self.prepareDataServices() // prepareDataServices was 90% of the function body
         NotificationCenter.default.addObserver(self, selector: #selector(self.reachabilityChanged), name: ReachabilityChangedNotification, object: nil)
-        // this can block when initiated
-        HEARTBEAT_QUEUE.async { self.heartbeat() }
+        
+        heartbeat_on_dispatch_queue()
     }
     
     /// ACTUAL initialization - initializes the weirdly complex self.gpsManager and everything else
@@ -594,11 +594,22 @@ class StudyManager {
         }
     }
     
+    func heartbeat_on_dispatch_queue() {
+        print("Enqueuing heartbeat...")
+        HEARTBEAT_QUEUE.asyncAfter(deadline: .now() + Constants.HEARTBEAT_INTERVAL, execute: {
+            print("running heartbeat on dispatch queue \(Date())")
+            self.heartbeat("DispatchQueue \(Constants.HEARTBEAT_INTERVAL) secondly - \(countBackgroundTasks())")
+            self.heartbeat_on_dispatch_queue()
+        })
+    }
+    
     /// dispatches the heartbeat task to run in a loop forever every 5 minutes.
-    func heartbeat() {
+    func heartbeat(_ message: String) {
         print("Sending heartbeat...")
-        HEARTBEAT_QUEUE.asyncAfter(deadline: .now() + Constants.HEARTBEAT_INTERVAL, execute: self.heartbeat)
-        ApiManager.sharedInstance.extremelySimplePostRequest("/mobile-heartbeat/")
+        ApiManager.sharedInstance.extremelySimplePostRequest(
+            "/mobile-heartbeat/",
+            extra_parameters: ["message": message]
+        )
     }
     
     /// called from self.setConsented, periodicNetworkTasks, and a debug menu button (I think)
@@ -880,7 +891,7 @@ class StudyManager {
                     uploadChain = uploadChain.then { (_: Bool) -> Promise<Bool> in
                         // do an upload
                         ApiManager.sharedInstance.makeMultipartUploadRequest(uploadRequest, file: filePath).then { (_: (UploadRequest.ApiReturnType, Int)) -> Promise<Bool> in
-                            print("Finished uploading: \(filename), deleting.")
+                            // print("Finished uploading: \(filename), deleting.")
                             AppEventManager.sharedInstance.logAppEvent(event: "uploaded", msg: "Uploaded data file", d1: filename)
                             numFiles = numFiles + 1
                             try FileManager.default.removeItem(at: filePath) // ok I guess this can fail...?

@@ -1,3 +1,4 @@
+import BackgroundTasks
 import CoreMotion
 import Crashlytics
 import EmitterKit
@@ -22,6 +23,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     // dev stuff
     var transition_count = 0
     let debugEnabled = false
+    var lastAppStart = Date()
     
     // constants
     let gcmMessageIDKey = "gcm.message_id"
@@ -45,7 +47,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     // this is a weird location for an object, its used in powerstatemanager, unclear why this is here.
     let lockEvent = EmitterKit.Event<Bool>()
-    
+        
     static func sharedInstance() -> AppDelegate {
         return UIApplication.shared.delegate as! AppDelegate
     }
@@ -64,22 +66,34 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     /// The AppDelegate started function
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        self.lastAppStart = Date()
+        
+        // Due to a line of documentation about backgroundtasks that says "do this before didFinishLaunchingWithOptions finishes"
+        // we are just going to stick it before everything else.  At least it doesn't crash when you remove background app refresh permissions.
+        // register the ios Background task scheduler target for the org.beiwe.heartbeatl task and then call it's scheduler
+        self.setupBackgroundAppRefresh()
         self.initialSetup(launchOptions)
         self.setupThatDependsOnDatabase(launchOptions)
         
         // start some background looping for core app functionality
         self.firebaseLoop()
-        self.deviceInfoUpdateLoop()
-        
-        // I think this is broken because the database is not set up.
-        if var study = self.currentStudy {
-            study.lastAppStart = self.currentTimestamp
-            _ = Recline.shared.save(study)
-        }
-        
+        BACKGROUND_DEVICE_INFO_QUEUE.asyncAfter(deadline: .now() + 60, execute: self.deviceInfoUpdateLoop)
+                
         // self.isLoggedIn = true // uncomment to auto log in
         return true
     }
+    
+    // this is currently literally just being tested because I don't know what it does but apple has documentation about it and the BGTasks are completely unreliable right now.
+    func beginBackgroundTask(withName taskName: String?, expirationHandler handler: (() -> Void)? = nil) -> UIBackgroundTaskIdentifier {
+        StudyManager.sharedInstance.heartbeat("beginBackgroundTask")
+        return UIBackgroundTaskIdentifier(rawValue: 0)
+    }
+
+    // setMinimumBackgroundFetchInterval, application(_:performFetchWithCompletionHandler:)
+    // func application(_ application: UIApplication, performFetchWithCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+    //     print("======= performFetchWithCompletionHandler")
+    //     completionHandler(.newData)
+    // }
     
     func setupLogging() {
         // Create a destination for the system console log (via NSLog), add the destination to the logger
@@ -93,6 +107,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         systemLogDestination.showLineNumber = true
         systemLogDestination.showDate = true
         log.add(destination: systemLogDestination)
+    }
+
+    // BY THE WAY background app refresh health tasts simply aren't functional as far as it is possible to tell, so we are just rawdogging at and logging everything
+    // up to the server inside the requests to the backend because the app isn't stable enough to be a reliable source of truth.
+    func setupBackgroundAppRefresh() {
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: BACKGROUND_TASK_NAME_HEARTBEAT_BGREFRESH, using: HEARTBEAT_QUEUE) { (task: BGTask) in
+            print("inside the register closure for \(BACKGROUND_TASK_NAME_HEARTBEAT_BGREFRESH)")
+            handleHeartbeatRefresh(task: task as! BGAppRefreshTask)
+        }
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: BACKGROUND_TASK_NAME_HEARTBEAT_BGPROCESSING, using: HEARTBEAT_QUEUE) { (task: BGTask) in
+            print("inside the register closure for \(BACKGROUND_TASK_NAME_HEARTBEAT_BGPROCESSING)")
+            handleHeartbeatProcessing(task: task as! BGProcessingTask)
+        }
+        // this appears to ... Just be broken? it doesn'n register a task, or maybe that task is not visible to getPendingBackgroundTasks in
+        if #available(iOS 17.0, *) {
+            BGTaskScheduler.shared.register(forTaskWithIdentifier: BACKGROUND_TASK_NAME_HEARTBEAT_BGHEALTH, using: HEARTBEAT_QUEUE) { (task: BGTask) in
+                print("inside the register closure for \(BACKGROUND_TASK_NAME_HEARTBEAT_BGHEALTH)")
+                handleHeartbeatHealth(task: task as! BGHealthResearchTask)
+            }
+        }
     }
     
     func appStartLog() {
@@ -175,38 +209,39 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     /// Run this function once at app boot and it will rerun itself every minute, updating some stored values that are in turn reported to the server.
     func deviceInfoUpdateLoop() {
-        BACKGROUND_DEVICE_INFO_QUEUE.async(qos: .background) {
-            // This takes an amount of time to run / must be run ~asynchronously
-            UNUserNotificationCenter.current().getNotificationSettings(completionHandler: { settings in
-                Ephemerals.notification_permission = switch settings.authorizationStatus {
-                case .notDetermined: "not_determined"
-                case .denied: "denied"
-                case .authorized: "authorized"
-                case .provisional: "provisional"
-                case .ephemeral: "ephemeral"
-                @unknown default: "unknown: '\(settings.authorizationStatus.rawValue)'"
-                }
-            })
-
-            // locationServicesEnabledDescription and notification_permission are device info datapoints taht need to be checked on periiodically
-            // because they require async calls to get their values, and we can't wait on them every time we do a network request.
-            Ephemerals.locationServicesEnabledDescription = CLLocationManager.locationServicesEnabled().description
-            Ephemerals.significantLocationChangeMonitoringAvailable = CLLocationManager.significantLocationChangeMonitoringAvailable().description
-            
-            // backgroundRefreshStatus needs to be run on the main thread, but we can do this asynchronously somehow? and that's better? hunh?
-            DispatchQueue.main.async {
-                Ephemerals.backgroundRefreshStatus = switch UIApplication.shared.backgroundRefreshStatus {
-                case .available: "available"
-                case .denied: "denied"
-                case .restricted: "restricted"
-                @unknown default: "unknown: '\(UIApplication.shared.backgroundRefreshStatus.rawValue)'"
-                }
+        
+        self.currentStudy?.lastAppStart = self.currentTimestamp
+        
+        // This takes an amount of time to run / must be run ~asynchronously
+        UNUserNotificationCenter.current().getNotificationSettings(completionHandler: { settings in
+            Ephemerals.notification_permission = switch settings.authorizationStatus {
+            case .notDetermined: "not_determined"
+            case .denied: "denied"
+            case .authorized: "authorized"
+            case .provisional: "provisional"
+            case .ephemeral: "ephemeral"
+            @unknown default: "unknown: '\(settings.authorizationStatus.rawValue)'"
             }
-            
-            // run this every 60 seconds
-            sleep(60)
-            self.deviceInfoUpdateLoop()
+        })
+
+        // locationServicesEnabledDescription and notification_permission are device info datapoints taht need to be checked on periiodically
+        // because they require async calls to get their values, and we can't wait on them every time we do a network request.
+        Ephemerals.locationServicesEnabledDescription = CLLocationManager.locationServicesEnabled().description
+        Ephemerals.significantLocationChangeMonitoringAvailable = CLLocationManager.significantLocationChangeMonitoringAvailable().description
+        
+        // backgroundRefreshStatus needs to be run on the main thread, but we can do this asynchronously somehow? and that's better? hunh?
+        DispatchQueue.main.async {
+            Ephemerals.backgroundRefreshStatus = switch UIApplication.shared.backgroundRefreshStatus {
+            case .available: "available"
+            case .denied: "denied"
+            case .restricted: "restricted"
+            @unknown default: "unknown: '\(UIApplication.shared.backgroundRefreshStatus.rawValue)'"
+            }
         }
+        
+        _ = countBackgroundTasks()  // this is purely for logging/development purposes
+        
+        BACKGROUND_DEVICE_INFO_QUEUE.asyncAfter(deadline: .now() + 60, execute: self.deviceInfoUpdateLoop)
     }
     
     /// anything that depends on app state at initialization time needs to go after this has run
@@ -219,7 +254,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             if currentStudy.participantConsented {
                 StudyManager.sharedInstance.startStudyDataServices()
             }
-            
             
             if !self.isLoggedIn {
                 // Load up the login view - when the animation is working (it used to not work 🙄) the main screen is
@@ -236,6 +270,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                 }
             }
             self.initializeFirebase()
+            
+            // schedule the heartbeats (after the database is ready, apparently, but there were a lot of race condition errors so this might not be necessary)
+            scheduleAllHeartbeats()
         } else {
             // If there is no study loaded, then it's obvious.  We need the onboarding flow from the beginning.
             self.changeRootViewController(OnboardingManager().onboardingViewController)

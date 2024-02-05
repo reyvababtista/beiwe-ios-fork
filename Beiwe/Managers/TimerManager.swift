@@ -17,6 +17,7 @@ class TimerManager {
     var timer: Timer = Timer()
     var nextSurveyUpdate: Date = Date(timeIntervalSince1970: 0)
     var nextDataServicesCheck: Date = Date(timeIntervalSince1970: 0)
+    var nextHeartbeat: Date = Date(timeIntervalSince1970: 0)
     
     /// a core function that enables many sensor managers (DataServiceProtocols)
     func addDataService(on_duration: Int, off_duration: Int, dataService: DataServiceProtocol) {
@@ -85,6 +86,11 @@ class TimerManager {
         let now = Date().timeIntervalSince1970
         var next_toggle_check = now + (10 * 60)  // default is a ten minute timer
         
+        if now > self.nextHeartbeat.timeIntervalSince1970 {
+            StudyManager.sharedInstance.heartbeat("Timer logic")
+            self.nextHeartbeat = Date(timeIntervalSince1970: now + Constants.HEARTBEAT_INTERVAL)
+        }
+        
         // for every data service get its nextToggleTime, turn it on or off as appropriate,
         // set state as appropriate, update nextToggleTime.
         for dataStatus in self.dataCollectionServices {
@@ -152,9 +158,10 @@ class TimerManager {
         if !self.areServicesRunning {
             return
         }
-
+        
         /// set the next service date (its a timeInterval object) to the next event time
         self.nextDataServicesCheck = self.runDataCollectionServicesToggleLogic()
+        
         let now = Date() // from before the network tasks execute
         
         // conditionally runs any network operations, handles reachability

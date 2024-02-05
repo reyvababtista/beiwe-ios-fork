@@ -9,6 +9,12 @@ enum ReclineErrors: Error {
     case databaseNotOpen
 }
 
+// Any call into json.map can error with an invalid collection count, which can't be caught.
+// The entire codebase would have to be examined to determine where any thread-unsafe database calls
+// are made - you can guarantee one by doing _any access on a Mapper object_, because those call the database? what?,
+// before AppDelegate.setupThatDependsOnDatabase is called - to determine if it was safe to stick any
+// individual call on a given dispatch queue for EVERY SINGLE USE OF A PROMISE.
+// GEE ITS ALMOST LIKE THE PERSON WHO DESIGNED THIS DIDN'T KNOW WHAT THEY WERE DOING.
 
 // This class name is utter, absolute, complete, and total garbage.
 class Recline {

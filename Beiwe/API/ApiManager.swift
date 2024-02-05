@@ -69,13 +69,13 @@ class ApiManager {
         
         // basic device info, will be displayed on the participant page
         parameters["version_code"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
-        // parameters["version_name"] =  // There isn't really anything to stick into this one for ios
+        parameters["version_name"] = Bundle.main.infoDictionary?["GitCommitHash"] as? String ?? "Unknown"
+        
         parameters["os_version"] = UIDevice.current.systemVersion
         parameters["timezone"] = TimeZone.current.identifier
         
         // various device metrics to be improved on over time, meant for developer use to debug issues.
         var device_status_report = [String: String]()
-        
         
         device_status_report["timestamp"] = timestampString() + " " + TimeZone.current.identifier
         device_status_report["transition_count"] = Ephemerals.transition_count.description
@@ -134,9 +134,13 @@ class ApiManager {
 
     /// hits the endpoint once, doesn't do anything with the request object, literally just returns.
     // assumes endpoint starts with a slash
-    func extremelySimplePostRequest(_ endpoint: String) {
+    func extremelySimplePostRequest(_ endpoint: String, extra_parameters: [String: Any]) {
         var parameters: [String: Any] = [:]
         self.setDefaultParameters(&parameters)
+        // add to parameters
+        for (key, value) in extra_parameters {
+            parameters[key] = value
+        }
         Alamofire.request(baseApiUrl + endpoint, method: .post, parameters: parameters)
         return
         // if we want to extend it here's some code to do so - note that this executes asynchronously, so we would need a completion handler pattern
