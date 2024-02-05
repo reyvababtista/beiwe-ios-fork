@@ -465,7 +465,7 @@
 				83F98C511C925F6F00E0B64B /* Run Script */,
 				83F98C4F1C9250A600E0B64B /* Run Script */,
 				C7A5541B51E06493BA1A7A86 /* [CP] Embed Pods Frameworks */,
-				AAEA006C2B714C71008DDDC7 /* ShellScript */,
+				AAEA006C2B714C71008DDDC7 /* Run Script */,
 			);
 			buildRules = (
 			);
@@ -578,7 +578,7 @@
 			shellPath = /bin/sh;
 			shellScript = "# Skip icon badging for now...\nexit 0\nif [[ \"$CONFIGURATION\" == \"Release\" ]]; then\n  exit 0\nfi\nIFS=$'\\n'\n#VERSION=`git describe --dirty |sed -e \"s/^[^0-9]*//\"`\nBUILD=$(/usr/libexec/PlistBuddy -c \"Print CFBundleVersion\" \"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\")\nVERSION=$(/usr/libexec/PlistBuddy -c \"Print CFBundleShortVersionString\" \"${TARGET_BUILD_DIR}/${INFOPLIST_PATH}\")\n#VERSION=\"0.1.2-243-abcdefg\"\nPATH=${PATH}:/usr/local/bin\necho \"Ver: $VERSION, build: $BUILD\"\n\nfunction generateIcon () {\n    BASE_IMAGE_NAME=$1\n\n    TARGET_PATH=\"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/${BASE_IMAGE_NAME}\"\n    echo $TARGET_PATH\n    echo $SRCROOT\n    echo $(find ${SRCROOT} -name \"AppIcon60x60@2x.png\")\n    BASE_IMAGE_PATH=$(find ${SRCROOT} -name ${BASE_IMAGE_NAME})\n    WIDTH=$(identify -format %w ${BASE_IMAGE_PATH})\n    NAME_FONT_SIZE=$(echo \"$WIDTH * .20\" | bc -l)\n    VERSION_FONT_SIZE=$(echo \"$WIDTH * .12\" | bc -l)\n    echo \"font size $NAME_FONT_SIZE, $VERSION_FONT_SIZE\"\n\n\n    convert ${BASE_IMAGE_PATH} -fill white -font Times-Bold -pointsize ${NAME_FONT_SIZE} -gravity north -annotate +0+3 ${TARGET_NAME_SUFFIX} -gravity south -pointsize ${VERSION_FONT_SIZE} -annotate +0+5 \"${BUILD}\" ${TARGET_PATH}\n}\n\ngenerateIcon \"AppIcon60x60@2x.png\"\n#generateIcon \"AppIcon60x60@3x.png\"\n#generateIcon \"AppIcon76x76~ipad.png\"\n#generateIcon \"AppIcon76x76@2x~ipad.png\"\n";
 		};
-		AAEA006C2B714C71008DDDC7 /* ShellScript */ = {
+		AAEA006C2B714C71008DDDC7 /* Run Script */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -589,6 +589,7 @@
 				$BUILT_PRODUCTS_DIR/$INFOPLIST_PATH,
 				$TARGET_BUILD_DIR/$INFOPLIST_PATH,
 			);
+			name = "Run Script";
 			outputFileListPaths = (
 			);
 			outputPaths = (
@@ -880,7 +881,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2024.2;
+				CURRENT_PROJECT_VERSION = 2024.4;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6M52R5C7FT;
 				ENABLE_BITCODE = NO;
@@ -980,7 +981,7 @@
 				CODE_SIGN_ENTITLEMENTS = Beiwe/Beiwe2Release2.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2024.2;
+				CURRENT_PROJECT_VERSION = 2024.4;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6M52R5C7FT;
 				ENABLE_BITCODE = NO;
@@ -1147,7 +1148,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2024.2;
+				CURRENT_PROJECT_VERSION = 2024.4;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6M52R5C7FT;
 				ENABLE_BITCODE = NO;
@@ -1185,7 +1186,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Distribution";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution: Onnela Lab LLC (6M52R5C7FT)";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2024.2;
+				CURRENT_PROJECT_VERSION = 2024.4;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6M52R5C7FT;
 				ENABLE_BITCODE = NO;
