@@ -108,6 +108,22 @@ class StudyManager {
         }
     }
     
+    func real_loadDefaultStudy() {
+        self.currentStudy = nil
+        self.gpsManager = nil // this seems like a bug waiting to happen
+        let studies: [Study] = Recline.shared.real_queryAll() // its a list of studies
+        if studies.count > 1 {
+            log.warning("Multiple Studies: \(studies)")    // should we now error on this??
+        }
+        if studies.count < 1 {
+            fatalError("no studies?")  // TODO test registration probably?
+        }
+        self.currentStudy = studies[0]
+        StudyManager.real_study_loaded = true
+        self.updateActiveSurveys()
+    }
+    
+    
     /// pretty much an initializer for data services, for some reason gpsManager is the test if we are already initialized
     func startStudyDataServices() {
         // if there is no study return immediately (this should probably throw an error, such an app state is too invalid to support)
@@ -1007,6 +1023,13 @@ class StudyManager {
                 }
             }
             return promise
+        }
+    }
+    
+    func real_purgeStudies() {
+        let studies = Recline.shared.real_queryAll()  // this returns a list of studies, ignore the templated type
+        for study in studies {
+            Recline.shared.real_purge(study)
         }
     }
     
