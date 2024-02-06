@@ -159,9 +159,8 @@ class ConsentManager: NSObject, ORKTaskViewControllerDelegate {
         // Handle results with taskViewController.result
         // taskViewController.dismissViewControllerAnimated(true, completion: nil)
         if reason == ORKTaskViewControllerFinishReason.discarded {
-            StudyManager.sharedInstance.leaveStudy().done { _ in
-                self.closeOnboarding()
-            }
+            StudyManager.sharedInstance.leaveStudy()
+            self.closeOnboarding()
         } else {
             StudyManager.sharedInstance.setConsented().done { _ in
                 self.closeOnboarding()

@@ -391,15 +391,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         
         AppEventManager.sharedInstance.logAppEvent(event: "terminate", msg: "Application terminating")
         
-        let dispatchGroup = DispatchGroup() // I don't know what this multithreading control tool is
-        dispatchGroup.enter()
-        // call stop on the study, then... leave the dispatch group, which I think means wait for everything to finish (or crash)
-        StudyManager.sharedInstance.stop().done(on: GLOBAL_DEFAULT_QUEUE) { (_: Bool) in
-            dispatchGroup.leave()
-        }.catch(on: GLOBAL_DEFAULT_QUEUE) { (_: Error) in
-            dispatchGroup.leave()
-        }
-        dispatchGroup.wait() // block until the dispatch group is... finished? until the promise is finished?
+        // stop used to be wrapped in a DispatchGroup and run on the default background queue,
+        // probably because of promisekit promises making async code weird?
+        StudyManager.sharedInstance.stop()
         print("applicationWillTerminate exiting")
     }
 

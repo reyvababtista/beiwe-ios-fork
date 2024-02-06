@@ -248,14 +248,14 @@ class Recline {
 
     }
 
-    /// wrapper for _purge...
-    func purge<T: ReclineObject>(_ obj: T) -> Promise<Bool> {
-        return Promise().then(on: RECLINE_QUEUE) {
-            return self._purge(obj)
-        }
-    }
+    // /// wrapper for _purge...
+    // func purge<T: ReclineObject>(_ obj: T) -> Promise<Bool> {
+    //     return Promise().then(on: RECLINE_QUEUE) {
+    //         return self._purge(obj)
+    //     }
+    // }
     
-    func real_purge<T: ReclineObject>(_ obj: T) {
+    func purge<T: ReclineObject>(_ obj: T) {
         if let object_id = obj._id {
             do {
                 try db?.document(withID: object_id)?.purgeDocument()
@@ -265,16 +265,16 @@ class Recline {
         }
     }
     
-    /// deletes the item, returns true (always)
-    func _purge<T: ReclineObject>(_ obj: T) -> Promise<Bool> {
-        return Promise { (resolver: Resolver<Bool>) in
-            // deletes the document and always returns true even on failure wut.
-            if let _id = obj._id {
-                try db?.document(withID: _id)?.purgeDocument()
-            }
-            return resolver.fulfill(true)
-        }
-    }
+    // /// deletes the item, returns true (always)
+    // func _purge<T: ReclineObject>(_ obj: T) -> Promise<Bool> {
+    //     return Promise { (resolver: Resolver<Bool>) in
+    //         // deletes the document and always returns true even on failure wut.
+    //         if let _id = obj._id {
+    //             try db?.document(withID: _id)?.purgeDocument()
+    //         }
+    //         return resolver.fulfill(true)
+    //     }
+    // }
 
     /// runs the database compact operation
     func compact() -> Promise<Void> {

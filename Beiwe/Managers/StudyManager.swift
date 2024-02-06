@@ -113,16 +113,15 @@ class StudyManager {
         self.gpsManager = nil // this seems like a bug waiting to happen
         let studies: [Study] = Recline.shared.real_queryAll() // its a list of studies
         if studies.count > 1 {
-            log.warning("Multiple Studies: \(studies)")    // should we now error on this??
+            log.warning("Multiple Studies: \(studies)") // should we now error on this??
         }
         if studies.count < 1 {
-            fatalError("no studies?")  // TODO test registration probably?
+            return // participant not registered.
         }
         self.currentStudy = studies[0]
         StudyManager.real_study_loaded = true
         self.updateActiveSurveys()
     }
-    
     
     /// pretty much an initializer for data services, for some reason gpsManager is the test if we are already initialized
     func startStudyDataServices() {
@@ -135,7 +134,7 @@ class StudyManager {
         self.prepareDataServices() // prepareDataServices was 90% of the function body
         NotificationCenter.default.addObserver(self, selector: #selector(self.reachabilityChanged), name: ReachabilityChangedNotification, object: nil)
         
-        heartbeat_on_dispatch_queue()
+        self.heartbeat_on_dispatch_queue()
     }
     
     /// ACTUAL initialization - initializes the weirdly complex self.gpsManager and everything else
@@ -953,7 +952,7 @@ class StudyManager {
     // but this is some free safety so until it becomes a maintenance burden we will keep it.
     
     /// the bulk of the leave study feature.
-    func leaveStudy() -> Promise<Bool> {
+    func leaveStudy() {
         // disable gps - gps is special because it interacts with app persistence
         if self.gpsManager != nil {
             self.gpsManager!.stopGps()
@@ -966,70 +965,62 @@ class StudyManager {
         NotificationCenter.default.removeObserver(self, name: ReachabilityChangedNotification, object: nil)
         UIApplication.shared.cancelAllLocalNotifications()
         
-        var promise: Promise<Void> = Promise()
-        // and then alllll code is located after return statement because Promises are totally meant to be used like this. hooray!
-        return promise.then { (_: Void) -> Promise<Bool> in
-            self.gpsManager = nil
-            self.timerManager.clear() // this may deallocate all sensors.  I think.
-            
-            // call purge studies and insert a _second_ return statement 🙄
-            return self.purgeStudies().then { (_: Bool) -> Promise<Bool> in
-                // delete upload diirectory using ugly code
-                var enumerator = FileManager.default.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)
-                if let enumerator = enumerator {
-                    while let filename = enumerator.nextObject() as? String {
-                        if true /* filename.hasSuffix(DataStorageManager.dataFileSuffix) */ {
-                            let filePath = DataStorageManager.uploadDataDirectory().appendingPathComponent(filename)
-                            try FileManager.default.removeItem(at: filePath)
-                        }
+        // clear out remaining active study objects
+        self.gpsManager = nil
+        self.timerManager.clear() // this may deallocate all sensors.  I think.
+        self.purgeStudies()
+        
+        // delete upload diirectory using ugly code
+        var enumerator = FileManager.default.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)
+        if let enumerator = enumerator {
+            while let filename = enumerator.nextObject() as? String {
+                if true /* filename.hasSuffix(DataStorageManager.dataFileSuffix) */ {
+                    let filePath = DataStorageManager.uploadDataDirectory().appendingPathComponent(filename)
+                    do {
+                        try FileManager.default.removeItem(at: filePath)
+                    } catch {
+                        log.error("(1) Failed to delete file: \(filename) with error \(error)")
                     }
                 }
-                // delete data directory using ugly code
-                enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path)
-                if let enumerator = enumerator {
-                    while let filename = enumerator.nextObject() as? String {
-                        if true /* filename.hasSuffix(DataStorageManager.dataFileSuffix) */ {
-                            let filePath = DataStorageManager.currentDataDirectory().appendingPathComponent(filename)
-                            try FileManager.default.removeItem(at: filePath)
-                        }
-                    }
-                }
-                // clear the study, patient id
-                self.currentStudy = nil // self.isStudyLoaded will now fail
-                ApiManager.sharedInstance.patientId = ""
-                
-                // I don't know what this is and I don't think it matters.
-                let instance = InstanceID.instanceID()
-                instance.deleteID { (error: Error?) in
-                    print(error.debugDescription)
-                    log.error(error.debugDescription)
-                }
-                return .value(true) // ohey a third return statement 🙄
             }
+        }
+        
+        // delete data directory using ugly code
+        enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path)
+        if let enumerator = enumerator {
+            while let filename = enumerator.nextObject() as? String {
+                let filePath = DataStorageManager.currentDataDirectory().appendingPathComponent(filename)
+                do {
+                    try FileManager.default.removeItem(at: filePath)
+                } catch {
+                    log.error("(2) Failed to delete file: \(filename) with error \(error)")
+                }
+            }
+        }
+        
+        // clear the study, patient id
+        self.currentStudy = nil // self.isStudyLoaded will now fail
+        ApiManager.sharedInstance.patientId = ""
+        
+        // I don't know what this is and I don't think it matters.
+        let instance = InstanceID.instanceID()
+        instance.deleteID { (error: Error?) in
+            log.error(error.debugDescription)
         }
     }
     
-    /// deletes all studies - ok? - used in registration for some reason
-    func purgeStudies() -> Promise<Bool> {
-        /// reaches into the database, removes the study, no clue what the queryall does
-        return firstly { () -> Promise<[Study]> in
-            Recline.shared.queryAll() // this returns a list of all studies as a parameter to the next promise.
-        }.then { (studies: [Study]) -> Promise<Bool> in
-            // delete all the studies
-            var promise = Promise<Bool>.value(true)
-            for study in studies {
-                promise = promise.then { (_: Bool) in
-                    Recline.shared.purge(study)
-                }
-            }
-            return promise
+    /// deletes all studies - used in registration for some reason
+    func purgeStudies() {
+        let studies: [Study] = Recline.shared.real_queryAll()
+        for study in studies {
+            Recline.shared.purge(study)
         }
     }
     
     func real_purgeStudies() {
-        let studies = Recline.shared.real_queryAll()  // this returns a list of studies, ignore the templated type
+        let studies = Recline.shared.real_queryAll() // this returns a list of studies, ignore the templated type
         for study in studies {
-            Recline.shared.real_purge(study)
+            Recline.shared.purge(study)
         }
     }
     
@@ -1038,7 +1029,7 @@ class StudyManager {
     ///
     
     /// only called from AppDelegate.applicationWillTerminate
-    func stop() -> Promise<Bool> {
+    func stop() {
         // stop gps because it interacts with app persistence...?
         if self.gpsManager != nil {
             self.gpsManager!.stopGps()
@@ -1049,12 +1040,9 @@ class StudyManager {
         self.timerManager.stop()
         self.timerManager.clear()
         
-        // clear currentStudy
-        return Promise().then(on: GLOBAL_DEFAULT_QUEUE) { (_: Void) -> Promise<Bool> in
-            // many things depend on current study, lets try a build with this removed.
-            self.currentStudy = nil
-            StudyManager.real_study_loaded = false
-            return .value(true)
-        }
+        // clear currentStudy - this originally ran on the default background queue inside a promisekit promise,
+        // but it was only called in applicationWillTerminate, so we can just run it on the main thread?
+        self.currentStudy = nil
+        StudyManager.real_study_loaded = false
     }
 }

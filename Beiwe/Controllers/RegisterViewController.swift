@@ -237,11 +237,9 @@ class RegisterViewController: FormViewController {
                         study.fuzzGpsLatitudeOffset = self.generateLatitudeOffset()
                         study.fuzzGpsLongitudeOffset = self.generateLongitudeOffset()
                     }
-                    
-                    // We keep the call to purge studies to ensure there is no weird data present from possible partial study registrations.
-                    return StudyManager.sharedInstance.purgeStudies().then { (_: Bool) in
-                        Recline.shared.save(study)
-                    }
+                    // Call purge studies to ensure there is no weird data present from possible partial study registrations.
+                    StudyManager.sharedInstance.purgeStudies()
+                    return Recline.shared.save(study)
                         
                 }.then { (_: Study) -> Promise<Bool> in
                     // set study fcm token, load the study
