@@ -1,6 +1,5 @@
 import Foundation
 import ObjectMapper
-import PromiseKit
 
 // its a key that we need to use to access something about the database metadata
 let kReclineMetadataKey = "reclineMetadata"
@@ -28,23 +27,23 @@ class Recline {
     init() {}
 
     /// database open function - called exactly once in AppDelegate
-    func open(_ dbName: String = "default") -> Promise<Bool> {
-        return Promise().then(on: RECLINE_QUEUE) { _ -> Promise<Bool> in
-            // safety in case its called twice? sure.
-            if self.manager == nil {
-                // it sets the database up as a file, we don't care about the UnsafeMutablePointer its objc junk
-                let cbloptions = CBLManagerOptions(readOnly: false, fileProtection: NSData.WritingOptions.noFileProtection)
-                let poptions = UnsafeMutablePointer<CBLManagerOptions>.allocate(capacity: 1)
-                poptions.initialize(to: cbloptions)
-                try self.manager = CBLManager(directory: CBLManager.defaultDirectory(), options: poptions)
-                self.manager.dispatchQueue = RECLINE_QUEUE
-            }
-            return self._open(dbName) // defines database views... in a promise... 🙄
-        }
-    }
+    // func open(_ dbName: String = "default") -> Promise<Bool> {
+    //     return Promise().then(on: RECLINE_QUEUE) { _ -> Promise<Bool> in
+    //         // safety in case its called twice? sure.
+    //         if self.manager == nil {
+    //             // it sets the database up as a file, we don't care about the UnsafeMutablePointer its objc junk
+    //             let cbloptions = CBLManagerOptions(readOnly: false, fileProtection: NSData.WritingOptions.noFileProtection)
+    //             let poptions = UnsafeMutablePointer<CBLManagerOptions>.allocate(capacity: 1)
+    //             poptions.initialize(to: cbloptions)
+    //             try self.manager = CBLManager(directory: CBLManager.defaultDirectory(), options: poptions)
+    //             self.manager.dispatchQueue = RECLINE_QUEUE
+    //         }
+    //         return self._open(dbName) // defines database views... in a promise... 🙄
+    //     }
+    // }
     
     // this function only be called once at app instantiation. If this fails, the app fails.
-    func open_database(_ dbName: String = "default") {
+    func open(_ dbName: String = "default") {
         // it sets the database up as a file, we don't care about the UnsafeMutablePointer its objc junk
         let cbloptions = CBLManagerOptions(readOnly: false, fileProtection: NSData.WritingOptions.noFileProtection)
         let poptions = UnsafeMutablePointer<CBLManagerOptions>.allocate(capacity: 1)
@@ -80,62 +79,86 @@ class Recline {
     
     /// The actual open function maybe - or at least its called at the end of open. and nowhere else.
     /// Sets self.db, self.typesView; defines view functions - whatever that means.
-    func _open(_ dbName: String = "default") -> Promise<Bool> {
-        return Promise { (resolver: Resolver<Bool>) in
-            // get our critical objects
-            self.db = try manager.databaseNamed(dbName)
-            self.typesView = self.db!.viewNamed("reclineType")
-            
-            // Defines the view, sets its functions.
-            typesView!.setMapBlock({ (doc: [String: Any], emit) in // let emit: <<error type>>  (probably ReclineErrors?)
-                // I think this sets the return type to be a dict of string to any, because it is json.
-                // I don't know what function this actually sets. (... map? mapblock?)
-                if let reclineMeta: ReclineMetadata = Mapper<ReclineMetadata>().map(JSONObject: doc[kReclineMetadataKey]) {
-                    if let type = reclineMeta.type {
-                        emit(type, Mapper<ReclineMetadata>().toJSON(reclineMeta))
-                    }
-                }
-            }, version: "5") // version arguument of setMapBlock
-            return resolver.fulfill(true) // hot garbo
-        }
-    }
+    // func _open(_ dbName: String = "default") -> Promise<Bool> {
+    //     return Promise { (resolver: Resolver<Bool>) in
+    //         // get our critical objects
+    //         self.db = try manager.databaseNamed(dbName)
+    //         self.typesView = self.db!.viewNamed("reclineType")
+    //         
+    //         // Defines the view, sets its functions.
+    //         typesView!.setMapBlock({ (doc: [String: Any], emit) in // let emit: <<error type>>  (probably ReclineErrors?)
+    //             // I think this sets the return type to be a dict of string to any, because it is json.
+    //             // I don't know what function this actually sets. (... map? mapblock?)
+    //             if let reclineMeta: ReclineMetadata = Mapper<ReclineMetadata>().map(JSONObject: doc[kReclineMetadataKey]) {
+    //                 if let type = reclineMeta.type {
+    //                     emit(type, Mapper<ReclineMetadata>().toJSON(reclineMeta))
+    //                 }
+    //             }
+    //         }, version: "5") // version arguument of setMapBlock
+    //         return resolver.fulfill(true) // hot garbo
+    //     }
+    // }
 
     /// wraps the actual save function in a promise, but its a template type so it might be necessary
     /// - ah, the templated type is required because this is called from a templated function inside RegisterViewController/ApiManager
     /// - (This still does not explain or justify why the ONLY CONTENT is factored out into another function with IDENTICAL TEMPLATED TYPING 🙄.)
-    func save<T: ReclineObject>(_ obj: T) -> Promise<T> {
-        return Promise().then(on: RECLINE_QUEUE) {
-            return self._save(obj)
+    // func save<T: ReclineObject>(_ obj: T) -> Promise<T> {
+    //     return Promise().then(on: RECLINE_QUEUE) {
+    //         return self._save(obj)
+    //     }
+    // }
+    
+    /// actual save [template] function
+    // func _save<T: ReclineObject>(_ obj: T) -> Promise<T> {
+    //     return Promise { (resolver: Resolver<T>) in
+    //         // give up early if db is not instantiated
+    //         guard let db = db else {
+    //             return resolver.reject(ReclineErrors.databaseNotOpen) // TODO: fatal error?
+    //         }
+    //         // get or create the document.  I can't tell if this could be made non-optional,
+    //         var doc: CBLDocument?
+    //         if let _id = obj._id {
+    //             doc = db.document(withID: _id)
+    //         } else {
+    //             doc = db.createDocument()
+    //         }
+    //         // take the object, make a json version of it, and .... then we do something involving ReclineMetadata?
+    //         var newProps: [String: Any] = Mapper<T>().toJSON(obj)
+    //         let reclineMeta = ReclineMetadata(type: String(describing: type(of: obj)))
+    //         newProps[kReclineMetadataKey] = Mapper<ReclineMetadata>().toJSON(reclineMeta)
+    //         // couchbase uses a revisioning system for concurrency, so this is probably assigning an id and a a revision
+    //         newProps["_id"] = doc?.properties?["_id"]
+    //         newProps["_rev"] = doc?.properties?["_rev"]
+    //         // I think we are swallowing any errors
+    //         try doc?.putProperties(newProps) // commit to database
+    //         return resolver.fulfill(obj)
+    //     }
+    // }
+
+    func save<T: ReclineObject>(_ obj: T) {
+        guard let db = db else {
+            fatalError("again the database is not instantiated - what do you think you are doing?")
+        }
+        // get or create the document.
+        let doc: CBLDocument = if let _id = obj._id { db.document(withID: _id)! } else { db.createDocument() }
+        
+        // take the object, make a json version of it, and .... then we do something involving ReclineMetadata?
+        var newProps: [String: Any] = Mapper<T>().toJSON(obj)
+        let reclineMeta = ReclineMetadata(type: String(describing: type(of: obj)))
+        newProps[kReclineMetadataKey] = Mapper<ReclineMetadata>().toJSON(reclineMeta)
+        
+        // couchbase uses a revisioning system for concurrency(?), so this is probably assigning an id and a revision
+        newProps["_id"] = doc.properties!["_id"]
+        newProps["_rev"] = doc.properties!["_rev"]
+        
+        // I think we are swallowing any errors
+        do {
+            try doc.putProperties(newProps) // commit to database
+        } catch {
+            fatalError("error saving to couchbase? \(error)")
         }
     }
     
-    /// actual save [template] function
-    func _save<T: ReclineObject>(_ obj: T) -> Promise<T> {
-        return Promise { (resolver: Resolver<T>) in
-            // give up early if db is not instantiated
-            guard let db = db else {
-                return resolver.reject(ReclineErrors.databaseNotOpen) // TODO: fatal error?
-            }
-            // get or create the document.  I can't tell if this could be made non-optional,
-            var doc: CBLDocument?
-            if let _id = obj._id {
-                doc = db.document(withID: _id)
-            } else {
-                doc = db.createDocument()
-            }
-            // take the object, make a json version of it, and .... then we do something involving ReclineMetadata?
-            var newProps: [String: Any] = Mapper<T>().toJSON(obj)
-            let reclineMeta = ReclineMetadata(type: String(describing: type(of: obj)))
-            newProps[kReclineMetadataKey] = Mapper<ReclineMetadata>().toJSON(reclineMeta)
-            // couchbase uses a revisioning system for concurrency, so this is probably assigning an id and a a revision
-            newProps["_id"] = doc?.properties?["_id"]
-            newProps["_rev"] = doc?.properties?["_rev"]
-            // I think we are swallowing any errors
-            try doc?.putProperties(newProps) // commit to database
-            return resolver.fulfill(obj)
-        }
-    }
-
     /// wraps load in a promise, but its a template function so maybe its okay 🙄.
     // func load<T: ReclineObject>(_ docId: String) -> Promise<T?> {
     //     return Promise().then(on: RECLINE_QUEUE) {
@@ -143,25 +166,26 @@ class Recline {
     //     }
     // }
     // 
-    /// template function to get a single object (a whole document?) from couchbase, inn a promise
-    func _load<T: ReclineObject>(_ docId: String) -> Promise<T?> {
-        return Promise { (resolver: Resolver<T?>) in
-            // give up early if db is not instantiated
-            guard let db = db else {
-                return resolver.reject(ReclineErrors.databaseNotOpen)
-            }
-            // get the _underlying_ document? it is apparently json, at least in our usage.
-            let doc: CBLDocument? = db.document(withID: docId)
-            if let doc = doc {
-                if let newObj = Mapper<T>().map(JSONObject: doc.properties) {
-                    newObj._id = doc.properties?["_id"] as? String
-                    return resolver.fulfill(newObj)
-                }
-            }
-            // this is the failure case?
-            return resolver.fulfill(nil)
-        }
-    }
+    
+    /// template function to get a single object (a whole document?) from couchbase, in a promise
+    // func _load<T: ReclineObject>(_ docId: String) -> Promise<T?> {
+    //     return Promise { (resolver: Resolver<T?>) in
+    //         // give up early if db is not instantiated
+    //         guard let db = db else {
+    //             return resolver.reject(ReclineErrors.databaseNotOpen)
+    //         }
+    //         // get the _underlying_ document? it is apparently json, at least in our usage.
+    //         let doc: CBLDocument? = db.document(withID: docId)
+    //         if let doc = doc {
+    //             if let newObj = Mapper<T>().map(JSONObject: doc.properties) {
+    //                 newObj._id = doc.properties?["_id"] as? String
+    //                 return resolver.fulfill(newObj)
+    //             }
+    //         }
+    //         // this is the failure case?
+    //         return resolver.fulfill(nil)
+    //     }
+    // }
 
     func load<T: ReclineObject>(_ docId: String) -> T {
         // give up early if db is not instantiated

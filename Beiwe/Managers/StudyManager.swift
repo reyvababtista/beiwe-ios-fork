@@ -62,9 +62,7 @@ class StudyManager {
             return
         }
         self.surveysUpdatedEvent.emit(0) // what is this>?
-        Recline.shared.save(study).catch { _ in
-            log.error("Failed to save study after processing surveys")
-        }
+        Recline.shared.save(study)
     }
     
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -214,9 +212,8 @@ class StudyManager {
         DataStorageManager.sharedInstance.dataStorageManagerInit(study, secKeyRef: self.keyRef)
         DataStorageManager.sharedInstance.createDirectories()
         // update study stuff?
-        return Recline.shared.save(study).then { (_: Study) -> Promise<Bool> in
-            self.checkSurveys()
-        }
+        Recline.shared.save(study)
+        return self.checkSurveys()
     }
     
     // FIXME: This function has 4 unacceptable failure modes -- called only from setConsented (study registration) and startStudyDataServices
@@ -520,9 +517,8 @@ class StudyManager {
             return .value(true)
         }
         study.nextUploadCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.uploadDataFileFrequencySeconds)
-        return Recline.shared.save(study).then { (_: Study) -> Promise<Bool> in
-            .value(true)
-        }
+        Recline.shared.save(study)
+        return Promise.value(true)
     }
     
     func setNextSurveyTime() -> Promise<Bool> {
@@ -530,9 +526,8 @@ class StudyManager {
             return .value(true)
         }
         study.nextSurveyCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.checkForNewSurveysFreqSeconds)
-        return Recline.shared.save(study).then { (_: Study) -> Promise<Bool> in
-            .value(true)
-        }
+        Recline.shared.save(study)
+        return Promise.value(true)
     }
     
     func setNextDeviceSettingsTime() -> Promise<Bool> {
@@ -540,9 +535,8 @@ class StudyManager {
             return .value(true)
         }
         study.nextDeviceSettingsCheck = Int64(Date().timeIntervalSince1970) + DEVICE_SETTINGS_INTERVAL
-        return Recline.shared.save(study).then { (_: Study) -> Promise<Bool> in
-            .value(true)
-        }
+        Recline.shared.save(study)
+        return Promise.value(true)
     }
     
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -636,17 +630,16 @@ class StudyManager {
         }
         log.info("Checking for surveys...")
         
-        // save the study (whatever that means), and then....
-        return Recline.shared.save(study).then { (_: Study) -> Promise<([Survey], Int)> in
-            // do the survey request (its json into a ~mappable)
-            let surveyRequest = GetSurveysRequest()
-            return ApiManager.sharedInstance.arrayPostRequest(surveyRequest)
-        }.then { surveys, _ -> Promise<Void> in
+        // save the study and then....
+        Recline.shared.save(study)
+        let surveyRequest = GetSurveysRequest()
+        return ApiManager.sharedInstance.arrayPostRequest(surveyRequest).then { surveys, _ -> Promise<Void> in
             // then... we receive the surveys from the api manager request possibly?
             // (This is another reason why promises are bad, they pointless obscure critical information)
             log.info("Surveys: \(surveys)")
             study.surveys = surveys
-            return Recline.shared.save(study).asVoid()
+            Recline.shared.save(study)
+            return Promise<Void>()
         }.then { _ -> Promise<Bool> in // its an error type
             // then update the active surveys because the surveys may have just changed
             self.updateActiveSurveys()
@@ -851,10 +844,10 @@ class StudyManager {
                         // print("callResearchAssistantButtonEnabled changed to: \(newSettings.callResearchAssistantButtonEnabled)")
                     }
                     // if anything changed, reset all data services.
-                    _ = Recline.shared.save(self.currentStudy!).done { (_: Study) in
-                        if anything_changed {
-                            self.prepareDataServices()
-                        }
+                    Recline.shared.save(self.currentStudy!)
+                    
+                    if anything_changed {
+                        self.prepareDataServices()
                     }
                 }
             }
@@ -925,7 +918,8 @@ class StudyManager {
             AppEventManager.sharedInstance.logAppEvent(event: "upload_complete", msg: "Upload Complete", d1: String(numFiles))
             if let study = self.currentStudy {
                 study.lastUploadSuccess = Int64(NSDate().timeIntervalSince1970)
-                return Recline.shared.save(study).asVoid()
+                Recline.shared.save(study)
+                return Promise()
             } else {
                 return Promise()
             }

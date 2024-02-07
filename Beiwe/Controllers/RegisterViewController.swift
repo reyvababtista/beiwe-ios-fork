@@ -239,8 +239,8 @@ class RegisterViewController: FormViewController {
                     }
                     // Call purge studies to ensure there is no weird data present from possible partial study registrations.
                     StudyManager.sharedInstance.purgeStudies()
-                    return Recline.shared.save(study)
-                        
+                    Recline.shared.save(study)
+                    return Promise.value(study)
                 }.then { (_: Study) -> Promise<Bool> in
                     // set study fcm token, load the study
                     let token = Messaging.messaging().fcmToken

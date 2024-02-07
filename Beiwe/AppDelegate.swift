@@ -179,7 +179,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     func setupThatDependsOnDatabase(_ launchOptions: [UIApplication.LaunchOptionsKey: Any]?) {
         // Start the database, eg LOAD STUDY STUFF
-        Recline.shared.open_database()
+        Recline.shared.open()
         StudyManager.sharedInstance.loadDefaultStudy()
         
         // IF A NOTIFICATION WAS RECEIVED while app was in killed state there will be launch options!
@@ -619,12 +619,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         guard let study = self.currentStudy else {
             return
         }
-        Recline.shared.save(study).then { (_: Study) -> Promise<([Survey], Int)> in
-            let surveyRequest = GetSurveysRequest()
-            return ApiManager.sharedInstance.arrayPostRequest(surveyRequest)
-        }.then { (surveys: [Survey], _: Int) -> Promise<Void> in
+        Recline.shared.save(study)
+        
+        let surveyRequest = GetSurveysRequest()
+        ApiManager.sharedInstance.arrayPostRequest(surveyRequest).then { (surveys: [Survey], _: Int) -> Promise<Void> in
             study.surveys = surveys
-            return Recline.shared.save(study).asVoid()
+            Recline.shared.save(study)
+            return Promise<Void>()
         }.done { (_: Void) in
             self.setActiveSurveys(surveyIds: surveyIds, sentTime: sentTime)
         }.catch { (error: Error) in
@@ -674,9 +675,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         
         // Emits a surveyUpdated event to the listener
         StudyManager.sharedInstance.surveysUpdatedEvent.emit(0)
-        Recline.shared.save(study).catch { (_: Error) in
-            print("Failed to save study after processing surveys")
-        }
+        Recline.shared.save(study)
 
         // set badge number
         UIApplication.shared.applicationIconBadgeNumber = study.activeSurveys.count

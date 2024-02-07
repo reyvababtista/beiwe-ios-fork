@@ -74,11 +74,8 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
         if let study = StudyManager.sharedInstance.currentStudy {
             // Just need to put any old answer in here...
             self.activeSurvey.bwAnswers["A"] = "A"
-            Recline.shared.save(study).done { _ in
-                log.info("Saved.")
-            }.catch { e in
-                log.error("Error saving updated answers: \(e)")
-            }
+            Recline.shared.save(study)
+            log.info("Saved.")
         }
     }
 
