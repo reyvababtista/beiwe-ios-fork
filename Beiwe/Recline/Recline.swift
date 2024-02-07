@@ -137,12 +137,12 @@ class Recline {
     }
 
     /// wraps load in a promise, but its a template function so maybe its okay 🙄.
-    func load<T: ReclineObject>(_ docId: String) -> Promise<T?> {
-        return Promise().then(on: RECLINE_QUEUE) {
-            self._load(docId)
-        }
-    }
-    
+    // func load<T: ReclineObject>(_ docId: String) -> Promise<T?> {
+    //     return Promise().then(on: RECLINE_QUEUE) {
+    //         self._load(docId)
+    //     }
+    // }
+    // 
     /// template function to get a single object (a whole document?) from couchbase, inn a promise
     func _load<T: ReclineObject>(_ docId: String) -> Promise<T?> {
         return Promise { (resolver: Resolver<T?>) in
@@ -163,7 +163,7 @@ class Recline {
         }
     }
 
-    func real_load<T: ReclineObject>(_ docId: String) -> T {
+    func load<T: ReclineObject>(_ docId: String) -> T {
         // give up early if db is not instantiated
         guard let db = self.db else {
             fatalError("what are you doing the database isn't instantiated")
@@ -182,37 +182,37 @@ class Recline {
     }
     
     /// wraps _queryAll....
-    func queryAll<T: ReclineObject>() -> Promise<[T]> {
-        return Promise().then(on: RECLINE_QUEUE) {
-            return self._queryAll()
-        }
-    }
+    // func queryAll<T: ReclineObject>() -> Promise<[T]> {
+    //     return Promise().then(on: RECLINE_QUEUE) {
+    //         return self._queryAll()
+    //     }
+    // }
     
     /// gets all rows in the typesView database view - this returns a list of all studies as a parameter to the next promise.
-    func _queryAll<T: ReclineObject>() -> Promise<[T]> {
-        return Promise { (resolver: Resolver<[T]>) in
-            guard let typesView = typesView else { // exit early
-                return resolver.reject(ReclineErrors.databaseNotOpen)
-            }
-            
-            // create an unfiltered query, run it, iterate on rows, each row is a study
-            let query = typesView.createQuery()
-            let result = try query.run()
-            var promises: [Promise<T?>] = []
-            while let row = result.nextRow() {
-                // assemble a bunch of studies inside promises?
-                if let docId = row.documentID {
-                    promises.append(load(docId))
-                }
-            }
-            when(fulfilled: promises).done(on: RECLINE_QUEUE) { results in
-                // resolve([])
-                resolver.fulfill(results.filter { $0 != nil }.map { $0! }) // I think this where it has found all the documents and is... making them findable
-            }.catch { err in
-                resolver.reject(err)
-            }
-        }
-    }
+    // func _queryAll<T: ReclineObject>() -> Promise<[T]> {
+    //     return Promise { (resolver: Resolver<[T]>) in
+    //         guard let typesView = typesView else { // exit early
+    //             return resolver.reject(ReclineErrors.databaseNotOpen)
+    //         }
+    //         
+    //         // create an unfiltered query, run it, iterate on rows, each row is a study
+    //         let query = typesView.createQuery()
+    //         let result = try query.run()
+    //         var promises: [Promise<T?>] = []
+    //         while let row = result.nextRow() {
+    //             // assemble a bunch of studies inside promises?
+    //             if let docId = row.documentID {
+    //                 promises.append(load(docId))
+    //             }
+    //         }
+    //         when(fulfilled: promises).done(on: RECLINE_QUEUE) { results in
+    //             // resolve([])
+    //             resolver.fulfill(results.filter { $0 != nil }.map { $0! }) // I think this where it has found all the documents and is... making them findable
+    //         }.catch { err in
+    //             resolver.reject(err)
+    //         }
+    //     }
+    // }
     
     // it is annoying to get the result of a query without it all this boiler plate, and all database operations
     // are supposed to succeed, so we wrap it and crash everything for convenience.
@@ -231,7 +231,7 @@ class Recline {
     }
     
     // runs the query across everything and returns the contents.
-    func real_queryAll<T: ReclineObject>() -> [T] {
+    func queryAll<T: ReclineObject>() -> [T] {
         guard let typesView: CBLView = self.typesView else { // exit early
             fatalError("uh, you didn't open the database?")
             // throw ReclineErrors.databaseNotOpen
@@ -241,11 +241,10 @@ class Recline {
         var loadedObjects: [T] = []
         while let row = results.nextRow() {
             if let docId = row.documentID {
-                loadedObjects.append(self.real_load(docId))
+                loadedObjects.append(self.load(docId))
             }
         }
         return loadedObjects
-
     }
 
     // /// wrapper for _purge...
@@ -277,9 +276,17 @@ class Recline {
     // }
 
     /// runs the database compact operation
-    func compact() -> Promise<Void> {
-        return Promise<Void>().done(on: RECLINE_QUEUE) { _ in
+    // func compact() -> Promise<Void> {
+    //     return Promise<Void>().done(on: RECLINE_QUEUE) { _ in
+    //         try self.db?.compact()
+    //     }
+    // }
+    
+    func compact() {
+        do {
             try self.db?.compact()
+        } catch {
+            fatalError("error compacting database: \(error)")
         }
     }
 }

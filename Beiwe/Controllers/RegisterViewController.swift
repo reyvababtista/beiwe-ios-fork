@@ -246,8 +246,8 @@ class RegisterViewController: FormViewController {
                     let token = Messaging.messaging().fcmToken
                     AppDelegate.sharedInstance().sendFCMToken(fcmToken: token ?? "")
                     HUD.flash(.success, delay: 1)
-                    return StudyManager.sharedInstance.loadDefaultStudy()
-                    
+                    StudyManager.sharedInstance.loadDefaultStudy() // no longer returns a promise
+                    return Promise.value(true)
                 }.done { (_: Bool) in
                     // set logged in to True, dismiss login view?
                     AppDelegate.sharedInstance().isLoggedIn = true

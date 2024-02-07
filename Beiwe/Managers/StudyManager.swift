@@ -73,45 +73,45 @@ class StudyManager {
     
     /// sets (but also clears?) the current study, and the gpsManager, sets real_study_loaded to true
     /// called just after registration, and when app is loaded with a registered study
-    func loadDefaultStudy() -> Promise<Bool> {
-        // print("(loadDefaultStudy) actual run start")
-        self.currentStudy = nil
-        self.gpsManager = nil
-        
-        // mostly sets real_study_loaded to true...
-        return firstly { () -> Promise<[Study]> in
-            // print("(loadDefaultStudy) firstly queryall start")
-            Recline.shared.queryAll() // this returns a list of all studies as a parameter to the next promise.
-            // I don't understand but trying to refactor as follows for a print statement doesn't work?
-            // print(print("(loadDefaultStudy) firstly queryall done"))
-            // return x
-        }.then { (studies: [Study]) -> Promise<Bool> in
-            // print("(loadDefaultStudy) then...")
-            // if there is more than one study, log a warning? this is pointless
-            if studies.count > 1 {
-                log.warning("Multiple Studies: \(studies)")
-            }
-            // grab the first study and the first study only, set the patient id (but not), real_study_loaded to true
-            if studies.count > 0 {
-                self.currentStudy = studies[0]
-                // print("(loadDefaultStudy) WE SET CURRENT STUDY")
-                // print("self.currentStudy.patientId: \(self.currentStudy?.patientId)")
-                // AppDelegate.sharedInstance().setDebuggingUser(self.currentStudy?.patientId ?? "unknown") // this doesn't do anything...
-                StudyManager.real_study_loaded = true
-                // print("(loadDefaultStudy) real_study_loaded = true")
-                self.updateActiveSurveys()
-            } else {
-                // print("(loadDefaultStudy) UHOH STUDY COUNT IS 0")
-            }
-            
-            return .value(true)
-        }
-    }
+    // func loadDefaultStudy() -> Promise<Bool> {
+    //     // print("(loadDefaultStudy) actual run start")
+    //     self.currentStudy = nil
+    //     self.gpsManager = nil // this seems like a bug waiting to happen
+    //     let studies: [Study] = Recline.shared.queryAll()
+    //     // mostly sets real_study_loaded to true...
+    //     return firstly { () -> Promise<[Study]> in
+    //         // print("(loadDefaultStudy) firstly queryall start")
+    //         Recline.shared.queryAll() // this returns a list of all studies as a parameter to the next promise.
+    //         // I don't understand but trying to refactor as follows for a print statement doesn't work?
+    //         // print(print("(loadDefaultStudy) firstly queryall done"))
+    //         // return x
+    //     }.then { (studies: [Study]) -> Promise<Bool> in
+    //         // print("(loadDefaultStudy) then...")
+    //         // if there is more than one study, log a warning? this is pointless
+    //         if studies.count > 1 {
+    //             log.warning("Multiple Studies: \(studies)")
+    //         }
+    //         // grab the first study and the first study only, set the patient id (but not), real_study_loaded to true
+    //         if studies.count > 0 {
+    //             self.currentStudy = studies[0]
+    //             // print("(loadDefaultStudy) WE SET CURRENT STUDY")
+    //             // print("self.currentStudy.patientId: \(self.currentStudy?.patientId)")
+    //             // AppDelegate.sharedInstance().setDebuggingUser(self.currentStudy?.patientId ?? "unknown") // this doesn't do anything...
+    //             StudyManager.real_study_loaded = true
+    //             // print("(loadDefaultStudy) real_study_loaded = true")
+    //             self.updateActiveSurveys()
+    //         } else {
+    //             // print("(loadDefaultStudy) UHOH STUDY COUNT IS 0")
+    //         }
+    //         
+    //         return .value(true)
+    //     }
+    // }
     
-    func real_loadDefaultStudy() {
+    func loadDefaultStudy() {
         self.currentStudy = nil
         self.gpsManager = nil // this seems like a bug waiting to happen
-        let studies: [Study] = Recline.shared.real_queryAll() // its a list of studies
+        let studies: [Study] = Recline.shared.queryAll() // its a list of studies
         if studies.count > 1 {
             log.warning("Multiple Studies: \(studies)") // should we now error on this??
         }
@@ -872,16 +872,10 @@ class StudyManager {
         // state tracking variables
         self.isUploading = true
         var numFiles = 0
-        
-        // oh good a promiseChain...
-        let promiseChain: Promise<Bool> = Recline.shared.compact().then { (_: Void) -> Promise<Bool> in
-            // run prepare for upload
-            DataStorageManager.sharedInstance.prepareForUpload().then { (_: Void) -> Promise<Bool> in
-                // print("prepareForUpload finished")
-                .value(true)
-            }
-        }
-        
+        RECLINE_QUEUE.sync { Recline.shared.compact() }
+        DataStorageManager.sharedInstance.prepareForUpload()
+        // THIS ISN'T A PROMISECHAIN THAT'S A REAL THING AND NOT A THIS
+        let promiseChain: Promise<Bool> = Promise<Bool>.value(true)
         // most of the function is after the return statement, duh.
         return promiseChain.then(on: GLOBAL_DEFAULT_QUEUE) { (_: Bool) -> Promise<Bool> in
             // if we can't enumerate files, that's insane, crash.
@@ -1010,15 +1004,15 @@ class StudyManager {
     }
     
     /// deletes all studies - used in registration for some reason
-    func purgeStudies() {
-        let studies: [Study] = Recline.shared.real_queryAll()
-        for study in studies {
-            Recline.shared.purge(study)
-        }
-    }
+    // func purgeStudies() {
+    //     let studies: [Study] = Recline.shared.queryAll()
+    //     for study in studies {
+    //         Recline.shared.purge(study)
+    //     }
+    // }
     
-    func real_purgeStudies() {
-        let studies = Recline.shared.real_queryAll() // this returns a list of studies, ignore the templated type
+    func purgeStudies() {
+        let studies = Recline.shared.queryAll() // this returns a list of studies, ignore the templated type
         for study in studies {
             Recline.shared.purge(study)
         }

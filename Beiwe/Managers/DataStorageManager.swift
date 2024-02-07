@@ -175,14 +175,15 @@ class DataStorageManager {
     
     ///////////////////////////////////////////////// Upload //////////////////////////////////////////////////////
     
-    func prepareForUpload() -> Promise<Void> {
-        return Promise().then(on: PRE_UPLOAD_QUEUE) { _ -> Promise<Void> in
-            self.prepareForUpload_actual()
-            return Promise()
-        }
-    }
+    // func prepareForUpload() -> Promise<Void> {
+    //     return Promise().then(on: PRE_UPLOAD_QUEUE) { _ -> Promise<Void> in
+    //         self.prepareForUpload_actual()
+    //         return Promise()
+    //     }
+    // }
 
-    private func prepareForUpload_actual() {
+    // private func prepareForUpload_actual() {
+    func prepareForUpload() {
         // TODO: this is a really dangerous general solution to ensuring files are getting uploaded...
         // Reset once to get all of the currently processing file paths.
         self.resetAll()
