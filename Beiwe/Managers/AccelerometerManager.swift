@@ -1,6 +1,5 @@
 import CoreMotion
 import Foundation
-import PromiseKit
 
 let accelerometer_headers = [
     "timestamp",
@@ -63,10 +62,10 @@ class AccelerometerManager: DataServiceProtocol {
     }
 
     /// protocol function
-    func finishCollecting() -> Promise<Void> {
+    func finishCollecting() {
         print("Stopping Accelerometer collecting")
         self.pauseCollecting()
         self.store = nil
-        return DataStorageManager.sharedInstance.closeStore(self.storeType)
+        DataStorageManager.sharedInstance.closeStore(self.storeType)
     }
 }

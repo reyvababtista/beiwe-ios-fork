@@ -1,6 +1,6 @@
 import CoreMotion
 import Foundation
-import PromiseKit
+
 
 let headers = [
     "timestamp",
@@ -63,10 +63,10 @@ class GyroManager: DataServiceProtocol {
     }
 
     /// protocol instruction
-    func finishCollecting() -> Promise<Void> {
+    func finishCollecting() {
         print("Stopping gyro collecting")
         self.pauseCollecting()
         self.store = nil
-        return DataStorageManager.sharedInstance.closeStore(self.storeType)
+        DataStorageManager.sharedInstance.closeStore(self.storeType)
     }
 }

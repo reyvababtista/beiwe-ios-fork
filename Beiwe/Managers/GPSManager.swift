@@ -1,7 +1,7 @@
 import CoreLocation
 import Darwin
 import Foundation
-import PromiseKit
+
 
 let gps_headers = [
     "timestamp",
@@ -116,15 +116,16 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
         log.info("Pausing GPS collection")
         AppEventManager.sharedInstance.logAppEvent(event: "gps_off", msg: "GPS collection off")
         self.isCollectingGps = false
+        // TODO: test disabling these so that it is always at best filter, other filter rates, etc.
         self.locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
         self.locationManager.distanceFilter = 99999
     }
 
     /// only called in self.stopAndClear
-    func finishCollecting() -> Promise<Void> {
+    func finishCollecting() {
         self.pauseCollecting()
         self.isCollectingGps = false
         self.gpsStore = nil
-        return DataStorageManager.sharedInstance.closeStore("gps")
+        DataStorageManager.sharedInstance.closeStore("gps")
     }
 }

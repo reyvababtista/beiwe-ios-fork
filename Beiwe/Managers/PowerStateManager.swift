@@ -1,6 +1,5 @@
 import EmitterKit
 import Foundation
-import PromiseKit
 
 let power_state_headers = [
     "timestamp",
@@ -79,10 +78,10 @@ class PowerStateManager: DataServiceProtocol {
     }
 
     /// protocol function
-    func finishCollecting() -> Promise<Void> {
+    func finishCollecting() {
         log.info("Finish collecting \(self.storeType) collection")
         self.pauseCollecting()
         self.store = nil
-        return DataStorageManager.sharedInstance.closeStore(self.storeType)
+        DataStorageManager.sharedInstance.closeStore(self.storeType)
     }
 }

@@ -1,6 +1,5 @@
 import Foundation
 import IDZSwiftCommonCrypto
-import PromiseKit
 import Security
 
 enum DataStorageErrors: Error {
@@ -159,11 +158,10 @@ class DataStorageManager {
     
     ///////////////////////////////////////////////// Teardown //////////////////////////////////////////////////////
     
-    func closeStore(_ type: String) -> Promise<Void> {
+    func closeStore(_ type: String) {
         // deletes a DataStorage object from the list
         // TODO: there is no corresponding close mechasims on datastorage objects themselves so... this is dangerous?
         self.storageTypes.removeValue(forKey: type)
-        return Promise()
     }
 
     // calls reset for all files
@@ -175,34 +173,31 @@ class DataStorageManager {
     
     ///////////////////////////////////////////////// Upload //////////////////////////////////////////////////////
     
-    // func prepareForUpload() -> Promise<Void> {
-    //     return Promise().then(on: PRE_UPLOAD_QUEUE) { _ -> Promise<Void> in
-    //         self.prepareForUpload_actual()
-    //         return Promise()
-    //     }
-    // }
 
     // private func prepareForUpload_actual() {
     func prepareForUpload() {
-        // TODO: this is a really dangerous general solution to ensuring files are getting uploaded...
-        // Reset once to get all of the currently processing file paths.
-        self.resetAll()
-        var filesToUpload: [String] = []
-        if let enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path) {
-            // for each file check its file type and add to list
-            while let filename = enumerator.nextObject() as? String {
-                if self.isUploadFile(filename) {
-                    filesToUpload.append(filename)
-                } else {
-                    log.warning("Non upload file sitting in directory: \(filename)")
+        // this is the only use of PRE_UPLOAD_QUEUE
+        PRE_UPLOAD_QUEUE.sync {
+            // TODO: this is a really dangerous general solution to ensuring files are getting uploaded...
+            // Reset once to get all of the currently processing file paths.
+            self.resetAll()
+            var filesToUpload: [String] = []
+            if let enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path) {
+                // for each file check its file type and add to list
+                while let filename = enumerator.nextObject() as? String {
+                    if self.isUploadFile(filename) {
+                        filesToUpload.append(filename)
+                    } else {
+                        log.warning("Non upload file sitting in directory: \(filename)")
+                    }
                 }
             }
-        }
-        // move all data in the current data directory to the upload file directory.
-        // active files are stored in a temp directory, then moved to the currentDataDirectory. this moves them to the upload directory.
-        for filename in filesToUpload {
-            self.moveFile(DataStorageManager.currentDataDirectory().appendingPathComponent(filename),
-                          dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
+            // move all data in the current data directory to the upload file directory.
+            // active files are stored in a temp directory, then moved to the currentDataDirectory. this moves them to the upload directory.
+            for filename in filesToUpload {
+                self.moveFile(DataStorageManager.currentDataDirectory().appendingPathComponent(filename),
+                              dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
+            }
         }
     }
     
@@ -572,7 +567,7 @@ class EncryptedStorage {
 
     init(data_stream_type: String, suffix: String, patientId: String, publicKey: String, keyRef: SecKey?) {
         // queue name
-        self.encryption_queue = DispatchQueue(label: "beiwe.dataqueue." + data_stream_type, attributes: [])
+        self.encryption_queue = DispatchQueue(label: "beiwe.dataqueue." + data_stream_type, qos: .userInteractive, attributes: [])
         // file names
         self.debug_shortname = patientId + "_" + data_stream_type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
         self.eventualFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.debug_shortname + suffix)
@@ -593,26 +588,23 @@ class EncryptedStorage {
         )
     }
 
-    func open() -> Promise<Void> {
-        return Promise().then(on: self.encryption_queue) { _ -> Promise<Void> in
+    func open() {
+        self.encryption_queue.sync {
             self.open_actual()
-            return Promise()
         }
     }
 
-    func close() -> Promise<Void> {
-        return Promise().then(on: self.encryption_queue) { _ -> Promise<Void> in
+    func close() {
+        self.encryption_queue.sync {
             self.close_actual()
-            return Promise()
         }
     }
 
-    func write(_ data: NSData?, writeLen: Int) -> Promise<Int> {
+    func write(_ data: NSData?, writeLen: Int) {
         // This is called directly in audio file code
         // log.info("write called on \(self.debug_shortname)...")
-        return Promise().then(on: self.encryption_queue) { _ -> Promise<Int> in
-            // log.info("write (promise) called on \(self.eventualFilename)...")
-            .value(self.write_actual(data, writeLen: writeLen))
+        encryption_queue.sync {
+            self.write_actual(data, writeLen: writeLen)
         }
     }
 

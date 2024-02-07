@@ -1,6 +1,5 @@
 import EmitterKit
 import Foundation
-import PromiseKit
 
 let app_event_headers = [
     "timestamp",
@@ -116,13 +115,13 @@ class AppEventManager: DataServiceProtocol {
     }
 
     /// protocol function - completely stops the iOS Log data stream
-    func finishCollecting() -> Promise<Void> {
+    func finishCollecting() {
         log.info("Finish \(self.storeType) collection")
         self.logAppEvent(event: "stop_collecting", msg: "Stop Collecting Data")
         self.pauseCollecting()
         log.info("Stopping \(self.storeType) collection, which is meaningful.")
         self.store = nil
-        return DataStorageManager.sharedInstance.closeStore(self.storeType)
+        DataStorageManager.sharedInstance.closeStore(self.storeType)
     }
     
     /// Gets a String like "used megabytes: 5" (ts an int) of the current app usage, uses an incorrect value to define megabyte.

@@ -1,5 +1,4 @@
 import Foundation
-import PromiseKit
 import ReachabilitySwift
 
 let reachability_headers = [
@@ -60,10 +59,10 @@ class ReachabilityManager: DataServiceProtocol {
     }
 
     /// protocol function
-    func finishCollecting() -> Promise<Void> {
+    func finishCollecting() {
         log.info("Finish collecting \(self.storeType) collection")
         self.pauseCollecting()
         self.store = nil
-        return DataStorageManager.sharedInstance.closeStore(self.storeType)
+        DataStorageManager.sharedInstance.closeStore(self.storeType)
     }
 }

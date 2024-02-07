@@ -1,6 +1,5 @@
 import CoreMotion
 import Foundation
-import PromiseKit
 
 let magnetometer_headers = [
     "timestamp",
@@ -62,10 +61,10 @@ class MagnetometerManager: DataServiceProtocol {
     }
 
     /// protocol function
-    func finishCollecting() -> Promise<Void> {
+    func finishCollecting() {
         print("Stopping Magnetometer collecting")
         self.pauseCollecting()
         self.store = nil
-        return DataStorageManager.sharedInstance.closeStore(self.storeType)
+        DataStorageManager.sharedInstance.closeStore(self.storeType)
     }
 }

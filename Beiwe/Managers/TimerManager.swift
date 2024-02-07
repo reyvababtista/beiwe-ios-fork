@@ -49,21 +49,10 @@ class TimerManager {
     func stop() {
         self.areServicesRunning = false
         self.clearPollTimer()
-        var promise = Promise()  // there is No Way that these operations take time, this use of a promise architecture is garbage.
-        
         // call finishCollecting on every collection service in dataCollectionServices
         for dataStatus in self.dataCollectionServices {
-            // (use .done because not returning anything - wutchutalkinbout Tuck, we return an empty promise!)
-            promise = promise.done(on: TIMER_QUEUE) { (_: ()) in // its a Void-returning callable that takes no arguments.
-                // need to explicitly state return type
-                dataStatus.dataService.finishCollecting().then(on: GLOBAL_DEFAULT_QUEUE) { (_: Void) -> Promise<Void> in
-                    return Promise()
-                }.catch(on: TIMER_QUEUE) { _ in
-                    print("err from finish collecting")
-                }
-            }
+            dataStatus.dataService.finishCollecting()
         }
-        
         self.dataCollectionServices.removeAll()  // clear out the registered services entirely
     }
     

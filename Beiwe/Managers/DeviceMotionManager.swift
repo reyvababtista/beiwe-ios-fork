@@ -1,6 +1,6 @@
 import CoreMotion
 import Foundation
-import PromiseKit
+
 
 let device_motion_headers = [
     "timestamp",
@@ -103,10 +103,10 @@ class DeviceMotionManager: DataServiceProtocol {
         AppEventManager.sharedInstance.logAppEvent(event: "devicemotion_off", msg: "DeviceMotion collection off")
     }
 
-    func finishCollecting() -> Promise<Void> {
+    func finishCollecting() {
         print("Stopping Devicemotion collecting")
         self.pauseCollecting()
         self.store = nil
-        return DataStorageManager.sharedInstance.closeStore(self.storeType)
+        DataStorageManager.sharedInstance.closeStore(self.storeType)
     }
 }

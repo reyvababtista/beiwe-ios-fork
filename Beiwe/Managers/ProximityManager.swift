@@ -1,5 +1,4 @@
 import Foundation
-import PromiseKit
 
 let proximity_headers = [
     "timestamp",
@@ -47,10 +46,10 @@ class ProximityManager: DataServiceProtocol {
     }
     
     /// protocol function
-    func finishCollecting() -> Promise<Void> {
+    func finishCollecting() {
         log.info("Finish collecting \(self.storeType) collection")
         self.pauseCollecting()
         self.store = nil
-        return DataStorageManager.sharedInstance.closeStore(self.storeType)
+        DataStorageManager.sharedInstance.closeStore(self.storeType)
     }
 }

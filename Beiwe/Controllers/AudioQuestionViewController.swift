@@ -1,14 +1,5 @@
-//
-//  AudioQuestionViewController.swift
-//  Beiwe
-//
-//  Created by Keary Griffin on 4/25/16.
-//  Copyright © 2016 Rocketfarm Studios. All rights reserved.
-//
-
 import AVFoundation
 import PKHUD
-import PromiseKit
 import UIKit
 
 class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AVAudioPlayerDelegate {
@@ -41,18 +32,9 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
         super.viewDidLoad()
         
         // Do any additional setup after loading the view.
-        let prompt = self.activeSurvey.survey?.questions[0].prompt ?? ""
-        /* TESTING
-         for _ in 0...100 {
-             prompt = prompt + "More text goes here! "
-         }
-         */
-        self.promptLabel.text = prompt
-
+        self.promptLabel.text = self.activeSurvey.survey?.questions[0].prompt ?? ""
         self.navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .trash, target: self, action: #selector(self.cancelButton))
-
         self.reset()
-
         self.recordingSession = AVAudioSession.sharedInstance()
 
         do {
@@ -238,47 +220,35 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
         }
     }
 
-    func writeSomeData(_ handle: FileHandle, encFile: EncryptedStorage) -> Promise<Void> {
-        return Promise().then(on: GLOBAL_BACKGROUND_QUEUE) { _ -> Promise<Void> in
-            // closure return
-            let data: Data = handle.readDataToEndOfFile()
-            if data.count > 0 {
-                return encFile.write(data as NSData, writeLen: data.count).then { _ in
-                    // closure recur
-                    self.writeSomeData(handle, encFile: encFile)
-                }
-            }
-            /* We're done... */
-            AppEventManager.sharedInstance.logAppEvent(event: "audio_save_closing", msg: "Closing audio file", d1: encFile.eventualFilename.lastPathComponent)
-            return encFile.close()
+    func saveEncryptedAudio() {
+        let study = StudyManager.sharedInstance.currentStudy!  // There's a study. excellent use of optionals here, really. 🙄
+        
+        // deal with file, name the file.
+        var fileHandle: FileHandle
+        do {
+            fileHandle = try FileHandle(forReadingFrom: self.filename!)
+        } catch {
+            fatalError("Could not open file for reading?? \(error)")
         }
+        let surveyId = self.activeSurvey.survey?.surveyId
+        let name = "voiceRecording" + "_" + surveyId!
+        let encFile = DataStorageManager.sharedInstance.createEncryptedFile(type: name, suffix: self.suffix)
+        
+        // open the file, write the file, close the file, close the file but different
+        encFile.open()
+        self.writeEncryptedData(fileHandle, encFile: encFile)
+        encFile.close()
+        fileHandle.closeFile()
     }
-
-    func saveEncryptedAudio() -> Promise<Void> {
-        if let study = StudyManager.sharedInstance.currentStudy {
-            var fileHandle: FileHandle
-            do {
-                fileHandle = try FileHandle(forReadingFrom: self.filename!)
-            } catch {
-                return Promise<Void>(error: BWErrors.ioError)
-            }
-            let surveyId = self.activeSurvey.survey?.surveyId
-            let name = "voiceRecording" + "_" + surveyId!
-            let encFile = DataStorageManager.sharedInstance.createEncryptedFile(type: name, suffix: self.suffix)
-            return encFile.open().then {
-                return self.writeSomeData(fileHandle, encFile: encFile)
-            }.always {
-                fileHandle.closeFile()
-            }
-        } else {
-            return Promise<Void>(error: BWErrors.ioError)
+    
+    func writeEncryptedData(_ handle: FileHandle, encFile: EncryptedStorage) {
+        var data: Data = handle.readDataToEndOfFile()
+        while data.count > 0 {
+            encFile.write(data as NSData, writeLen: data.count)
+            data = handle.readDataToEndOfFile()
         }
-        /*
-         return Promise<Void> { fulfill, reject in
-             let is: NSInputStream? = NSInputStream(URL: self.filename)
-             if (!)
-         }
-         */
+        /* We're done... */
+        AppEventManager.sharedInstance.logAppEvent(event: "audio_save_closing", msg: "Closing audio file", d1: encFile.eventualFilename.lastPathComponent)
     }
 
     @IBAction func saveButtonPressed(_ sender: AnyObject) {
@@ -287,15 +257,18 @@ class AudioQuestionViewController: UIViewController, AVAudioRecorderDelegate, AV
 
         HUD.show(.labeledProgress(title: "Saving", subtitle: ""))
         AppEventManager.sharedInstance.logAppEvent(event: "audio_save", msg: "Save audio pressed")
-
-        self.saveEncryptedAudio().done { _ in
+        
+        // this used to be in a promise structure with a catch clause, now it is syncronous code and doesn't actually have throw clauses
+        do {
+            self.saveEncryptedAudio()
             self.activeSurvey.isComplete = true
             StudyManager.sharedInstance.cleanupSurvey(self.activeSurvey)
             StudyManager.sharedInstance.updateActiveSurveys(true)
             HUD.flash(.success, delay: 0.5)
             self.cleanupAndDismiss()
-        }.catch { err in
-            AppEventManager.sharedInstance.logAppEvent(event: "audio_save_fail", msg: "Save audio failed", d1: String(describing: err))
+        } catch {
+            // IDE should say that this is unreachable.
+            AppEventManager.sharedInstance.logAppEvent(event: "audio_save_fail", msg: "Save audio failed", d1: String(describing: error))
             HUD.flash(.labeledError(title: NSLocalizedString("audio_survey_error_saving_title", comment: ""), subtitle: NSLocalizedString("audio_survey_error_saving_text", comment: "")), delay: 2.0) { finished in
                 self.cleanupAndDismiss()
             }
