@@ -63,7 +63,6 @@ class ConsentManager: NSObject, ORKTaskViewControllerDelegate {
         super.init()
 
         // Set up permissions
-
         var steps = [ORKStep]()
 
         if !self.hasRequiredPermissions() {

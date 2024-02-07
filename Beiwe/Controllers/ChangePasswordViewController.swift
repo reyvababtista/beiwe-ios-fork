@@ -1,6 +1,5 @@
 import Eureka
 import PKHUD
-import PromiseKit
 import SwiftValidator
 import UIKit
 

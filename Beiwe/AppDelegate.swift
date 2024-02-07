@@ -1,3 +1,4 @@
+import Alamofire
 import BackgroundTasks
 import CoreMotion
 import Crashlytics
@@ -44,6 +45,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     // app state
     var isLoggedIn: Bool = false
     var timeEnteredBackground: Date?
+    var fcmToken = "" // we stash this in case the initial attempt doesn't work.
     
     // this is a weird location for an object, its used in powerstatemanager, unclear why this is here.
     let lockEvent = EmitterKit.Event<Bool>()
@@ -198,8 +200,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // okay we currently are blanket removing notifications, not ideal.
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         self.transitionToLoadedAppState()
-        
     }
+
     // func setupThatDependsOnDatabase(_ launchOptions: [UIApplication.LaunchOptionsKey: Any]?) {
     //     Recline.shared.open().then { (_: Bool) -> Promise<Bool> in
     //         // print("Database opened")
@@ -217,7 +219,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     //                 self.handleSurveyNotification(notification.request.content.userInfo)
     //             }
     //         }
-    //         
+    //
     //         // okay we currently are blanket removing notifications, not ideal.
     //         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
     //         self.transitionToLoadedAppState() // transition to loaded app state
@@ -228,7 +230,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     /// Run this function once at app boot and it will rerun itself every minute, updating some stored values that are in turn reported to the server.
     func deviceInfoUpdateLoop() {
-        
         self.currentStudy?.lastAppStart = self.currentTimestamp
         
         // This takes an amount of time to run / must be run ~asynchronously
@@ -258,7 +259,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             }
         }
         
-        _ = countBackgroundTasks()  // this is purely for logging/development purposes
+        _ = countBackgroundTasks() // this is purely for logging/development purposes
         
         BACKGROUND_DEVICE_INFO_QUEUE.asyncAfter(deadline: .now() + 60, execute: self.deviceInfoUpdateLoop)
     }
@@ -754,13 +755,38 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         }
     }
 
+    /// dispatches the fcm update request, managing retry logic
     func sendFCMToken(fcmToken: String) {
+        self.fcmToken = fcmToken
         if fcmToken != "" {
             let fcmTokenRequest = FCMTokenRequest(fcmToken: fcmToken)
-            ApiManager.sharedInstance.makePostRequest(fcmTokenRequest).catch { (error: Error) in
-                AppEventManager.sharedInstance.logAppEvent(
-                    event: "push_notification", msg: "Error registering FCM token: \(error)")
+            ApiManager.sharedInstance.makePostRequest_responseString(fcmTokenRequest, completion_handler: self.fcmToken_responseHandler)
+        }
+    }
+    
+    // the completion/retry logic for
+    func fcmToken_responseHandler(_ response: DataResponse<String>) {
+        var error_string = ""
+        switch response.result {
+        case .success:
+            if let statusCode = response.response?.statusCode {
+                // only 200 codes are valid.
+                if statusCode < 200 || statusCode >= 300 {
+                    error_string = "status code \(statusCode)"
+                } // else clause here would trigger on real success
+            } else {
+                error_string = "unknown error"
             }
+        case .failure:
+            error_string = String(describing: response.error)
+        }
+        // retry in 30 minutes if this is was broken
+        if error_string != "" {
+            print("fcm request had an error (\(error_string)), retrying in 30 minutes")
+            AppEventManager.sharedInstance.logAppEvent(
+                event: "push_notification", msg: "Error registering FCM token: \(error_string)")
+            GLOBAL_DEFAULT_QUEUE.asyncAfter(
+                deadline: .now() + 60 * 30, execute: { self.sendFCMToken(fcmToken: self.fcmToken) })
         }
     }
     

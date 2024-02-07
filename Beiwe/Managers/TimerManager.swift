@@ -1,6 +1,5 @@
 import Darwin
 import Foundation
-import PromiseKit
 
 /// For some unfathomable, incomprehensible reason, this logic was attached to the GpsManager
 // It may be the case that the GPS updates are how the app stays open (there is disabled logic to record when the app vas opened that checks

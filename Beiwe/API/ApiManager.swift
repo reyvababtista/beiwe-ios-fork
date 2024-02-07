@@ -129,7 +129,7 @@ class ApiManager {
 
     /// This looks like it does literally nothing?
     static func serialErr() -> NSError {
-        return NSError(domain: "com.rf.beiwe.studies", code: 2, userInfo: nil)
+        return NSError(domain: "com.beiwe.studies", code: 2, userInfo: nil)
     }
 
     /// hits the endpoint once, doesn't do anything with the request object, literally just returns.
@@ -147,11 +147,11 @@ class ApiManager {
         // var return_code = 0
         // let x = request.responseString { (response: DataResponse<String>) in
         //     switch response.result {
-        //         
+        //
         //     case let .failure(error):
         //         print("failure in simpleGetRequest, Error: '\(error)', Response: '\(response)', Response.response: '\(String(describing: response.response))'")
         //         return_code = -1
-        //         
+        //
         //     case .success:
         //         return_code = response.response!.statusCode
         //         print("response code:", response.response!.statusCode)
@@ -166,25 +166,25 @@ class ApiManager {
         var parameters = requestObject.toJSON()
         parameters["password"] = (password == nil) ? self.hashedPassword : Crypto.sharedInstance.sha256Base64URL(password!) // I don't know what this line does
         self.setDefaultParameters(&parameters, skip_password: true)
-
+    
         return Promise { (resolver: Resolver<(T.ApiReturnType, Int)>) in
             let request = Alamofire.request(baseApiUrl + T.apiEndpoint, method: .post, parameters: parameters)
-
+    
             request.responseString { (response: DataResponse<String>) in
                 switch response.result {
                 // the code errored, I think
                 case let .failure(error):
                     return resolver.reject(error)
-
+    
                 // the request received a response
                 case .success:
                     let statusCode = response.response?.statusCode
-
+    
                     // 400, and invalid error codes
                     if let statusCode = statusCode, statusCode < 200 || statusCode >= 400 {
                         return resolver.reject(ApiErrors.failedStatus(code: statusCode))
                     }
-
+    
                     // casing for return type
                     var returnObject: T.ApiReturnType? // its a mappable?
                     
@@ -228,11 +228,11 @@ class ApiManager {
                             log.error("Unable to create default firebase credentials plist")
                             AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Unable to create default firebase credentials plist")
                         }
-
+    
                     } else { // all other type cases
                         returnObject = Mapper<T.ApiReturnType>().map(JSONString: response.result.value ?? "")
                     }
-
+    
                     // return
                     if let returnObject = returnObject { // returnObject exists, return
                         // this returnobject is one of two(?) types, either a bodyresponse or a StudySettings object
@@ -245,6 +245,31 @@ class ApiManager {
         }
     }
 
+    
+    /// way WAY less complex api request that doesn't bypass the entire point of Alamofire. Requires a completionhandler.
+    /// If we need the non-DataResponse<String> type.... make such a function.
+    /// (request runs on the default alamofire queue, the convenience session constructor in the docs
+    /// might require version 5+. This is version 4.9.1. )
+    func makePostRequest_responseString<T: ApiRequest>(
+        _ requestObject: T,
+        password: String? = nil,
+        completion_queue: DispatchQueue? = nil,
+        completion_handler: ((DataResponse<String>)-> Void)? = nil)
+    where T: Mappable {
+        var parameters = requestObject.toJSON()
+        parameters["password"] = (password == nil) ? self.hashedPassword : Crypto.sharedInstance.sha256Base64URL(password!) // I don't know what this line does
+        self.setDefaultParameters(&parameters, skip_password: true)
+        
+        // this is asynchronous, it ~immediately fires, and somehow we can attach the completion handler
+        // afterwards and it all just works. cool.
+        let request = Alamofire.request(baseApiUrl + T.apiEndpoint, method: .post, parameters: parameters)
+        
+        // pass the completion handler to the responseString method on the queue
+        if let completion_handler = completion_handler {
+            request.responseString(queue: completion_queue, completionHandler: completion_handler)
+        }
+    }
+    
     func arrayPostRequest<T: ApiRequest>(_ requestObject: T) -> Promise<([T.ApiReturnType], Int)> where T: Mappable {
         var parameters = requestObject.toJSON()
         self.setDefaultParameters(&parameters)
