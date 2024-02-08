@@ -35,7 +35,7 @@ class MagnetometerManager: DataServiceProtocol {
     
     /// protocol function
     func startCollecting() {
-        log.info("Turning \(self.storeType) collection on")
+        // print("Turning \(self.storeType) collection on")
         let queue = OperationQueue()
         // this closure is the function that records data
         self.motionManager.startMagnetometerUpdates(to: queue) { (magData: CMMagnetometerData?, _: Error?) in
@@ -55,14 +55,14 @@ class MagnetometerManager: DataServiceProtocol {
 
     /// protocol function
     func pauseCollecting() {
-        log.info("Pausing \(self.storeType) collection")
+        // print("Pausing \(self.storeType) collection")
         self.motionManager.stopMagnetometerUpdates()
         AppEventManager.sharedInstance.logAppEvent(event: "magnetometer_off", msg: "Magnetometer collection off")
     }
 
     /// protocol function
     func finishCollecting() {
-        print("Stopping Magnetometer collecting")
+        // print("Finishing \(self.storeType) collection")
         self.pauseCollecting()
         self.store = nil
         DataStorageManager.sharedInstance.closeStore(self.storeType)

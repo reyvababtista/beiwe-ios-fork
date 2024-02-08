@@ -38,7 +38,7 @@ class GyroManager: DataServiceProtocol {
 
     /// protocol instruction - sets the delegate(?) function
     func startCollecting() {
-        log.info("Turning \(self.storeType) collection on")
+        // print("Turning \(self.storeType) collection on")
         // print("gyroUpdateInterval: \(motionManager.gyroUpdateInterval)")
         let queue = OperationQueue()
         // set the closure as the delegate function
@@ -57,14 +57,14 @@ class GyroManager: DataServiceProtocol {
 
     /// protocol instruction
     func pauseCollecting() {
-        log.info("Pausing \(self.storeType) collection")
+        // print("Pausing \(self.storeType) collection")
         self.motionManager.stopGyroUpdates()
         AppEventManager.sharedInstance.logAppEvent(event: "gyro_off", msg: "Gyro collection off")
     }
 
     /// protocol instruction
     func finishCollecting() {
-        print("Stopping gyro collecting")
+        // print("Finishing \(self.storeType) collection")
         self.pauseCollecting()
         self.store = nil
         DataStorageManager.sharedInstance.closeStore(self.storeType)

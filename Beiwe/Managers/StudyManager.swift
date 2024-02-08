@@ -1,3 +1,4 @@
+import Alamofire
 import Crashlytics
 import EmitterKit
 import Firebase
@@ -101,7 +102,7 @@ class StudyManager {
     //         } else {
     //             // print("(loadDefaultStudy) UHOH STUDY COUNT IS 0")
     //         }
-    //         
+    //
     //         return .value(true)
     //     }
     // }
@@ -138,9 +139,8 @@ class StudyManager {
     /// ACTUAL initialization - initializes the weirdly complex self.gpsManager and everything else
     private func prepareDataServices() {
         // current study and study settings are null of course
-        guard let studySettings: StudySettings = currentStudy?.studySettings else {
-            // this should probably be a crash...
-            return
+        guard let studySettings: StudySettings = self.currentStudy?.studySettings else {
+            return // this should probably be a crash...
         }
         
         if self.sensorsStartedEver {
@@ -152,7 +152,7 @@ class StudyManager {
         
         DataStorageManager.sharedInstance.createDirectories()
         // Move non current files out.  (Probably unnecessary, would happen later anyway)
-        _ = DataStorageManager.sharedInstance.prepareForUpload()
+        DataStorageManager.sharedInstance.prepareForUpload()
         
         // GPS, Check if gps fuzzing is enabled for currentStudy
         self.gpsManager = GPSManager()
@@ -650,207 +650,247 @@ class StudyManager {
         }
     }
     
-    /// This abomination of a function queries the server for new study settings, applies them, and then restarts sensors if anything changed
+    /// Queries the server for new study settings, hand off to completion handler
     func updateDeviceSettings() {
         // assert that these are instantiated
         guard let _ = self.currentStudy, let _ = self.currentStudy?.studySettings else {
             return
         }
         // make the post request, convert to json, convert to a JustStudySettings mapper
-        _ = ApiManager.sharedInstance.makePostRequest(UpdateDeviceSettingsRequest()).done { (response: BodyResponse, some_int: Int) in
-            if let body_string = response.body {
-                let newSettings: JustStudySettings? = Mapper<JustStudySettings>().map(JSONString: body_string) // manually calling the mapper
-                // Check EVERY SETTING, record if anything changed, assign any new values
-                if let newSettings = newSettings {
-                    var anything_changed: Bool = false
-                    if self.currentStudy?.studySettings?.accelerometer != newSettings.accelerometer {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.accelerometer = newSettings.accelerometer
-                        // print("accelerometer changed to: \(newSettings.accelerometer)")
+        ApiManager.sharedInstance.makePostRequest_responseString(
+            UpdateDeviceSettingsRequest(), completion_handler: self.updateSettingsCompletionHandler)
+    }
+
+    /// callback for the updateDeviceSettings function, handles output of the post request, determines if we have any input data.
+    func updateSettingsCompletionHandler(response: DataResponse<String>) {
+        var error_message = ""
+        
+        // this could be cleaned up, but don't bother? it is tested and works.
+        // All the error cases are "fine", we just try again later regardless of current success,
+        // so we only print the error type.
+        switch response.result {
+        case .success:
+            if let statusCode = response.response?.statusCode {
+                if statusCode >= 200 && statusCode < 300 {
+                    let body_response = BodyResponse(body: response.result.value)
+                    if let body_string = body_response.body {
+                        // use the custom-purpose JustStudySettings class
+                        if let newSettings: JustStudySettings = Mapper<JustStudySettings>().map(JSONString: body_string) {
+                            self.updateSettings(newSettings: newSettings)
+                        } else {
+                            error_message = "update settings response: \(response) - but body was nil"
+                        }
                     }
-                    if self.currentStudy?.studySettings?.accelerometerOffDurationSeconds != newSettings.accelerometerOffDurationSeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.accelerometerOffDurationSeconds = newSettings.accelerometerOffDurationSeconds
-                        // print("accelerometerOffDurationSeconds changed to: \(newSettings.accelerometerOffDurationSeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.accelerometerOnDurationSeconds != newSettings.accelerometerOnDurationSeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.accelerometerOnDurationSeconds = newSettings.accelerometerOnDurationSeconds
-                        // print("accelerometerOnDurationSeconds changed to: \(newSettings.accelerometerOnDurationSeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.accelerometerFrequency != newSettings.accelerometerFrequency {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.accelerometerFrequency = newSettings.accelerometerFrequency
-                        // print("accelerometerFrequency changed to: \(newSettings.accelerometerFrequency)")
-                    }
-                    if self.currentStudy?.studySettings?.aboutPageText != newSettings.aboutPageText {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.aboutPageText = newSettings.aboutPageText
-                        // print("aboutPageText changed to: \(newSettings.aboutPageText)")
-                    }
-                    if self.currentStudy?.studySettings?.callClinicianText != newSettings.callClinicianText {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.callClinicianText = newSettings.callClinicianText
-                        // print("callClinicianText changed to: \(newSettings.callClinicianText)")
-                    }
-                    if self.currentStudy?.studySettings?.consentFormText != newSettings.consentFormText {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.consentFormText = newSettings.consentFormText
-                        // print("consentFormText changed to: \(newSettings.consentFormText)")
-                    }
-                    if self.currentStudy?.studySettings?.checkForNewSurveysFreqSeconds != newSettings.checkForNewSurveysFreqSeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.checkForNewSurveysFreqSeconds = newSettings.checkForNewSurveysFreqSeconds
-                        // print("checkForNewSurveysFreqSeconds changed to: \(newSettings.checkForNewSurveysFreqSeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.createNewDataFileFrequencySeconds != newSettings.createNewDataFileFrequencySeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.createNewDataFileFrequencySeconds = newSettings.createNewDataFileFrequencySeconds
-                        // print("createNewDataFileFrequencySeconds changed to: \(newSettings.createNewDataFileFrequencySeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.gps != newSettings.gps {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.gps = newSettings.gps
-                        // print("gps changed to: \(newSettings.gps)")
-                    }
-                    if self.currentStudy?.studySettings?.gpsOffDurationSeconds != newSettings.gpsOffDurationSeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.gpsOffDurationSeconds = newSettings.gpsOffDurationSeconds
-                        // print("gpsOffDurationSeconds changed to: \(newSettings.gpsOffDurationSeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.gpsOnDurationSeconds != newSettings.gpsOnDurationSeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.gpsOnDurationSeconds = newSettings.gpsOnDurationSeconds
-                        // print("gpsOnDurationSeconds changed to: \(newSettings.gpsOnDurationSeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.powerState != newSettings.powerState {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.powerState = newSettings.powerState
-                        // print("powerState changed to: \(newSettings.powerState)")
-                    }
-                    if self.currentStudy?.studySettings?.secondsBeforeAutoLogout != newSettings.secondsBeforeAutoLogout {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.secondsBeforeAutoLogout = newSettings.secondsBeforeAutoLogout
-                        // print("secondsBeforeAutoLogout changed to: \(newSettings.secondsBeforeAutoLogout)")
-                    }
-                    if self.currentStudy?.studySettings?.submitSurveySuccessText != newSettings.submitSurveySuccessText {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.submitSurveySuccessText = newSettings.submitSurveySuccessText
-                        // print("submitSurveySuccessText changed to: \(newSettings.submitSurveySuccessText)")
-                    }
-                    if self.currentStudy?.studySettings?.uploadDataFileFrequencySeconds != newSettings.uploadDataFileFrequencySeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.uploadDataFileFrequencySeconds = newSettings.uploadDataFileFrequencySeconds
-                        // print("uploadDataFileFrequencySeconds changed to: \(newSettings.uploadDataFileFrequencySeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.voiceRecordingMaxLengthSeconds != newSettings.voiceRecordingMaxLengthSeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.voiceRecordingMaxLengthSeconds = newSettings.voiceRecordingMaxLengthSeconds
-                        // print("voiceRecordingMaxLengthSeconds changed to: \(newSettings.voiceRecordingMaxLengthSeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.wifi != newSettings.wifi {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.wifi = newSettings.wifi
-                        // print("wifi changed to: \(newSettings.wifi)")
-                    }
-                    if self.currentStudy?.studySettings?.wifiLogFrequencySeconds != newSettings.wifiLogFrequencySeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.wifiLogFrequencySeconds = newSettings.wifiLogFrequencySeconds
-                        // print("wifiLogFrequencySeconds changed to: \(newSettings.wifiLogFrequencySeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.proximity != newSettings.proximity {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.proximity = newSettings.proximity
-                        // print("proximity changed to: \(newSettings.proximity)")
-                    }
-                    if self.currentStudy?.studySettings?.magnetometer != newSettings.magnetometer {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.magnetometer = newSettings.magnetometer
-                        // print("magnetometer changed to: \(newSettings.magnetometer)")
-                    }
-                    if self.currentStudy?.studySettings?.magnetometerOffDurationSeconds != newSettings.magnetometerOffDurationSeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.magnetometerOffDurationSeconds = newSettings.magnetometerOffDurationSeconds
-                        // print("magnetometerOffDurationSeconds changed to: \(newSettings.magnetometerOffDurationSeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.magnetometerOnDurationSeconds != newSettings.magnetometerOnDurationSeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.magnetometerOnDurationSeconds = newSettings.magnetometerOnDurationSeconds
-                        // print("magnetometerOnDurationSeconds changed to: \(newSettings.magnetometerOnDurationSeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.gyro != newSettings.gyro {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.gyro = newSettings.gyro
-                        // print("gyro changed to: \(newSettings.gyro)")
-                    }
-                    if self.currentStudy?.studySettings?.gyroOffDurationSeconds != newSettings.gyroOffDurationSeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.gyroOffDurationSeconds = newSettings.gyroOffDurationSeconds
-                        // print("gyroOffDurationSeconds changed to: \(newSettings.gyroOffDurationSeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.gyroOnDurationSeconds != newSettings.gyroOnDurationSeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.gyroOnDurationSeconds = newSettings.gyroOnDurationSeconds
-                        // print("gyroOnDurationSeconds changed to: \(newSettings.gyroOnDurationSeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.gyroFrequency != newSettings.gyroFrequency {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.gyroFrequency = newSettings.gyroFrequency
-                        // print("gyroFrequency changed to: \(newSettings.gyroFrequency)")
-                    }
-                    if self.currentStudy?.studySettings?.motion != newSettings.motion {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.motion = newSettings.motion
-                        // print("motion changed to: \(newSettings.motion)")
-                    }
-                    if self.currentStudy?.studySettings?.motionOffDurationSeconds != newSettings.motionOffDurationSeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.motionOffDurationSeconds = newSettings.motionOffDurationSeconds
-                        // print("motionOffDurationSeconds changed to: \(newSettings.motionOffDurationSeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.motionOnDurationSeconds != newSettings.motionOnDurationSeconds {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.motionOnDurationSeconds = newSettings.motionOnDurationSeconds
-                        // print("motionOnDurationSeconds changed to: \(newSettings.motionOnDurationSeconds)")
-                    }
-                    if self.currentStudy?.studySettings?.reachability != newSettings.reachability {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.reachability = newSettings.reachability
-                        // print("reachability changed to: \(newSettings.reachability)")
-                    }
-                    if self.currentStudy?.studySettings?.consentSections != newSettings.consentSections {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.consentSections = newSettings.consentSections
-                        // print("consentSections changed to: \(newSettings.consentSections)")
-                    }
-                    if self.currentStudy?.studySettings?.uploadOverCellular != newSettings.uploadOverCellular {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.uploadOverCellular = newSettings.uploadOverCellular
-                        // print("uploadOverCellular changed to: \(newSettings.uploadOverCellular)")
-                    }
-                    if self.currentStudy?.studySettings?.fuzzGps != newSettings.fuzzGps {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.fuzzGps = newSettings.fuzzGps
-                        // print("fuzzGps changed to: \(newSettings.fuzzGps)")
-                    }
-                    if self.currentStudy?.studySettings?.callClinicianButtonEnabled != newSettings.callClinicianButtonEnabled {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.callClinicianButtonEnabled = newSettings.callClinicianButtonEnabled
-                        // print("callClinicianButtonEnabled changed to: \(newSettings.callClinicianButtonEnabled)")
-                    }
-                    if self.currentStudy?.studySettings?.callResearchAssistantButtonEnabled != newSettings.callResearchAssistantButtonEnabled {
-                        anything_changed = true
-                        self.currentStudy?.studySettings?.callResearchAssistantButtonEnabled = newSettings.callResearchAssistantButtonEnabled
-                        // print("callResearchAssistantButtonEnabled changed to: \(newSettings.callResearchAssistantButtonEnabled)")
-                    }
-                    // if anything changed, reset all data services.
-                    Recline.shared.save(self.currentStudy!)
-                    
-                    if anything_changed {
-                        self.prepareDataServices()
-                    }
+                } else {
+                    error_message = "update settings response: \(response) , statuscode: \(statusCode), value/body: \(String(describing: response.result.value))"
                 }
+            } else {
+                error_message = "update settings response: \(response) - no status code?"
             }
+        case .failure:
+            error_message = "update settings response: \(response) - error: \(String(describing: response.error))"
+        }
+        
+        if error_message != "" {
+            log.error(error_message)
+        }
+    }
+    
+    /// This abomination of a function updates study settings if they have changed
+    func updateSettings(newSettings: JustStudySettings) {
+        // Check EVERY SETTING, record if anything changed, assign any new values
+        var anything_changed: Bool = false
+        
+        // TODO: find a way to make this introspective (BUT SAFE) and less verbose.
+        // I encountered problems using anything other than "self.currentStudy?.studySettings?.accelerometer"
+        // to access and update the study settings for the device
+        if self.currentStudy?.studySettings?.accelerometer != newSettings.accelerometer {
+            anything_changed = true
+            self.currentStudy?.studySettings?.accelerometer = newSettings.accelerometer
+            // print("accelerometer changed to: \(newSettings.accelerometer)")
+        }
+        if self.currentStudy?.studySettings?.accelerometerOffDurationSeconds != newSettings.accelerometerOffDurationSeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.accelerometerOffDurationSeconds = newSettings.accelerometerOffDurationSeconds
+            // print("accelerometerOffDurationSeconds changed to: \(newSettings.accelerometerOffDurationSeconds)")
+        }
+        if self.currentStudy?.studySettings?.accelerometerOnDurationSeconds != newSettings.accelerometerOnDurationSeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.accelerometerOnDurationSeconds = newSettings.accelerometerOnDurationSeconds
+            // print("accelerometerOnDurationSeconds changed to: \(newSettings.accelerometerOnDurationSeconds)")
+        }
+        if self.currentStudy?.studySettings?.accelerometerFrequency != newSettings.accelerometerFrequency {
+            anything_changed = true
+            self.currentStudy?.studySettings?.accelerometerFrequency = newSettings.accelerometerFrequency
+            // print("accelerometerFrequency changed to: \(newSettings.accelerometerFrequency)")
+        }
+        if self.currentStudy?.studySettings?.aboutPageText != newSettings.aboutPageText {
+            anything_changed = true
+            self.currentStudy?.studySettings?.aboutPageText = newSettings.aboutPageText
+            // print("aboutPageText changed to: \(newSettings.aboutPageText)")
+        }
+        if self.currentStudy?.studySettings?.callClinicianText != newSettings.callClinicianText {
+            anything_changed = true
+            self.currentStudy?.studySettings?.callClinicianText = newSettings.callClinicianText
+            // print("callClinicianText changed to: \(newSettings.callClinicianText)")
+        }
+        if self.currentStudy?.studySettings?.consentFormText != newSettings.consentFormText {
+            anything_changed = true
+            self.currentStudy?.studySettings?.consentFormText = newSettings.consentFormText
+            // print("consentFormText changed to: \(newSettings.consentFormText)")
+        }
+        if self.currentStudy?.studySettings?.checkForNewSurveysFreqSeconds != newSettings.checkForNewSurveysFreqSeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.checkForNewSurveysFreqSeconds = newSettings.checkForNewSurveysFreqSeconds
+            // print("checkForNewSurveysFreqSeconds changed to: \(newSettings.checkForNewSurveysFreqSeconds)")
+        }
+        if self.currentStudy?.studySettings?.createNewDataFileFrequencySeconds != newSettings.createNewDataFileFrequencySeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.createNewDataFileFrequencySeconds = newSettings.createNewDataFileFrequencySeconds
+            // print("createNewDataFileFrequencySeconds changed to: \(newSettings.createNewDataFileFrequencySeconds)")
+        }
+        if self.currentStudy?.studySettings?.gps != newSettings.gps {
+            anything_changed = true
+            self.currentStudy?.studySettings?.gps = newSettings.gps
+            // print("gps changed to: \(newSettings.gps)")
+        }
+        if self.currentStudy?.studySettings?.gpsOffDurationSeconds != newSettings.gpsOffDurationSeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.gpsOffDurationSeconds = newSettings.gpsOffDurationSeconds
+            // print("gpsOffDurationSeconds changed to: \(newSettings.gpsOffDurationSeconds)")
+        }
+        if self.currentStudy?.studySettings?.gpsOnDurationSeconds != newSettings.gpsOnDurationSeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.gpsOnDurationSeconds = newSettings.gpsOnDurationSeconds
+            // print("gpsOnDurationSeconds changed to: \(newSettings.gpsOnDurationSeconds)")
+        }
+        if self.currentStudy?.studySettings?.powerState != newSettings.powerState {
+            anything_changed = true
+            self.currentStudy?.studySettings?.powerState = newSettings.powerState
+            // print("powerState changed to: \(newSettings.powerState)")
+        }
+        if self.currentStudy?.studySettings?.secondsBeforeAutoLogout != newSettings.secondsBeforeAutoLogout {
+            anything_changed = true
+            self.currentStudy?.studySettings?.secondsBeforeAutoLogout = newSettings.secondsBeforeAutoLogout
+            // print("secondsBeforeAutoLogout changed to: \(newSettings.secondsBeforeAutoLogout)")
+        }
+        if self.currentStudy?.studySettings?.submitSurveySuccessText != newSettings.submitSurveySuccessText {
+            anything_changed = true
+            self.currentStudy?.studySettings?.submitSurveySuccessText = newSettings.submitSurveySuccessText
+            // print("submitSurveySuccessText changed to: \(newSettings.submitSurveySuccessText)")
+        }
+        if self.currentStudy?.studySettings?.uploadDataFileFrequencySeconds != newSettings.uploadDataFileFrequencySeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.uploadDataFileFrequencySeconds = newSettings.uploadDataFileFrequencySeconds
+            // print("uploadDataFileFrequencySeconds changed to: \(newSettings.uploadDataFileFrequencySeconds)")
+        }
+        if self.currentStudy?.studySettings?.voiceRecordingMaxLengthSeconds != newSettings.voiceRecordingMaxLengthSeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.voiceRecordingMaxLengthSeconds = newSettings.voiceRecordingMaxLengthSeconds
+            // print("voiceRecordingMaxLengthSeconds changed to: \(newSettings.voiceRecordingMaxLengthSeconds)")
+        }
+        if self.currentStudy?.studySettings?.wifi != newSettings.wifi {
+            anything_changed = true
+            self.currentStudy?.studySettings?.wifi = newSettings.wifi
+            // print("wifi changed to: \(newSettings.wifi)")
+        }
+        if self.currentStudy?.studySettings?.wifiLogFrequencySeconds != newSettings.wifiLogFrequencySeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.wifiLogFrequencySeconds = newSettings.wifiLogFrequencySeconds
+            // print("wifiLogFrequencySeconds changed to: \(newSettings.wifiLogFrequencySeconds)")
+        }
+        if self.currentStudy?.studySettings?.proximity != newSettings.proximity {
+            anything_changed = true
+            self.currentStudy?.studySettings?.proximity = newSettings.proximity
+            // print("proximity changed to: \(newSettings.proximity)")
+        }
+        if self.currentStudy?.studySettings?.magnetometer != newSettings.magnetometer {
+            anything_changed = true
+            self.currentStudy?.studySettings?.magnetometer = newSettings.magnetometer
+            // print("magnetometer changed to: \(newSettings.magnetometer)")
+        }
+        if self.currentStudy?.studySettings?.magnetometerOffDurationSeconds != newSettings.magnetometerOffDurationSeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.magnetometerOffDurationSeconds = newSettings.magnetometerOffDurationSeconds
+            // print("magnetometerOffDurationSeconds changed to: \(newSettings.magnetometerOffDurationSeconds)")
+        }
+        if self.currentStudy?.studySettings?.magnetometerOnDurationSeconds != newSettings.magnetometerOnDurationSeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.magnetometerOnDurationSeconds = newSettings.magnetometerOnDurationSeconds
+            // print("magnetometerOnDurationSeconds changed to: \(newSettings.magnetometerOnDurationSeconds)")
+        }
+        if self.currentStudy?.studySettings?.gyro != newSettings.gyro {
+            anything_changed = true
+            self.currentStudy?.studySettings?.gyro = newSettings.gyro
+            // print("gyro changed to: \(newSettings.gyro)")
+        }
+        if self.currentStudy?.studySettings?.gyroOffDurationSeconds != newSettings.gyroOffDurationSeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.gyroOffDurationSeconds = newSettings.gyroOffDurationSeconds
+            // print("gyroOffDurationSeconds changed to: \(newSettings.gyroOffDurationSeconds)")
+        }
+        if self.currentStudy?.studySettings?.gyroOnDurationSeconds != newSettings.gyroOnDurationSeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.gyroOnDurationSeconds = newSettings.gyroOnDurationSeconds
+            // print("gyroOnDurationSeconds changed to: \(newSettings.gyroOnDurationSeconds)")
+        }
+        if self.currentStudy?.studySettings?.gyroFrequency != newSettings.gyroFrequency {
+            anything_changed = true
+            self.currentStudy?.studySettings?.gyroFrequency = newSettings.gyroFrequency
+            // print("gyroFrequency changed to: \(newSettings.gyroFrequency)")
+        }
+        if self.currentStudy?.studySettings?.motion != newSettings.motion {
+            anything_changed = true
+            self.currentStudy?.studySettings?.motion = newSettings.motion
+            // print("motion changed to: \(newSettings.motion)")
+        }
+        if self.currentStudy?.studySettings?.motionOffDurationSeconds != newSettings.motionOffDurationSeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.motionOffDurationSeconds = newSettings.motionOffDurationSeconds
+            // print("motionOffDurationSeconds changed to: \(newSettings.motionOffDurationSeconds)")
+        }
+        if self.currentStudy?.studySettings?.motionOnDurationSeconds != newSettings.motionOnDurationSeconds {
+            anything_changed = true
+            self.currentStudy?.studySettings?.motionOnDurationSeconds = newSettings.motionOnDurationSeconds
+            // print("motionOnDurationSeconds changed to: \(newSettings.motionOnDurationSeconds)")
+        }
+        if self.currentStudy?.studySettings?.reachability != newSettings.reachability {
+            anything_changed = true
+            self.currentStudy?.studySettings?.reachability = newSettings.reachability
+            // print("reachability changed to: \(newSettings.reachability)")
+        }
+        if self.currentStudy?.studySettings?.consentSections != newSettings.consentSections {
+            anything_changed = true
+            self.currentStudy?.studySettings?.consentSections = newSettings.consentSections
+            // print("consentSections changed to: \(newSettings.consentSections)")
+        }
+        if self.currentStudy?.studySettings?.uploadOverCellular != newSettings.uploadOverCellular {
+            anything_changed = true
+            self.currentStudy?.studySettings?.uploadOverCellular = newSettings.uploadOverCellular
+            // print("uploadOverCellular changed to: \(newSettings.uploadOverCellular)")
+        }
+        if self.currentStudy?.studySettings?.fuzzGps != newSettings.fuzzGps {
+            anything_changed = true
+            self.currentStudy?.studySettings?.fuzzGps = newSettings.fuzzGps
+            // print("fuzzGps changed to: \(newSettings.fuzzGps)")
+        }
+        if self.currentStudy?.studySettings?.callClinicianButtonEnabled != newSettings.callClinicianButtonEnabled {
+            anything_changed = true
+            self.currentStudy?.studySettings?.callClinicianButtonEnabled = newSettings.callClinicianButtonEnabled
+            // print("callClinicianButtonEnabled changed to: \(newSettings.callClinicianButtonEnabled)")
+        }
+        if self.currentStudy?.studySettings?.callResearchAssistantButtonEnabled != newSettings.callResearchAssistantButtonEnabled {
+            anything_changed = true
+            self.currentStudy?.studySettings?.callResearchAssistantButtonEnabled = newSettings.callResearchAssistantButtonEnabled
+            // print("callResearchAssistantButtonEnabled changed to: \(newSettings.callResearchAssistantButtonEnabled)")
+        }
+        
+        // accedentally tested it like this outside of if anything_changed, it's fine.
+        Recline.shared.save(self.currentStudy!)
+        
+        // if anything changed, reset all data services.
+        if anything_changed {
+            self.prepareDataServices()
         }
     }
     

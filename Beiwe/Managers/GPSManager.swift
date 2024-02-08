@@ -27,6 +27,7 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
     var isDeferringUpdates = false  // this doesn't seem to do anything in this subclass of CLLocationManagerDelegate, and also isn't part of the superclass.  unclear purpose.
 
     // gps storage
+    let storeType = "gps"
     var gpsStore: DataStorage?
 
     /// checks gps permission - IDE warning about UI unresponsiveness appears to never be an issue.
@@ -97,14 +98,14 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
             log.error("GPS not enabled.  Not initializing collection")
             return false
         }
-        self.gpsStore = DataStorageManager.sharedInstance.createStore("gps", headers: gps_headers)
+        self.gpsStore = DataStorageManager.sharedInstance.createStore(self.storeType, headers: gps_headers)
         self.isCollectingGps = false
         return true
     }
 
     /// start collecting
     func startCollecting() {
-        log.info("Turning GPS collection on")
+        // print("Turning \(self.storeType) collection on")
         AppEventManager.sharedInstance.logAppEvent(event: "gps_on", msg: "GPS collection on")
         self.isCollectingGps = true
         self.locationManager.desiredAccuracy = kCLLocationAccuracyBest
@@ -113,7 +114,7 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
 
     /// stop collecting
     func pauseCollecting() {
-        log.info("Pausing GPS collection")
+        // print("Pausing \(self.storeType) collection")
         AppEventManager.sharedInstance.logAppEvent(event: "gps_off", msg: "GPS collection off")
         self.isCollectingGps = false
         // TODO: test disabling these so that it is always at best filter, other filter rates, etc.
@@ -123,9 +124,11 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
 
     /// only called in self.stopAndClear
     func finishCollecting() {
+        // print("Finishing \(self.storeType) collection")
+
         self.pauseCollecting()
         self.isCollectingGps = false
         self.gpsStore = nil
-        DataStorageManager.sharedInstance.closeStore("gps")
+        DataStorageManager.sharedInstance.closeStore(self.storeType)
     }
 }

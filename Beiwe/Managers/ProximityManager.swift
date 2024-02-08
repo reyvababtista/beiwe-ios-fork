@@ -28,7 +28,7 @@ class ProximityManager: DataServiceProtocol {
 
     /// protocol function
     func startCollecting() {
-        log.info("Turning \(self.storeType) collection on")
+        // print("Turning \(self.storeType) collection on")
         UIDevice.current.isProximityMonitoringEnabled = true
         // register the observer
         NotificationCenter.default.addObserver(
@@ -39,7 +39,7 @@ class ProximityManager: DataServiceProtocol {
     
     /// protocol function
     func pauseCollecting() {
-        log.info("Pausing \(self.storeType) collection")
+        // print("Pausing \(self.storeType) collection")
         // unregister the observer
         NotificationCenter.default.removeObserver(self, name: UIDevice.proximityStateDidChangeNotification, object: nil)
         AppEventManager.sharedInstance.logAppEvent(event: "proximity_off", msg: "Proximity collection off")
@@ -47,7 +47,7 @@ class ProximityManager: DataServiceProtocol {
     
     /// protocol function
     func finishCollecting() {
-        log.info("Finish collecting \(self.storeType) collection")
+        // print("Finishing \(self.storeType) collection")
         self.pauseCollecting()
         self.store = nil
         DataStorageManager.sharedInstance.closeStore(self.storeType)

@@ -50,6 +50,7 @@ class TimerManager {
         self.clearPollTimer()
         // call finishCollecting on every collection service in dataCollectionServices
         for dataStatus in self.dataCollectionServices {
+            // print("global timer stop, calling finishCollecting on \(dataStatus.dataService.self)")
             dataStatus.dataService.finishCollecting()
         }
         self.dataCollectionServices.removeAll()  // clear out the registered services entirely

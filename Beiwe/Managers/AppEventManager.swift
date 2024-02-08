@@ -103,23 +103,22 @@ class AppEventManager: DataServiceProtocol {
 
     /// protocol function - does not directly start collecting - sets isCollecting to true and logs,
     func startCollecting() {
-        log.info("Turning \(self.storeType) collection on")
+        // print("Turning \(self.storeType) collection on")
         self.logAppEvent(event: "collecting", msg: "Collecting Data")
         self.isCollecting = true
     }
 
     /// protocol function - sets is collection to false
     func pauseCollecting() {
+        // print("Pausing \(self.storeType) collection but that is meaningless?")
         self.isCollecting = false
-        log.info("Pausing \(self.storeType) collection but that is meanings")
     }
 
     /// protocol function - completely stops the iOS Log data stream
     func finishCollecting() {
-        log.info("Finish \(self.storeType) collection")
+        // print("Finishing \(self.storeType) collection")
         self.logAppEvent(event: "stop_collecting", msg: "Stop Collecting Data")
         self.pauseCollecting()
-        log.info("Stopping \(self.storeType) collection, which is meaningful.")
         self.store = nil
         DataStorageManager.sharedInstance.closeStore(self.storeType)
     }
@@ -186,7 +185,7 @@ class AppEventManager: DataServiceProtocol {
 //     }
 //
 //     func startCollecting() {
-//         log.info("Turning \(self.storeType) collection on")
+//         // print("Turning \(self.storeType) collection on")
 //         self.logAppEvent("dev log start")
 //         self.isCollecting = true
 //     }

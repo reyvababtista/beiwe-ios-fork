@@ -44,7 +44,7 @@ class ReachabilityManager: DataServiceProtocol {
 
     /// protocol function
     func startCollecting() {
-        log.info("Turning \(self.storeType) collection on")
+        // print("Turning \(self.storeType) collection on")
         // register as the delegate
         NotificationCenter.default.addObserver(self, selector: #selector(self.reachabilityChanged), name: ReachabilityChangedNotification, object: nil)
         AppEventManager.sharedInstance.logAppEvent(event: "reachability_on", msg: "Reachability collection on")
@@ -52,7 +52,7 @@ class ReachabilityManager: DataServiceProtocol {
 
     /// protocol function
     func pauseCollecting() {
-        log.info("Pausing \(self.storeType) collection")
+        // print("Pausing \(self.storeType) collection")
         // unregister the delegate
         NotificationCenter.default.removeObserver(self, name: ReachabilityChangedNotification, object: nil)
         AppEventManager.sharedInstance.logAppEvent(event: "reachability_off", msg: "Reachability collection off")
@@ -60,7 +60,7 @@ class ReachabilityManager: DataServiceProtocol {
 
     /// protocol function
     func finishCollecting() {
-        log.info("Finish collecting \(self.storeType) collection")
+        // print("Finishing \(self.storeType) collection")
         self.pauseCollecting()
         self.store = nil
         DataStorageManager.sharedInstance.closeStore(self.storeType)

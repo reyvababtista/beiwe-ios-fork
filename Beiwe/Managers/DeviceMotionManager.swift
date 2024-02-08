@@ -49,7 +49,7 @@ class DeviceMotionManager: DataServiceProtocol {
 
     /// protocol function
     func startCollecting() {
-        log.info("Turning \(self.storeType) collection on")
+        // print("Turning \(self.storeType) collection on")
 
         let queue = OperationQueue()
         self.motionManager.startDeviceMotionUpdates(using: CMAttitudeReferenceFrame.xArbitraryZVertical, to: queue) {
@@ -98,13 +98,13 @@ class DeviceMotionManager: DataServiceProtocol {
     }
 
     func pauseCollecting() {
-        log.info("Pausing \(self.storeType) collection")
+        // print("Pausing \(self.storeType) collection")
         self.motionManager.stopDeviceMotionUpdates()
         AppEventManager.sharedInstance.logAppEvent(event: "devicemotion_off", msg: "DeviceMotion collection off")
     }
 
     func finishCollecting() {
-        print("Stopping Devicemotion collecting")
+        // print("Finishing \(self.storeType) collection")
         self.pauseCollecting()
         self.store = nil
         DataStorageManager.sharedInstance.closeStore(self.storeType)

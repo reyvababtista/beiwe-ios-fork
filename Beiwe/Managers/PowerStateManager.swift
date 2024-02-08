@@ -57,7 +57,7 @@ class PowerStateManager: DataServiceProtocol {
     
     /// protocol function - populates listeners, registers delegate pattern
     func startCollecting() {
-        log.info("Turning \(self.storeType) collection on")
+        // print("Turning \(self.storeType) collection on")
         UIDevice.current.isBatteryMonitoringEnabled = true
         // TODO: document why there is a weak reference here?
         self.listeners += AppDelegate.sharedInstance().lockEvent.on { [weak self] locked in
@@ -70,7 +70,7 @@ class PowerStateManager: DataServiceProtocol {
 
     /// protocol function - clears listeners, unregisters delegate patters
     func pauseCollecting() {
-        log.info("Pausing \(self.storeType) collection")
+        // print("Pausing \(self.storeType) collection")
         NotificationCenter.default.removeObserver(self, name: UIDevice.batteryStateDidChangeNotification, object: nil)
         NotificationCenter.default.removeObserver(self, name: UIDevice.batteryLevelDidChangeNotification, object: nil)
         self.listeners = []
@@ -79,7 +79,7 @@ class PowerStateManager: DataServiceProtocol {
 
     /// protocol function
     func finishCollecting() {
-        log.info("Finish collecting \(self.storeType) collection")
+        // print("Finishing \(self.storeType) collection")
         self.pauseCollecting()
         self.store = nil
         DataStorageManager.sharedInstance.closeStore(self.storeType)

@@ -22,7 +22,7 @@ class AccelerometerManager: DataServiceProtocol {
     /// protocol function - sets up frequency
     func initCollecting() -> Bool {
         guard self.motionManager.isAccelerometerAvailable else {
-            log.info("Accel not available.  Not initializing collection")
+            log.error("Accel not available.  Not initializing collection")
             return false
         }
         // TimeInterval of uptime, boottime as unix timestamp
@@ -36,7 +36,7 @@ class AccelerometerManager: DataServiceProtocol {
 
     /// protocol function
     func startCollecting() {
-        log.info("Turning \(self.storeType) collection on")
+        // print("Turning \(self.storeType) collection on")
         // print("accelerometerUpdateInterval: \(motionManager.accelerometerUpdateInterval)")
         let queue = OperationQueue()
         // set the closure function as the delegate for updates
@@ -56,14 +56,14 @@ class AccelerometerManager: DataServiceProtocol {
 
     /// protocol function
     func pauseCollecting() {
-        log.info("Pausing \(self.storeType) collection")
+        // print("Pausing \(self.storeType) collection")
         self.motionManager.stopAccelerometerUpdates()
         AppEventManager.sharedInstance.logAppEvent(event: "accel_off", msg: "Accel collection off")
     }
 
     /// protocol function
     func finishCollecting() {
-        print("Stopping Accelerometer collecting")
+        // print("Finishing \(self.storeType) collection")
         self.pauseCollecting()
         self.store = nil
         DataStorageManager.sharedInstance.closeStore(self.storeType)
