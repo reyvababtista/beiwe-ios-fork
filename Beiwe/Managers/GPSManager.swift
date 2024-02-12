@@ -74,7 +74,10 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
             var lng = loc.coordinate.longitude
             if self.enableGpsFuzzing {
                 lat = lat + self.fuzzGpsLatitudeOffset
-                lng = ((lng + self.fuzzGpsLongitudeOffset + 180.0).truncatingRemainder(dividingBy: 360.0)) - 180.0
+                // the range for highly negative numbers (up to -360.0) creates out-of-range output, the fix is to add
+                // multiple of 360 + 180 so that the truncating remainder is always a positive value -  and then at
+                // the end account for the negative range by subtracting 180. (1260 = 360*3 + 180)
+                lng = ((lng + self.fuzzGpsLongitudeOffset + 1260.0).truncatingRemainder(dividingBy: 360.0)) - 180.0
             }
             // header order is timestamp, latitude, longitude, altitude, accuracy, vert_accuracy
             data.append(String(Int64(loc.timestamp.timeIntervalSince1970 * 1000)))
