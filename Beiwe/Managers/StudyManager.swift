@@ -70,43 +70,6 @@ class StudyManager {
     ///////////////////////////////////////////////////// Setup and UnSetup ///////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     
-    /// sets (but also clears?) the current study, and the gpsManager, sets real_study_loaded to true
-    /// called just after registration, and when app is loaded with a registered study
-    // func loadDefaultStudy() -> Promise<Bool> {
-    //     // print("(loadDefaultStudy) actual run start")
-    //     self.currentStudy = nil
-    //     self.gpsManager = nil // this seems like a bug waiting to happen
-    //     let studies: [Study] = Recline.shared.queryAll()
-    //     // mostly sets real_study_loaded to true...
-    //     return firstly { () -> Promise<[Study]> in
-    //         // print("(loadDefaultStudy) firstly queryall start")
-    //         Recline.shared.queryAll() // this returns a list of all studies as a parameter to the next promise.
-    //         // I don't understand but trying to refactor as follows for a print statement doesn't work?
-    //         // print(print("(loadDefaultStudy) firstly queryall done"))
-    //         // return x
-    //     }.then { (studies: [Study]) -> Promise<Bool> in
-    //         // print("(loadDefaultStudy) then...")
-    //         // if there is more than one study, log a warning? this is pointless
-    //         if studies.count > 1 {
-    //             log.warning("Multiple Studies: \(studies)")
-    //         }
-    //         // grab the first study and the first study only, set the patient id (but not), real_study_loaded to true
-    //         if studies.count > 0 {
-    //             self.currentStudy = studies[0]
-    //             // print("(loadDefaultStudy) WE SET CURRENT STUDY")
-    //             // print("self.currentStudy.patientId: \(self.currentStudy?.patientId)")
-    //             // AppDelegate.sharedInstance().setDebuggingUser(self.currentStudy?.patientId ?? "unknown") // this doesn't do anything...
-    //             StudyManager.real_study_loaded = true
-    //             // print("(loadDefaultStudy) real_study_loaded = true")
-    //             self.updateActiveSurveys()
-    //         } else {
-    //             // print("(loadDefaultStudy) UHOH STUDY COUNT IS 0")
-    //         }
-    //
-    //         return .value(true)
-    //     }
-    // }
-    
     func loadDefaultStudy() {
         self.currentStudy = nil
         self.gpsManager = nil // this seems like a bug waiting to happen
@@ -442,72 +405,31 @@ class StudyManager {
         return surveyDataModified
     }
     
-    /// This is the old version of the code that checked survey properties and status for adding them to activeSurveys.
-    /// The original comments have been preservered, the logic has been radically simplified in check_surveys_new above.
-    /// This code is real dumb, I don't think it logically makes sense. I don't understand how the ios app workd with this
-    /// degree of crappy, wrote checks checks for which surveys should be active - triggerOnFirstDownload has the exact
-    /// same activation logic as alwaysAvailable
-    // func ensure_active_surveys_old() -> Bool {
-    //     guard let study = self.currentStudy else {
-    //         return false
-    //     }
-    //     print("new check_surveys")
-    //     var surveyDataModified = false
-    //
-    //     // for each survey from the server, check on the scheduling
-    //     var allSurveyIds: [String] = []
-    //     for survey in study.surveys {
-    //         if let id = survey.surveyId {
-    //             allSurveyIds.append(id)
-    //             // If we don't know about this survey already, add it in there for TRIGGERONFIRSTDOWNLOAD surverys
-    //             if study.activeSurveys[id] == nil && (survey.triggerOnFirstDownload /* || next > 0 */ ) {
-    //                 print("Adding survey  \(id) to active surveys")
-    //                 let newActiveSurvey = ActiveSurvey(survey: survey)
-    //                 study.activeSurveys[id] = newActiveSurvey
-    //                 surveyDataModified = true
-    //             }
-    //             // We want to display permanent surveys as active, and expect to change some details below (currently
-    //             // identical to the actions we take on a regular active survey)
-    //             else if study.activeSurveys[id] == nil && (survey.alwaysAvailable) {
-    //                 print("Adding survey  \(id) to active surveys")
-    //                 let newActiveSurvey = ActiveSurvey(survey: survey)
-    //                 study.activeSurveys[id] = newActiveSurvey
-    //                 surveyDataModified = true
-    //             }
-    //         }
-    //     }
-    //     return surveyDataModified
-    // }
+    /// Timers! They now do what they say they do and aren't even complicated! Holy !#*&$@#*!
+    /// AND NOW THEY DON'T USE PROMISES
     
-    ///
-    /// Timers! They do what they say and aren't even complicated! Holy !#*&$@#*!
-    ///    okay but they do all use completely unnecessary promises.
-    
-    func setNextUploadTime() -> Promise<Bool> {
+    func setNextUploadTime() {
         guard let study = currentStudy, let studySettings = study.studySettings else {
-            return .value(true)
+            return
         }
         study.nextUploadCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.uploadDataFileFrequencySeconds)
         Recline.shared.save(study)
-        return Promise.value(true)
     }
     
-    func setNextSurveyTime() -> Promise<Bool> {
+    func setNextSurveyTime() {
         guard let study = currentStudy, let studySettings = study.studySettings else {
-            return .value(true)
+            return
         }
         study.nextSurveyCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.checkForNewSurveysFreqSeconds)
         Recline.shared.save(study)
-        return Promise.value(true)
     }
     
-    func setNextDeviceSettingsTime() -> Promise<Bool> {
+    func setNextDeviceSettingsTime() {
         guard let study = currentStudy else {
-            return .value(true)
+            return
         }
         study.nextDeviceSettingsCheck = Int64(Date().timeIntervalSince1970) + DEVICE_SETTINGS_INTERVAL
         Recline.shared.save(study)
-        return Promise.value(true)
     }
     
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -516,10 +438,8 @@ class StudyManager {
     
     /// some kind of reachability thing, calls periodicNetworkTransfers in a promise (of course it does)
     @objc func reachabilityChanged(_ notification: Notification) {
-        _ = Promise().done { _ in
-            log.info("Reachability changed, running periodic.")
-            self.periodicNetworkTransfers()
-        }
+        print("Reachability changed, running periodic network transfers.")
+        self.periodicNetworkTransfers()
     }
     
     /// runs network operations inside of promises, handles checking and updating timer values on the timer.
@@ -542,35 +462,26 @@ class StudyManager {
         // logic for checking for surveys
         if now > nextSurvey || (reachable && currentStudy.missedSurveyCheck) {
             // This (missedSurveyCheck?) will be saved because setNextSurveyTime saves the study
-            currentStudy.missedSurveyCheck = !reachable // whut?
-            self.setNextSurveyTime().done { (_: Bool) in
-                if reachable {
-                    _ = self.checkSurveys()
-                }
-            }.catch { (_: Error) in
-                log.error("Error checking for surveys")
+            currentStudy.missedSurveyCheck = !reachable // if not reachable we missed the survey check
+            self.setNextSurveyTime()
+            if reachable {
+                self.checkSurveys()
             }
         }
         
         // logic for running uploads code
         if now > nextUpload || (reachable && currentStudy.missedUploadCheck) {
             // This (missedUploadCheck?) will be saved because setNextUpload saves the study
-            currentStudy.missedUploadCheck = !reachable
-            self.setNextUploadTime().done { (_: Bool) in
-                _ = self.upload(!reachable)
-            }.catch { (_: Error) in
-                log.error("Error checking for uploads") // this is kindof unnecessary
-            }
+            currentStudy.missedUploadCheck = !reachable // if not reachable we missed the upload check
+            self.setNextUploadTime()
+            self.upload(!reachable)
         }
         
         // logic for updating the study's device settings.
         if now > nextDeviceSettings && reachable {
             // print("Checking for updated device settings...")
-            self.setNextDeviceSettingsTime().done { (_: Bool) in
-                self.updateDeviceSettings()
-            }.catch { (_: Error) in
-                log.error("Error checking for updated device settings") // this is kindof unnecessary
-            }
+            self.setNextDeviceSettingsTime()
+            self.updateDeviceSettings()
         }
     }
     
