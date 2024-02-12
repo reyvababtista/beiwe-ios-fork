@@ -1,3 +1,4 @@
+import Alamofire
 import Eureka
 import PKHUD
 import SwiftValidator
@@ -7,8 +8,22 @@ import UIKit
 class ChangePasswordViewController: FormViewController {
     let autoValidation = false
     var isForgotPassword = false // flag determines whether this is the forgot password or change password use-case
-    let db = Recline.shared // this is not used
-    var finished: ((_ changed: Bool) -> Void)? // dunnoo
+    
+    let error_label_invalid_old_password: HUDContentType = .labeledError(
+        title: NSLocalizedString("reset_password_error_alert_title", comment: ""),
+        subtitle: NSLocalizedString("invalid_old_password", comment: "")
+    )
+    let error_label_reset_password_communication_error: HUDContentType = .labeledError(
+        title: NSLocalizedString("reset_password_error_alert_title", comment: ""),
+        subtitle: NSLocalizedString("reset_password_communication_error", comment: "")
+    )
+    let fake_hud_error: HUDContentType = .labeledError(title: "", subtitle: "")
+    
+    // I literally have no idea what this is or was intended to be, its usage makes no sense.
+    // TODO: test thoroughly, there is some dismiss behavior that it gates? I guess?
+    var finished: ((_ changed: Bool) -> Void)?
+    
+    var the_proposed_password: String? // this is not used
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -21,11 +36,12 @@ class ChangePasswordViewController: FormViewController {
                 // populate
                 var header = HeaderFooterView<ForgotPasswordHeaderView>(.nibFile(name: "ForgotPasswordHeaderView", bundle: nil))
                 header.onSetupView = { (headerView: ForgotPasswordHeaderView, _: Section) in
-                    // headerView.patientId - is offset vertically (down) by about 2/3rds of a line height and and I can't work out how to fix it
+                    // headerView.patientId - is offset vertically (down) by about 2/3rds of a line
+                    // height and and I can't work out how to fix it
                     // headerView.patientId.text = StudyManager.sharedInstance.currentStudy?.patientId ?? ""
-                    // so instead we bind to the other element if we delete headerView.patientId from the .nib file it breaks text flow differently
-                    headerView.patientId2.text = "Patient ID: " + (StudyManager.sharedInstance.currentStudy?.patientId ?? "")!
-                    
+                    headerView.patientId2.text = "Patient ID: " +
+                        (StudyManager.sharedInstance.currentStudy?.patientId ?? "")!
+
                     // add the call button, but hide it if it's disabled in the study settings
                     headerView.callButton.addTarget(self, action: #selector(ChangePasswordViewController.callAssistant(_:)), for: UIControl.Event.touchUpInside)
                     if !(StudyManager.sharedInstance.currentStudy?.studySettings?.callResearchAssistantButtonEnabled)! {
@@ -40,9 +56,9 @@ class ChangePasswordViewController: FormViewController {
             }
         }
         
-            // these are the cells (items) in the menu
-            // tewporary / current password field
-            <<< SVPasswordRow("currentPassword") { // button setup
+            // these are the cells (buttons) in the menu
+            // temporary / current password field
+            <<< SVPasswordRow("currentPassword") {
                 $0.title = isForgotPassword ? NSLocalizedString("forgot_password_temporary_password_caption", comment: "") : NSLocalizedString("reset_password_current_password_caption", comment: "")
                 let placeholder: String = String($0.title!.lowercased().dropLast())
                 $0.placeholder = placeholder
@@ -52,7 +68,7 @@ class ChangePasswordViewController: FormViewController {
                 $0.cell.tintColor = UIColor.white // sets the text color
             }
             // new password field
-            <<< SVPasswordRow("password") { // button setup
+            <<< SVPasswordRow("password") {
                 $0.title = NSLocalizedString("reset_password_new_password_caption", comment: "")
                 $0.placeholder = NSLocalizedString("reset_password_new_password_hint", comment: "")
                 $0.customRules = [RequiredRule(), RegexRule(regex: Constants.passwordRequirementRegex, message: Constants.passwordRequirementDescription)]
@@ -61,7 +77,7 @@ class ChangePasswordViewController: FormViewController {
                 $0.cell.tintColor = UIColor.white
             }
             // new password again field
-            <<< SVPasswordRow("confirmPassword") { // button setup
+            <<< SVPasswordRow("confirmPassword") {
                 $0.title = NSLocalizedString("reset_password_confirm_new_password_caption", comment: "")
                 $0.placeholder = NSLocalizedString("reset_password_confirm_new_password_hint", comment: "")
                 $0.customRules = [RequiredRule(), MinLengthRule(length: 1)]
@@ -70,12 +86,12 @@ class ChangePasswordViewController: FormViewController {
                 $0.cell.tintColor = UIColor.white
             }
             // submit button
-            <<< ButtonRow { // button setup
+            <<< ButtonRow {
                 $0.title = NSLocalizedString("reset_password_submit", comment: "")
                 $0.cell.backgroundColor = AppColors.Beiwe2 // set a darker color on the submit and cancel buttons
                 $0.cell.tintColor = UIColor.cyan // and a different text color for distinction
             }
-            // the code for doing a password reset, contacting the server etc. (TERRIBLE FACTORING WHY WOULD ANYONE WITH A BRAIN IN THEIR HEAD THINK THIS WAS TOLERABLE)
+            // the code for doing a password reset, contacting the server etc., calls do_password_reset_request
             .onCellSelection { [unowned self] (cell: ButtonCellOf<String>, row: ButtonRow) in
                 if self.form.validateAll() {
                     // ui lock etc
@@ -90,53 +106,20 @@ class ChangePasswordViewController: FormViewController {
                     
                     // do the request
                     if let newPassword = newPassword, let currentPassword = currentPassword {
-                        let changePasswordRequest = ChangePasswordRequest(newPassword: newPassword)
-                        ApiManager.sharedInstance.makePostRequest(changePasswordRequest, password: currentPassword).done { (arg: (ChangePasswordRequest.ApiReturnType, Int)) in
-                            // success case
-                            let (body, code) = arg
-                            log.info("Password changed")
-                            PersistentPasswordManager.sharedInstance.storePassword(newPassword)
-                            HUD.flash(.success, delay: 1)
-                            if let finished = self.finished {
-                                finished(true)
-                            } else {
-                                self.presentingViewController?.dismiss(animated: true, completion: nil)
-                            }
-                        }.catch { (error: Error) in
-                            // error case
-                            log.info("error received from change password: \(error)")
-                            var err: HUDContentType
-                            switch error {
-                            case let ApiErrors.failedStatus(code):
-                                switch code {
-                                case 403, 401:
-                                    err = .labeledError(title: NSLocalizedString("reset_password_error_alert_title", comment: ""), subtitle: NSLocalizedString("invalid_old_password", comment: ""))
-                                default:
-                                    err = .labeledError(title: NSLocalizedString("reset_password_error_alert_title", comment: ""), subtitle: NSLocalizedString("reset_password_communication_error", comment: ""))
-                                }
-                            default:
-                                err = .labeledError(title: NSLocalizedString("reset_password_error_alert_title", comment: ""), subtitle: NSLocalizedString("reset_password_communication_error", comment: ""))
-                            }
-                            HUD.flash(err, delay: 2.0)
-                        } // end catch
-                    } // end request clause
-                } // end self.form.validateAll()
-                else {
+                        do_password_reset_request(newPassword: newPassword, currentPassword: currentPassword)
+                    }
+                } else {
                     // print("Bad validation.")
                 }
             } // end submit button (have I mentioned this is terrible factoring?)
             
             // The Cancel button
-            <<< ButtonRow { // button setup
+            <<< ButtonRow {
                 $0.title = NSLocalizedString("cancel_button_text", comment: "")
                 $0.cell.backgroundColor = AppColors.Beiwe2
                 $0.cell.tintColor = UIColor.cyan
             }.onCellSelection { [unowned self] (cell: ButtonCellOf<String>, row: ButtonRow) in
-                if let finished = self.finished {
-                    finished(false) // ... call itself? what is this?
-                } else {
-                    self.presentingViewController?.dismiss(animated: true, completion: nil)
-                }
+                self.presentingViewController?.dismiss(animated: true, completion: nil)
             }
         
         // I guess this is some kind of configuration of the confirmation field that has to be assigned/set up outside the active code.
@@ -145,9 +128,74 @@ class ChangePasswordViewController: FormViewController {
         confirmRow!.customRules = [ConfirmationRule(confirmField: passwordRow!.cell.textField)]
     }
 
+    func do_password_reset_request(newPassword: String, currentPassword: String) {
+        self.the_proposed_password = newPassword
+        let changePasswordRequest = ChangePasswordRequest(newPassword: newPassword)
+        ApiManager.sharedInstance.makePostRequest_responseString(changePasswordRequest, password: currentPassword, completion_handler: self.reset_password_callback)
+    }
+    
+    func reset_password_callback(response: DataResponse<String>) {
+        guard let the_proposed_password = self.the_proposed_password else {
+            log.error("self.the_proposed_password is nil")
+            fatalError("self.the_proposed_password is nil")
+            return
+        }
+        self.the_proposed_password = nil // immediately clear
+        
+        // populate these
+        var error_message = "" // for a debug print statement
+        var hud_error_message: HUDContentType // for ui display
+
+        switch response.result {
+        case .success:
+            if let statusCode = response.response?.statusCode {
+                // real success, 200 class status codes
+                if statusCode >= 200 && statusCode < 300 {
+                    var error_message = ""
+                    hud_error_message = self.fake_hud_error
+                }
+                // rejected errors (400 class)
+                else if statusCode == 403 || statusCode == 401 {
+                    hud_error_message = self.error_label_invalid_old_password
+                }
+                // all other status codes
+                else {
+                    hud_error_message = self.error_label_reset_password_communication_error
+                    error_message = "password reset: \(response) , statuscode: \(statusCode), value/body: \(String(describing: response.result.value))"
+                }
+            } else {
+                // no status code
+                hud_error_message = self.error_label_reset_password_communication_error
+                error_message = "password reset: \(response) - no status code?"
+            }
+        case .failure:
+            // general failure
+            hud_error_message = self.error_label_reset_password_communication_error
+            error_message = "password reset: \(response) - error: \(String(describing: response.error))"
+        }
+        
+        // error message will be an empty string if there were no errors.
+        if error_message == "" {
+            PersistentPasswordManager.sharedInstance.storePassword(the_proposed_password)
+            
+            // ui runs on main thread
+            DispatchQueue.main.async {
+                HUD.flash(.success, delay: 2)
+                self.presentingViewController?.dismiss(animated: true, completion: nil)
+            }
+        } else {
+            log.error(error_message)
+            DispatchQueue.main.async {
+                // xcode/swift will yell at you if you've missed cases and hud_error_message is null.
+                // (comment out `hud_error_message = fake_hud_error` to test)
+                HUD.flash(hud_error_message, delay: 2.0)
+            }
+        }
+    }
+    
+    // waring
     override func didReceiveMemoryWarning() {
-        super.didReceiveMemoryWarning()
-        // Dispose of any resources that can be recreated.
+        super.didReceiveMemoryWarning() // Dispose of any resources that can be recreated.
     }
 
     @objc func callAssistant(_ sender: UIButton!) {
