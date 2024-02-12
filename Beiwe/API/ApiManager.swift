@@ -254,8 +254,8 @@ class ApiManager {
         _ requestObject: T,
         password: String? = nil,
         completion_queue: DispatchQueue? = nil,
-        completion_handler: ((DataResponse<String>)-> Void)? = nil)
-    where T: Mappable {
+        completion_handler: ((DataResponse<String>)-> Void)? = nil
+    ) where T: Mappable {
         var parameters = requestObject.toJSON()
         parameters["password"] = (password == nil) ? self.hashedPassword : Crypto.sharedInstance.sha256Base64URL(password!) // I don't know what this line does
         self.setDefaultParameters(&parameters, skip_password: true)
@@ -263,46 +263,13 @@ class ApiManager {
         // this is asynchronous, it ~immediately fires, and somehow we can attach the completion handler
         // afterwards and it all just works. cool.
         let request = Alamofire.request(baseApiUrl + T.apiEndpoint, method: .post, parameters: parameters)
-        
         // pass the completion handler to the responseString method on the queue
+        
         if let completion_handler = completion_handler {
             request.responseString(queue: completion_queue, completionHandler: completion_handler)
         }
     }
     
-    func arrayPostRequest<T: ApiRequest>(_ requestObject: T) -> Promise<([T.ApiReturnType], Int)> where T: Mappable {
-        var parameters = requestObject.toJSON()
-        self.setDefaultParameters(&parameters)
-
-        return Promise { (resolver: Resolver<([T.ApiReturnType], Int)>) in
-            let request = Alamofire.request(baseApiUrl + T.apiEndpoint, method: .post, parameters: parameters)
-
-            request.responseString { (response: DataResponse<String>) in
-                switch response.result {
-                case let .failure(error): // code error I think
-                    resolver.reject(error)
-
-                case .success:
-                    let statusCode = response.response?.statusCode
-                    // bad status codes
-                    if let statusCode = statusCode, statusCode < 200 || statusCode >= 400 {
-                        resolver.reject(ApiErrors.failedStatus(code: statusCode))
-                    } else {
-                        // FIXME: I may have screwed up this else clause, compare to original
-                    
-                        // get the return type, make an array of it, consume the json and set up to return it
-                        var returnObject: [T.ApiReturnType]?
-                        returnObject = Mapper<T.ApiReturnType>().mapArray(JSONString: response.result.value ?? "")
-                        if let returnObject = returnObject {
-                            resolver.fulfill((returnObject, statusCode ?? 0))
-                        } else {
-                            resolver.reject(ApiManager.serialErr())
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     // /// this is going to replace the first chunk of that multipartFormData upload code below
     // func thingy(_ multipartFormData: MultipartFormData, parameters: [String: Any], file: URL) {

@@ -6,7 +6,7 @@ import EmitterKit
 import Fabric
 import Firebase
 import Foundation
-import PromiseKit
+import ObjectMapper
 import ReachabilitySwift
 import ResearchKit
 import Sentry
@@ -328,7 +328,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             self.isLoggedIn = true
             if let study = self.currentStudy {
                 study.lastSuccessfulLogin = self.currentTimestamp
-                _ = Recline.shared.save(study)
+                Recline.shared.save(study)
             }
             return true
         }
@@ -343,7 +343,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("applicationWillEnterForeground")
         if let study = self.currentStudy {
             study.lastApplicationWillEnterForeground = self.currentTimestamp
-            _ = Recline.shared.save(study)
+            Recline.shared.save(study)
         }
         
         // Called as part of the transition from the background to the inactive (Eli does not know who wrote "inactive") state.
@@ -377,7 +377,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("applicationWillFinishLaunchingWithOptions")
         if let study = self.currentStudy {
             study.lastApplicationWillFinishLaunchingWithOptions = self.currentTimestamp
-            _ = Recline.shared.save(study)
+            Recline.shared.save(study)
         }
         return true
     }
@@ -387,7 +387,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("applicationWillTerminate")
         if let study = self.currentStudy {
             study.lastApplicationWillTerminate = self.currentTimestamp
-            _ = Recline.shared.save(study)
+            Recline.shared.save(study)
         }
         
         AppEventManager.sharedInstance.logAppEvent(event: "terminate", msg: "Application terminating")
@@ -404,7 +404,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("applicationWillResignActive")
         if let study = self.currentStudy {
             study.lastApplicationWillResignActive = self.currentTimestamp
-            _ = Recline.shared.save(study)
+            Recline.shared.save(study)
         }
     }
 
@@ -417,7 +417,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("applicationDidBecomeActive")
         if let study = self.currentStudy {
             study.lastApplicationDidBecomeActive = self.currentTimestamp
-            _ = Recline.shared.save(study)
+            Recline.shared.save(study)
         }
         
         AppEventManager.sharedInstance.logAppEvent(event: "foreground", msg: "Application entered foreground")
@@ -436,7 +436,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("applicationDidEnterBackground")
         if let study = self.currentStudy {
             study.lastApplicationDidEnterBackground = self.currentTimestamp
-            _ = Recline.shared.save(study)
+            Recline.shared.save(study)
         }
         self.timeEnteredBackground = Date()
         AppEventManager.sharedInstance.logAppEvent(event: "background", msg: "Application entered background")
@@ -446,7 +446,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("applicationDidReceiveMemoryWarning")
         if let study = self.currentStudy {
             study.lastApplicationDidReceiveMemoryWarning = self.currentTimestamp
-            _ = Recline.shared.save(study)
+            Recline.shared.save(study)
         }
         AppEventManager.sharedInstance.logAppEvent(event: "memory_warn", msg: "Application received memory warning")
     }
@@ -455,7 +455,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("applicationProtectedDataDidBecomeAvailable")
         if let study = self.currentStudy {
             study.lastApplicationProtectedDataDidBecomeAvailable = self.currentTimestamp
-            _ = Recline.shared.save(study)
+            Recline.shared.save(study)
         }
         self.lockEvent.emit(false)
         AppEventManager.sharedInstance.logAppEvent(event: "unlocked", msg: "Phone/keystore unlocked")
@@ -465,7 +465,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("applicationProtectedDataWillBecomeUnavailable")
         if let study = self.currentStudy {
             study.lastApplicationProtectedDataWillBecomeUnavailable = self.currentTimestamp
-            _ = Recline.shared.save(study)
+            Recline.shared.save(study)
         }
         self.lockEvent.emit(true)
         AppEventManager.sharedInstance.logAppEvent(event: "locked", msg: "Phone/keystore locked")
@@ -511,7 +511,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("Failed to register for notifications: \(error.localizedDescription)")
         if let study = self.currentStudy {
             study.lastFailedToRegisterForNotification = self.currentTimestamp
-            _ = Recline.shared.save(study)
+            Recline.shared.save(study)
         }
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Failed to register for notifications: \(error.localizedDescription)")
     }
@@ -521,7 +521,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func application(_ application: UIApplication, didReceiveRemoteNotification messageInfo: [AnyHashable: Any]) {
         if let study = self.currentStudy {
             study.lastBackgroundPushNotificationReceived = self.currentTimestamp
-            _ = Recline.shared.save(study)
+            Recline.shared.save(study)
         }
         
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Background push notification received")
@@ -542,7 +542,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("Foreground push notification received func application")
         if let study = self.currentStudy {
             study.lastForegroundPushNotificationReceived = self.currentTimestamp
-            _ = Recline.shared.save(study)
+            Recline.shared.save(study)
         }
         
         AppEventManager.sharedInstance.logAppEvent(event: "push_notification", msg: "Foreground push notification received")
@@ -579,7 +579,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // return if nothing found
         guard let surveyIdsString = messageInfo["survey_ids"] else {
             print("no surveyIds found, checking for new surveys anyway.")
-            self.downloadSurveys(surveyIds: [])
+            StudyManager.sharedInstance.downloadSurveys(surveyIds: [])
             return
         }
         
@@ -590,9 +590,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // downloadSurveys calls setActiveSurveys, even if it errors/fails. We always want to download the most recent survey information.
         // (old versions of the backend don't supply the sent_time key)
         if let sentTimeString = messageInfo["sent_time"] as! String? {
-            self.downloadSurveys(surveyIds: surveyIds, sentTime: isoStringToTimeInterval(timeString: sentTimeString))
+            StudyManager.sharedInstance.downloadSurveys(surveyIds: surveyIds, sentTime: isoStringToTimeInterval(timeString: sentTimeString))
         } else {
-            self.downloadSurveys(surveyIds: surveyIds)
+            StudyManager.sharedInstance.downloadSurveys(surveyIds: surveyIds)
         }
     }
     
@@ -613,73 +613,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             }
         }
         return surveyIds
-    }
-
-    // downloads all of the surveys in the study
-    func downloadSurveys(surveyIds: [String], sentTime: TimeInterval = 0) {
-        guard let study = self.currentStudy else {
-            return
-        }
-        Recline.shared.save(study)
-        
-        let surveyRequest = GetSurveysRequest()
-        ApiManager.sharedInstance.arrayPostRequest(surveyRequest).then { (surveys: [Survey], _: Int) -> Promise<Void> in
-            study.surveys = surveys
-            Recline.shared.save(study)
-            return Promise<Void>()
-        }.done { (_: Void) in
-            self.setActiveSurveys(surveyIds: surveyIds, sentTime: sentTime)
-        }.catch { (error: Error) in
-            print("Error downloading surveys: \(error)")
-            AppEventManager.sharedInstance.logAppEvent(event: "survey_download", msg: "Error downloading surveys: \(error)")
-            // try setting the active surveys anyway, even if download failed, can still use previously downloaded surveys
-            self.setActiveSurveys(surveyIds: surveyIds, sentTime: sentTime)
-        }
-    }
-
-    /// sets the active survey on the main app page, force-enables any specified surveys.
-    func setActiveSurveys(surveyIds: [String], sentTime: TimeInterval = 0) {
-        guard let study = self.currentStudy else {
-            return
-        }
-        
-        // force reload all always-available surveys and any passed in surveys
-        for survey in study.surveys {
-            let surveyId = survey.surveyId!, from_notification = surveyIds.contains(surveyId)
-            
-            if from_notification || survey.alwaysAvailable {
-                let activeSurvey = ActiveSurvey(survey: survey)
-                // when we receive a notification we need to record that, this is used to sort surveys on the main screen (I think)
-                if from_notification {
-                    activeSurvey.received = sentTime
-                    // FIXME: study.receivedAudioSurveys and study.receivedTrackingSurveys are junk, they are assigned but never used.
-                    if let surveyType = survey.surveyType {
-                        switch surveyType {
-                        case .AudioSurvey:
-                            study.receivedAudioSurveys = (study.receivedAudioSurveys) + 1
-                        case .TrackingSurvey:
-                            study.receivedTrackingSurveys = (study.receivedTrackingSurveys) + 1
-                        }
-                    }
-                }
-                study.activeSurveys[surveyId] = activeSurvey
-            }
-        }
-        
-        // if the survey id doesn't exist record a log statement
-        for surveyId in surveyIds {
-            if !study.surveyExists(surveyId: surveyId) {
-                print("Could not get survey \(surveyId)")
-                AppEventManager.sharedInstance.logAppEvent(event: "survey_download", msg: "Could not get obtain survey for ActiveSurvey")
-            }
-        }
-        
-        // Emits a surveyUpdated event to the listener
-        StudyManager.sharedInstance.surveysUpdatedEvent.emit(0)
-        Recline.shared.save(study)
-
-        // set badge number
-        UIApplication.shared.applicationIconBadgeNumber = study.activeSurveys.count
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -760,7 +693,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         self.fcmToken = fcmToken
         if fcmToken != "" {
             let fcmTokenRequest = FCMTokenRequest(fcmToken: fcmToken)
-            ApiManager.sharedInstance.makePostRequest_responseString(fcmTokenRequest, completion_handler: self.fcmToken_responseHandler)
+            ApiManager.sharedInstance.makePostRequest_responseString(
+                fcmTokenRequest, completion_handler: self.fcmToken_responseHandler)
         }
     }
     

@@ -195,10 +195,11 @@ class StudyManager {
     }
     
     /// sets the study as consented, sets api credentials
-    func setConsented() -> Promise<Bool> {
+    // ok I have not tested whether removing the promise from this impactse registration
+    func setConsented() {
         // fail if current study or study settings are null
         guard let study = currentStudy, let studySettings = study.studySettings else {
-            return .value(false)
+            return
         }
         // api setup
         self.setApiCredentials()
@@ -213,7 +214,7 @@ class StudyManager {
         DataStorageManager.sharedInstance.createDirectories()
         // update study stuff?
         Recline.shared.save(study)
-        return self.checkSurveys()
+        self.checkSurveys()
     }
     
     // FIXME: This function has 4 unacceptable failure modes -- called only from setConsented (study registration) and startStudyDataServices
@@ -290,7 +291,6 @@ class StudyManager {
     /// Called from, AudioQuestionsViewController.saveButtonPressed, StudyManager.checkSurveys,
     ///  and inside TrackingSurveyPresenter when the survey is completed.
     func updateActiveSurveys(_ forceSave: Bool = false) {
-        // if for some reason we don't have a current study, return 15 minutes (used when surveys are scheduled tells something to wait 15 minutes)
         guard let study = currentStudy else {
             return
         }
@@ -306,6 +306,55 @@ class StudyManager {
             self.emit_survey_updates_save_study_data()
         }
     }
+    
+    // FIXME: there these two functions: updateActiveSurveys, setActiveSurveys
+    // Are diverged versions of related code, see fixme next to duplicated download surveys code
+    
+    /// sets the active survey on the main app page, force-enables any specified surveys.
+    func setActiveSurveys(surveyIds: [String], sentTime: TimeInterval = 0) {
+        guard let study = self.currentStudy else {
+            return
+        }
+        
+        // force reload all always-available surveys and any passed in surveys
+        for survey in study.surveys {
+            let surveyId = survey.surveyId!, from_notification = surveyIds.contains(surveyId)
+            
+            if from_notification || survey.alwaysAvailable {
+                let activeSurvey = ActiveSurvey(survey: survey)
+                // when we receive a notification we need to record that, this is used to sort surveys on the main screen (I think)
+                if from_notification {
+                    activeSurvey.received = sentTime
+                    // FIXME: study.receivedAudioSurveys and study.receivedTrackingSurveys are junk, they are assigned but never used.
+                    if let surveyType = survey.surveyType {
+                        switch surveyType {
+                        case .AudioSurvey:
+                            study.receivedAudioSurveys = (study.receivedAudioSurveys) + 1
+                        case .TrackingSurvey:
+                            study.receivedTrackingSurveys = (study.receivedTrackingSurveys) + 1
+                        }
+                    }
+                }
+                study.activeSurveys[surveyId] = activeSurvey
+            }
+        }
+        
+        // if the survey id doesn't exist record a log statement
+        for surveyId in surveyIds {
+            if !study.surveyExists(surveyId: surveyId) {
+                print("Could not get survey \(surveyId)")
+                AppEventManager.sharedInstance.logAppEvent(event: "survey_download", msg: "Could not get obtain survey for ActiveSurvey")
+            }
+        }
+        
+        // Emits a surveyUpdated event to the listener
+        StudyManager.sharedInstance.surveysUpdatedEvent.emit(0)
+        Recline.shared.save(study)
+        
+        // set badge number
+        UIApplication.shared.applicationIconBadgeNumber = study.activeSurveys.count
+    }
+    
     
     func clear_out_submitted_surveys() -> Bool {
         guard let study = currentStudy else {
@@ -334,57 +383,6 @@ class StudyManager {
         // the old code reset a survey timer by 1 week, but that's not even correct because absolute time and relative schedules exist.
         return surveyDataModified
     }
-    
-    // func buggy_submit_survey() -> (TimeInterval, Bool) {
-    //     guard let study = currentStudy else {
-    //         return (Date().addingTimeInterval(15.0 * 60.0).timeIntervalSince1970, false)
-    //     }
-    //
-    //     let currentDate = Date()
-    //     let currentTime = currentDate.timeIntervalSince1970
-    //     // let currentDay = (calendar as NSCalendar).component(.weekday, from: currentDate) - 1
-    //     var nowDateComponents: DateComponents = (calendar as NSCalendar).components(
-    //         [NSCalendar.Unit.day, NSCalendar.Unit.year, NSCalendar.Unit.month, NSCalendar.Unit.timeZone], from: currentDate
-    //     )
-    //     nowDateComponents.hour = 0
-    //     nowDateComponents.minute = 0
-    //     nowDateComponents.second = 0
-    //
-    //     // For all active surveys that aren't complete, but have expired, submit them. (id is a string)
-    //     var surveyDataModified = false
-    //     for (surveyId, activeSurvey) in study.activeSurveys {
-    //         // case: always displayed survey
-    //         // almost the same as the else-if statement below, except we are resetting the survey, so that we reset the state for a permananent
-    //         // survey. If we don't the survey stays in the "done" stage after it is completed and you can't retake it.  It loads the survey to
-    //         // the done page, which will resave a new version of the data in a file.
-    //         if activeSurvey.survey?.alwaysAvailable ?? false && activeSurvey.isComplete {
-    //             print("\nActiveSurvey \(surveyId) expired, this means the file is getting reset.\n")
-    //             // activeSurvey.isComplete = true
-    //             surveyDataModified = true
-    //             //  adding submitSurvey creates a new file; therefore we get 2 files of data- one when you
-    //             //  hit the confirm button and one when this code executes. we DO NOT KNOW why this is in the else if statement
-    //             //  below - however we are not keeping it in this if statement for the aforementioned problem.
-    //             // submitSurvey(activeSurvey)
-    //             activeSurvey.reset(activeSurvey.survey)
-    //         }
-    //         // submits ALL permanent surveys when ANY permanent survey loads. <- (I think that's ok, it doesn't create a file unless opened - I think.
-    //         //   No data bugs because of it, possibly due to the deduplication step.)
-    //         // case: If the survey not been completed, but it is time for the next survey
-    //         // TODO: why don't we have nextScheduleTime on active (or normal) surveys? oh we have no schedule inspection logic riiight.
-    //         else if !activeSurvey.isComplete /* && activeSurvey.nextScheduledTime > 0 && activeSurvey.nextScheduledTime <= currentTime */ {
-    //             log.info("ActiveSurvey \(surveyId) expired.")
-    //             // activeSurvey.isComplete = true;
-    //             surveyDataModified = true
-    //             self.submitSurvey(activeSurvey)
-    //         }
-    //     }
-    //
-    //     // calculate the duration the survey can be active/not be reset for (always 1 week) and return that time.
-    //     // FIXME: it was in trying to track down why on earth this was hardcoded to 1 week that I discovered there is no code to parse the survey schedules
-    //     let closestNextSurveyTime: TimeInterval = currentTime + (60.0 * 60.0 * 24.0 * 7)
-    //     self.timerManager.resetNextSurveyUpdate(closestNextSurveyTime)
-    //     return (closestNextSurveyTime, surveyDataModified)
-    // }
     
     /// Checks the database for surveys that should exist, removes active surveys that are not in that list.
     // FIXME: This does not do anything if surveys are not removed from the database when the app checks for new surveys. NEED TO TEST.
@@ -418,33 +416,6 @@ class StudyManager {
         // print("Setting badge count to: \(bdgrCnt)")
         UIApplication.shared.applicationIconBadgeNumber = bdgrCnt
     }
-    
-    // /// Has some very incoherent logical statements.
-    // func updateBadgerCount_old() -> Bool {
-    //     guard let study = self.currentStudy else {
-    //         return false
-    //     }
-    //
-    //     // Set the badge, and remove surveys no longer on server from our active surveys list
-    //     let allSurveyIds = self.getAllSurveyIds()
-    //     var surveyDataModified = false
-    //     var badgeCnt = 0
-    //     for (id, activeSurvey) in study.activeSurveys {
-    //         if activeSurvey.isComplete && !allSurveyIds.contains(id) {
-    //             self.cleanupSurvey(activeSurvey)
-    //             study.activeSurveys.removeValue(forKey: id)
-    //             surveyDataModified = true
-    //         } else if !activeSurvey.isComplete {
-    //             // if (activeSurvey.nextScheduledTime > 0) {
-    //             //     closestNextSurveyTime = min(closestNextSurveyTime, activeSurvey.nextScheduledTime);
-    //             // }
-    //             badgeCnt += 1
-    //         }
-    //     }
-    //     // print("Setting badge count to: \(badgeCnt)")
-    //     UIApplication.shared.applicationIconBadgeNumber = badgeCnt
-    //     return surveyDataModified
-    // }
     
     /// changes from check_surveys_old
     /// radically simplified equivalent logic
@@ -604,7 +575,7 @@ class StudyManager {
     }
     
     func heartbeat_on_dispatch_queue() {
-        print("Enqueuing heartbeat...")
+        print("Scheduling dispatchqueue heartbeat...")
         HEARTBEAT_QUEUE.asyncAfter(deadline: .now() + Constants.HEARTBEAT_INTERVAL, execute: {
             print("running heartbeat on dispatch queue \(Date())")
             self.heartbeat("DispatchQueue \(Constants.HEARTBEAT_INTERVAL) secondly - \(countBackgroundTasks())")
@@ -623,32 +594,111 @@ class StudyManager {
     
     /// called from self.setConsented, periodicNetworkTasks, and a debug menu button (I think)
     /// THE RETURN VALUE IS NOT USED BECAUSE OF COURSE NOT
-    func checkSurveys() -> Promise<Bool> {
-        // return early if there is no study or no study settings (retaining studysettings check for safety)
-        guard let study = currentStudy, let _ = study.studySettings else {
-            return .value(false)
+    func checkSurveys() {
+        guard let study = currentStudy else {
+            return
         }
-        log.info("Checking for surveys...")
+        print("inside duplicate survey checker function 1")
         
         // save the study and then....
         Recline.shared.save(study)
-        let surveyRequest = GetSurveysRequest()
-        return ApiManager.sharedInstance.arrayPostRequest(surveyRequest).then { surveys, _ -> Promise<Void> in
-            // then... we receive the surveys from the api manager request possibly?
-            // (This is another reason why promises are bad, they pointless obscure critical information)
-            log.info("Surveys: \(surveys)")
-            study.surveys = surveys
-            Recline.shared.save(study)
-            return Promise<Void>()
-        }.then { _ -> Promise<Bool> in // its an error type
-            // then update the active surveys because the surveys may have just changed
-            self.updateActiveSurveys()
-            return .value(true)
-        }.recover { _ -> Promise<Bool> in // _ is of some error type
-            // and if anything went wrong return false  --  IT IS NEVER USED
-            .value(false)
-        }
+        
+        ApiManager.sharedInstance.makePostRequest_responseString(
+            GetSurveysRequest(), completion_handler: { (response: DataResponse<String>) in
+                var error_message = ""
+                switch response.result {
+                case .success:
+                    if let statusCode = response.response?.statusCode {
+                        // valid 200 range response
+                        if statusCode >= 200 && statusCode < 300 {
+                            let body_response = BodyResponse(body: response.result.value)
+                            if let body_string = body_response.body {
+                                if let newSurveys: [Survey] = Mapper<Survey>().mapArray(JSONString: body_string) {
+                                    // we have survey data!
+                                    study.surveys = newSurveys
+                                    Recline.shared.save(study)
+                                    self.updateActiveSurveys()     // differs from other version of code.
+                                } else {
+                                    error_message = "download surveys: \(response) - but body was nil"
+                                }
+                            }
+                        } else { // all non-200 error codes
+                            error_message = "download surveys: statuscode: \(statusCode), value/body: \(String(describing: response.result.value))"
+                        }
+                    } else { // no error code?
+                        error_message = "download surveys: no status code?"
+                    }
+                case .failure: // general failure?
+                    error_message = "download surveys - error: \(String(describing: response.error))"
+                }
+                
+                if error_message != "" {
+                    log.error(error_message)
+                    AppEventManager.sharedInstance.logAppEvent(event: "survey_download", msg: error_message)
+                }
+            }
+        )
     }
+
+    // FIXME: this code got duplicated and the diverged. we should only have one checksurveys function
+    // but instead we now have two. Both of these have been stripped of the promise architecture
+    // and should retain their basic unique details.
+    // downloadSurveys() was called from push notifications
+    // checkSurveys() was called from timers
+    // The todo here is merge them, which is non trivial because setActiveSurveys and updateActiveSurveys now do different things.
+        
+        
+    /// there was a bunch of duplicated code, one version of the code was in appDelegate
+    func downloadSurveys(surveyIds: [String], sentTime: TimeInterval = 0) {
+        guard let study = self.currentStudy else {
+            return
+        }
+        print("inside duplicate survey checker function 2")
+        
+        // this code always saved the study beforehand, I don't know why. -- AH it was because that started a chain of promises ok still stupid
+        Recline.shared.save(study)
+        
+        // our logic requires those passed-in parameters,
+        ApiManager.sharedInstance.makePostRequest_responseString(
+            GetSurveysRequest(), completion_handler: { (response: DataResponse<String>) in
+                var error_message = ""
+                switch response.result {
+                case .success:
+                    if let statusCode = response.response?.statusCode {
+                        // valid 200 range response
+                        if statusCode >= 200 && statusCode < 300 {
+                            let body_response = BodyResponse(body: response.result.value)
+                            if let body_string = body_response.body {
+                                if let newSurveys: [Survey] = Mapper<Survey>().mapArray(JSONString: body_string) {
+                                    // we have survey data!
+                                    study.surveys = newSurveys
+                                    Recline.shared.save(study)
+                                } else {
+                                    error_message = "download surveys: \(response) - but body was nil"
+                                }
+                            }
+                        } else { // all non-200 error codes
+                            error_message = "download surveys: statuscode: \(statusCode), value/body: \(String(describing: response.result.value))"
+                        }
+                    } else { // no error code?
+                        error_message = "download surveys: no status code?"
+                    }
+                case .failure: // general failure?
+                    error_message = "download surveys - error: \(String(describing: response.error))"
+                }
+                
+                // log app event if it couldn't hit the server
+                if error_message != "" {
+                    log.error(error_message)
+                    AppEventManager.sharedInstance.logAppEvent(event: "survey_download", msg: error_message)
+                }
+                
+                // even if we didn't get new surveys we need to call setActiveSurveys with the survey ids
+                self.setActiveSurveys(surveyIds: surveyIds, sentTime: sentTime)
+            }
+        )
+    }
+    
     
     /// Queries the server for new study settings, hand off to completion handler
     func updateDeviceSettings() {

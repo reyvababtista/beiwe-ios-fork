@@ -161,9 +161,8 @@ class ConsentManager: NSObject, ORKTaskViewControllerDelegate {
             StudyManager.sharedInstance.leaveStudy()
             self.closeOnboarding()
         } else {
-            StudyManager.sharedInstance.setConsented().done { _ in
-                self.closeOnboarding()
-            }
+            StudyManager.sharedInstance.setConsented()
+            self.closeOnboarding()
         }
     }
 
