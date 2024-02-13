@@ -201,32 +201,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
         self.transitionToLoadedAppState()
     }
-
-    // func setupThatDependsOnDatabase(_ launchOptions: [UIApplication.LaunchOptionsKey: Any]?) {
-    //     Recline.shared.open().then { (_: Bool) -> Promise<Bool> in
-    //         // print("Database opened")
-    //         StudyManager.sharedInstance.loadDefaultStudy()
-    //     }.done { (_: Bool) in
-    //         // IF A NOTIFICATION WAS RECEIVED while app was in killed state there will be launch options!
-    //         if launchOptions != nil {
-    //             if let informationDictionary = launchOptions?[UIApplication.LaunchOptionsKey.remoteNotification] as? Dictionary<AnyHashable, Any> {
-    //                 self.handleSurveyNotification(informationDictionary)
-    //             }
-    //         }
-    //         // get any (delivered) notifications
-    //         UNUserNotificationCenter.current().getDeliveredNotifications { (notifications: [UNNotification]) in
-    //             for notification in notifications {
-    //                 self.handleSurveyNotification(notification.request.content.userInfo)
-    //             }
-    //         }
-    //
-    //         // okay we currently are blanket removing notifications, not ideal.
-    //         UNUserNotificationCenter.current().removeAllDeliveredNotifications()
-    //         self.transitionToLoadedAppState() // transition to loaded app state
-    //     }.catch { (_: Error) in
-    //         print("Database open failed, probably should just crash the app tbh")
-    //     }
-    // }
     
     /// Run this function once at app boot and it will rerun itself every minute, updating some stored values that are in turn reported to the server.
     func deviceInfoUpdateLoop() {
