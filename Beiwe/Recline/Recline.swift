@@ -80,8 +80,9 @@ class Recline {
         newProps[kReclineMetadataKey] = Mapper<ReclineMetadata>().toJSON(reclineMeta)
         
         // couchbase uses a revisioning system for concurrency(?), so this is probably assigning an id and a revision
-        newProps["_id"] = doc.properties!["_id"]
-        newProps["_rev"] = doc.properties!["_rev"]
+        // these are nil on registration (e.g. when the database is empty), need the ?
+        newProps["_id"] = doc.properties?["_id"]
+        newProps["_rev"] = doc.properties?["_rev"]
         
         // I think we are swallowing any errors
         do {

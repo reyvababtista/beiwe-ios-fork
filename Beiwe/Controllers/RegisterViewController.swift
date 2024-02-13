@@ -1,4 +1,6 @@
 import Eureka
+import ObjectMapper
+import Alamofire
 import Firebase
 import PKHUD
 import PromiseKit
@@ -6,12 +8,11 @@ import Sentry
 import SwiftValidator
 import UIKit
 
-enum RegistrationError: Error {
-    case incorrectServer
-}
 
 class RegisterViewController: FormViewController {
-    // static assets
+    // static assets - communication erro is our generic couldn't-find-it error, it also covers
+    // the case inside the callback function where there was no or bad json/no encryption key.
+    // The message includes "or you have entered an incorrect server address"
     static let commErrDelay = 7.0
     static let commErr = NSLocalizedString("http_message_server_not_found", comment: "")
     
@@ -201,91 +202,219 @@ class RegisterViewController: FormViewController {
             
             if let patientId = patientId, let phoneNumber = phoneNumber, let newPassword = newPassword, let clinicianPhone = clinicianPhone, let raPhone = raPhone {
                 let registerStudyRequest = RegisterStudyRequest(patientId: patientId, phoneNumber: phoneNumber, newPassword: newPassword)
-                    
+                
                 // sets tags for Sentry
                 Client.shared?.tags = ["user_id": patientId, "server_url": server]
                 ApiManager.sharedInstance.password = tempPassword ?? ""
                 ApiManager.sharedInstance.patientId = patientId
                 ApiManager.sharedInstance.customApiUrl = server
                 
-                // make the post request - this studysettings object is instantiated inside the RegisterStudyRequest.makePostRequest
-                ApiManager.sharedInstance.makePostRequest(registerStudyRequest).then { (studySettings: StudySettings, _: Int) -> Promise<Study> in
-                    // we cannot just rely on the request succeeding (200 code), we need to test the data in the response...
-                    // ... but StudySettings only has one optional value without a default.
-                    guard studySettings.clientPublicKey != nil else {
-                          // studySettings.wifiLogFrequencySeconds != nil // old checks?
-                          // studySettings.callClinicianButtonEnabled != nil
-                        throw RegistrationError.incorrectServer
-                    }
-                        
-                    // configure firebase first
-                    if FirebaseApp.app() == nil && studySettings.googleAppID != "" {
-                        AppDelegate.sharedInstance().configureFirebase(studySettings: studySettings)
-                    }
-                        
-                    // set password
-                    PersistentPasswordManager.sharedInstance.storePassword(newPassword)
-                    ApiManager.sharedInstance.password = newPassword
-                        
-                    // instantiate study, set phone numbers (not part of request return, it was entered locally)
-                    let study = Study(patientPhone: phoneNumber, patientId: patientId, studySettings: studySettings, apiUrl: server)
-                    study.clinicianPhoneNumber = clinicianPhone
-                    study.raPhoneNumber = raPhone
-                    
-                    // fuzzgps
-                    if studySettings.fuzzGps {
-                        study.fuzzGpsLatitudeOffset = self.generateLatitudeOffset()
-                        study.fuzzGpsLongitudeOffset = self.generateLongitudeOffset()
-                    }
-                    // Call purge studies to ensure there is no weird data present from possible partial study registrations.
-                    StudyManager.sharedInstance.purgeStudies()
-                    Recline.shared.save(study)
-                    return Promise.value(study)
-                }.then { (_: Study) -> Promise<Bool> in
-                    // set study fcm token, load the study
-                    let token = Messaging.messaging().fcmToken
-                    AppDelegate.sharedInstance().sendFCMToken(fcmToken: token ?? "")
-                    HUD.flash(.success, delay: 1)
-                    StudyManager.sharedInstance.loadDefaultStudy() // no longer returns a promise
-                    return Promise.value(true)
-                }.done { (_: Bool) in
-                    // set logged in to True, dismiss login view?
-                    AppDelegate.sharedInstance().isLoggedIn = true
-                    if let dismiss = self.dismiss {
-                        dismiss(true) // no clue...
-                    } else {
-                        self.presentingViewController?.dismiss(animated: true, completion: nil) // dismisses the view?
-                    }
-                    
-                }.catch { (error: Error) in
-                    // Show error message logic
-                    print("error received during registration:\n\(error)")
-                    var delay = 1.5
-                    var err: HUDContentType
-                    switch error {
-                    case let ApiErrors.failedStatus(code):
-                        switch code {
-                        case 403, 401:
-                            err = .labeledError(title: NSLocalizedString("couldnt_register", comment: ""), subtitle: NSLocalizedString("http_message_403_during_registration", comment: ""))
-                        case 405:
-                            err = .label(NSLocalizedString("http_message_405", comment: ""))
-                            delay = 10.0 // long message, long delay (ui is still locked)
-                        case 400:
-                            err = .label(NSLocalizedString("http_message_400", comment: ""))
-                            delay = 10.0 // long message, long delay (ui is still locked)
-                        default:
-                            err = .label(RegisterViewController.commErr)
-                            delay = RegisterViewController.commErrDelay
+                ApiManager.sharedInstance.makePostRequest_responseString(
+                    registerStudyRequest, completion_handler: { (dataResponse: DataResponse<String>) in
+                        var error_message = ""
+                        switch dataResponse.result {
+                        case .success:
+                            if let statusCode = dataResponse.response?.statusCode {
+                                if statusCode >= 200 && statusCode < 300 {
+                                    // body response also "throws errors" (ui elements)
+                                    let body_response = BodyResponse(body: dataResponse.result.value)
+                                    if let body_string = body_response.body {
+                                        self.registrationCompletionHandler(
+                                            body_response,
+                                            new_password: newPassword,
+                                            phone_number: phoneNumber,
+                                            patient_id: patientId,
+                                            clinician_phone: clinicianPhone,
+                                            ra_phone: raPhone,
+                                            server: server
+                                        )
+                                    }
+                                } else {
+                                    error_message = "registration request, but statuscode: \(statusCode), value/body: \(String(describing: dataResponse.result.value))"
+                                    self.display_errors(statusCode, url: server)
+                                }
+                            } else {
+                                error_message = "registration request - no status code?"
+                                self.display_errors(0, url: server)
+                            }
+                        case .failure:
+                            error_message = "registration request - error: \(String(describing: dataResponse.error))"
+                            self.display_errors(0, url: server)
                         }
-                    default:
-                        err = .label(RegisterViewController.commErr)
-                        delay = RegisterViewController.commErrDelay
+                        
+                        if error_message != "" {
+                            log.error(error_message)
+                        }
                     }
-                    HUD.flash(err, delay: delay) // delay
-                }
+                )
             }
+        }
+    }
+    
+    /// displays user readable errors in an overlay
+    /// This function should not be called with 200-299 status codes.
+    func display_errors(_ statusCode: Int, url: String) {
+        print("bad status code during registration: \(statusCode)")
+        var duration = 2.0
+        var err: HUDContentType
+        
+        // determine message based on status code
+        if statusCode == 403 || statusCode == 401 {
+            // throwing on the url so that the person is presented with extra information if
+            // they are hitting the wrong url that happens to throw a 403 or 401.
+            err = .labeledError(
+                title: NSLocalizedString("couldnt_register", comment: ""),
+                subtitle: NSLocalizedString("http_message_403_during_registration", comment: "") + " " + url
+            )
+            duration = 4.0
+        // we used to have this 405 code for participants already registered on another
+        // device, it was removed
+        // } else if statusCode == 405 {
+        //     err = .label(NSLocalizedString("http_message_405", comment: ""))
+        //     duration = 10.0 // long message, long duration (ui is still locked)
+        } else if statusCode == 400 {
+            err = .label(NSLocalizedString("http_message_400", comment: ""))
+            duration = 10.0 // long message, long duration (ui is still locked)
         } else {
-            print("validation failed.")
+            err = .label(RegisterViewController.commErr)
+            duration = RegisterViewController.commErrDelay
+        }
+        // display the error message
+        HUD.flash(err, delay: duration) // delay is duration
+    }
+    
+    /// We have to do something real stupid, see comments
+    func extractStudySettings(_ bodyResponse: BodyResponse) -> StudySettings? {
+        // the json string we are handed may not have data for `ios_plist`, which is the
+        // firebase push notification ~certificate from which this app get's access to the
+        // service and can generate the app-side tokens.  IF THERE IS NO VALUE then we have
+        // to insert some defaults because this is a critical and optional part of Beiwe.
+        // But.
+        // We use ObjectMapper objects for our critical classes, like StudySettings, and the database
+        // expects them too. We can only instantiate these classes using `Mapper<StudySettings>().map`,
+        // which takes a String of json text.  In order to do this we need to:
+        // - deserialize the incoming string from the server
+        // - check if it has the ios_plist content
+        // - if it doesn't then we have to insert safe defaults
+        // - then reserialize the json to a string - but actually we can't it has to be a Data
+        // - so we serialize to Data and then to utf8 encoded string
+        // - and then we pass it to the `Mapper<StudySettings>().map`
+        // Yes, this is Very Very stupid.
+        // But:
+        // DON'T REFACTOR TO HAVE A SIMPLER PASSTHROUGH FOR THE CASE WHERE ios_plist IS PRESENT.
+        // If you do that then you will not be testing this case bydefault and some poor future soul
+        // will be forced to detangle this stupidity again.
+        
+        // (And if you think this is bad, it used to be inside a promise, inside a
+        // conditional, inside the makePostRequest MapperObject-templated function call used
+        // by all post requests over in ApiManager because, due to the awful use of PromiseKit
+        // this serialization functionality was otherwise completely inaccessible. If you, you
+        // poor future soul, find a way to get rid of this crap it is because you are
+        // standing on the shoulders of giants. Still, I salute you. |(￣^￣)ゞ - Eli)
+        
+        // bodyResponse.body is confirmed not nil inside the closure on the registration request.
+        do {
+            // the ios plist default values may need to be injected
+            var converted_original_json: [String: Any] =
+                try JSONSerialization.jsonObject(with: Data(bodyResponse.body!.utf8)) as! [String: Any]
+            if converted_original_json["ios_plist"] is NSNull || converted_original_json["ios_plist"] == nil {
+                converted_original_json["ios_plist"] = [
+                    "CLIENT_ID": "",
+                    "REVERSED_CLIENT_ID": "",
+                    "API_KEY": "",
+                    "GCM_SENDER_ID": "",
+                    "PLIST_VERSION": "1",
+                    "BUNDLE_ID": "",
+                    "PROJECT_ID": "",
+                    "STORAGE_BUCKET": "",
+                    "IS_ADS_ENABLED": false,
+                    "IS_ANALYTICS_ENABLED": false,
+                    "IS_APPINVITE_ENABLED": true,
+                    "IS_GCM_ENABLED": true,
+                    "IS_SIGNIN_ENABLED": true,
+                    "GOOGLE_APP_ID": "",
+                    "DATABASE_URL": "",
+                ]
+            }
+            
+            // Do the stupid double serialization.
+            // (The String() constructor is optional, can't change that.)
+            let back_to_bytes: Data = try JSONSerialization.data(withJSONObject: converted_original_json, options: [])
+            if let and_now_its_a_string = String(data: back_to_bytes, encoding: .utf8) {
+                // omg a StudySettings object emerges from the mists of stupid.
+                return Mapper<StudySettings>().map(JSONString: and_now_its_a_string)
+            }
+        } catch {
+            log.error("Unable to create default firebase credentials plist")
+        }
+        // case: and_now_its_a_string somehow was null, or the catch logic happened
+        return nil
+    }
+    
+    func registrationCompletionHandler(
+        _ bodyResponse: BodyResponse,
+        new_password: String, 
+        phone_number: String,
+        patient_id: String,
+        clinician_phone: String,
+        ra_phone: String,
+        server: String
+    ) {
+        // if the json was not parseable than we probably have the wrong url.
+        // Everything is broken if the settings or public key are nil.
+        // (the latter  can theoretically happen if there is a valid json in the response body
+        // from a rando website, unlikely but possible).  commErr is the appropriate message.
+        guard let studySettings = extractStudySettings(bodyResponse), studySettings.clientPublicKey != nil else {
+            HUD.flash(.label(RegisterViewController.commErr), delay: RegisterViewController.commErrDelay)
+            return
+        }
+        
+        // set password, network ops require the password, there could potentially be network requests happening?
+        PersistentPasswordManager.sharedInstance.storePassword(new_password)
+        ApiManager.sharedInstance.password = new_password
+        
+        // firebase - is one of the network requests
+        if FirebaseApp.app() == nil && studySettings.googleAppID != "" {
+            AppDelegate.sharedInstance().configureFirebase(studySettings: studySettings)
+        }
+        
+        // OK here we go - instantiate the study
+        let study = Study(
+            patientPhone: phone_number,
+            patientId: patient_id,
+            studySettings: studySettings,
+            apiUrl: server
+        )
+        study.clinicianPhoneNumber = clinician_phone
+        study.raPhoneNumber = ra_phone
+        
+        // fuzzgps
+        if studySettings.fuzzGps {
+            study.fuzzGpsLatitudeOffset = self.generateLatitudeOffset()
+            study.fuzzGpsLongitudeOffset = self.generateLongitudeOffset()
+        }
+        
+        // Call purge studies to ensure there is no weird data present from possible partial study registrations.
+        // (sure, odd that we call the studymanager before creating the study but whatever)
+        // TODO: if we are literally emptying the database do we even need the leave study logic AT ALL??
+        StudyManager.sharedInstance.purgeStudies()
+        Recline.shared.save(study)
+        
+        // sendFCMToken only sends on non empty string case
+        AppDelegate.sharedInstance().sendFCMToken(fcmToken: Messaging.messaging().fcmToken ?? "")
+        
+        // load the study
+        StudyManager.sharedInstance.loadDefaultStudy()
+        AppDelegate.sharedInstance().isLoggedIn = true
+        HUD.flash(.success, delay: 2) // delay is duration
+        
+        // UI operations must come from the main thread
+        DispatchQueue.main.async {
+            if let dismiss = self.dismiss {
+                dismiss(true) // it calls dismiss which is a weird assignable function variable.
+            } else {
+                self.presentingViewController?.dismiss(animated: true, completion: nil) // dismisses the view?
+            }
         }
     }
     
