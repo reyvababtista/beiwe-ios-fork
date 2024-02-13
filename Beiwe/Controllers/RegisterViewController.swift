@@ -3,7 +3,6 @@ import ObjectMapper
 import Alamofire
 import Firebase
 import PKHUD
-import PromiseKit
 import Sentry
 import SwiftValidator
 import UIKit

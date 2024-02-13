@@ -241,7 +241,7 @@ class StudyManager {
         // removeNotificationForSurvey(activeSurvey)  // I don't know why we don't call this, but we don't.
         if let surveyId = activeSurvey.survey?.surveyId {
             let timingsName = TrackingSurveyPresenter.timingDataType + "_" + surveyId
-            _ = DataStorageManager.sharedInstance.closeStore(timingsName)
+            DataStorageManager.sharedInstance.closeStore(timingsName)
         }
     }
     
@@ -999,13 +999,6 @@ class StudyManager {
     }
     
     /// deletes all studies - used in registration for some reason
-    // func purgeStudies() {
-    //     let studies: [Study] = Recline.shared.queryAll()
-    //     for study in studies {
-    //         Recline.shared.purge(study)
-    //     }
-    // }
-    
     func purgeStudies() {
         let studies = Recline.shared.queryAll() // this returns a list of studies, ignore the templated type
         for study in studies {
