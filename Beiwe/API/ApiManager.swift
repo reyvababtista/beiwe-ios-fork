@@ -165,7 +165,7 @@ class ApiManager {
     /// If we need the non-DataResponse<String> type.... make such a function.
     /// (request runs on the default alamofire queue, the convenience session constructor in the docs
     /// might require version 5+. This is version 4.9.1. )
-    func makePostRequest_responseString<T: ApiRequest>(
+    func makePostRequest<T: ApiRequest>(
         _ requestObject: T,
         password: String? = nil,
         completion_queue: DispatchQueue? = nil,

@@ -208,7 +208,7 @@ class RegisterViewController: FormViewController {
                 ApiManager.sharedInstance.patientId = patientId
                 ApiManager.sharedInstance.customApiUrl = server
                 
-                ApiManager.sharedInstance.makePostRequest_responseString(
+                ApiManager.sharedInstance.makePostRequest(
                     registerStudyRequest, completion_handler: { (dataResponse: DataResponse<String>) in
                         var error_message = ""
                         switch dataResponse.result {

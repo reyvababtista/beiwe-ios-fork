@@ -131,7 +131,7 @@ class ChangePasswordViewController: FormViewController {
     func do_password_reset_request(newPassword: String, currentPassword: String) {
         self.the_proposed_password = newPassword
         let changePasswordRequest = ChangePasswordRequest(newPassword: newPassword)
-        ApiManager.sharedInstance.makePostRequest_responseString(changePasswordRequest, password: currentPassword, completion_handler: self.reset_password_callback)
+        ApiManager.sharedInstance.makePostRequest(changePasswordRequest, password: currentPassword, completion_handler: self.reset_password_callback)
     }
     
     func reset_password_callback(response: DataResponse<String>) {

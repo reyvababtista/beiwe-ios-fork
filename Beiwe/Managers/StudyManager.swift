@@ -514,7 +514,7 @@ class StudyManager {
         // save the study and then....
         Recline.shared.save(study)
         
-        ApiManager.sharedInstance.makePostRequest_responseString(
+        ApiManager.sharedInstance.makePostRequest(
             GetSurveysRequest(), completion_handler: { (response: DataResponse<String>) in
                 var error_message = ""
                 switch response.result {
@@ -570,7 +570,7 @@ class StudyManager {
         Recline.shared.save(study)
         
         // our logic requires those passed-in parameters,
-        ApiManager.sharedInstance.makePostRequest_responseString(
+        ApiManager.sharedInstance.makePostRequest(
             GetSurveysRequest(), completion_handler: { (response: DataResponse<String>) in
                 var error_message = ""
                 switch response.result {
@@ -618,7 +618,7 @@ class StudyManager {
             return
         }
         // make the post request, convert to json, convert to a JustStudySettings mapper
-        ApiManager.sharedInstance.makePostRequest_responseString(
+        ApiManager.sharedInstance.makePostRequest(
             UpdateDeviceSettingsRequest(), completion_handler: self.updateSettingsCompletionHandler)
     }
 

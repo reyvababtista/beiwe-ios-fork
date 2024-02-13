@@ -667,7 +667,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         self.fcmToken = fcmToken
         if fcmToken != "" {
             let fcmTokenRequest = FCMTokenRequest(fcmToken: fcmToken)
-            ApiManager.sharedInstance.makePostRequest_responseString(
+            ApiManager.sharedInstance.makePostRequest(
                 fcmTokenRequest, completion_handler: self.fcmToken_responseHandler)
         }
     }
