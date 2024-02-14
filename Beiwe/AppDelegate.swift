@@ -182,6 +182,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func setupThatDependsOnDatabase(_ launchOptions: [UIApplication.LaunchOptionsKey: Any]?) {
         // Start the database, eg LOAD STUDY STUFF
         Recline.shared.open()
+        Recline.shared.compact()
         StudyManager.sharedInstance.loadDefaultStudy()
         
         // IF A NOTIFICATION WAS RECEIVED while app was in killed state there will be launch options!

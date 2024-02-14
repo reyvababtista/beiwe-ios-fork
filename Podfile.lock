@@ -94,15 +94,6 @@ PODS:
   - ObjcExceptionBridging/ObjcExceptionBridging (1.0.1)
   - ObjectMapper (4.2.0)
   - PKHUD (4.2.3)
-  - PromiseKit (6.17.1):
-    - PromiseKit/CorePromise (= 6.17.1)
-    - PromiseKit/Foundation (= 6.17.1)
-    - PromiseKit/UIKit (= 6.17.1)
-  - PromiseKit/CorePromise (6.17.1)
-  - PromiseKit/Foundation (6.17.1):
-    - PromiseKit/CorePromise
-  - PromiseKit/UIKit (6.17.1):
-    - PromiseKit/CorePromise
   - PromisesObjC (1.2.12)
   - Protobuf (3.21.1)
   - ReachabilitySwift (3)
@@ -132,7 +123,6 @@ DEPENDENCIES:
   - KeychainSwift (~> 8.0)
   - ObjectMapper (from `https://github.com/Hearst-DD/ObjectMapper.git`, branch `master`)
   - PKHUD (from `https://github.com/pkluz/PKHUD.git`, branch `release/swift4`)
-  - PromiseKit (~> 6)
   - ReachabilitySwift (~> 3)
   - ResearchKit (from `https://github.com/ResearchKit/ResearchKit.git`, commit `b50e1d7`)
   - Sentry (from `https://github.com/getsentry/sentry-cocoa.git`, tag `4.5.0`)
@@ -162,7 +152,6 @@ SPEC REPOS:
     - KeychainSwift
     - nanopb
     - ObjcExceptionBridging
-    - PromiseKit
     - PromisesObjC
     - Protobuf
     - ReachabilitySwift
@@ -233,7 +222,6 @@ SPEC CHECKSUMS:
   ObjcExceptionBridging: c30e00eb3700467e695faeea30e26e18bd445001
   ObjectMapper: 5a6c9f063ef67e7fc0d7eb8958919e3121396a96
   PKHUD: 351011b853e6b942e7ee8ad335864cc84c787241
-  PromiseKit: ee485df3d4dc570594d7e7aecae6352697dc6a4c
   PromisesObjC: 3113f7f76903778cf4a0586bd1ab89329a0b7b97
   Protobuf: 9e88c1e667d75aa2491d211f26ccddde4e8ad4cf
   ReachabilitySwift: f5b9bb30a0777fac8f09ce8b067e32faeb29bb64
@@ -243,6 +231,6 @@ SPEC CHECKSUMS:
   XCGLogger: 1943831ef907df55108b0b18657953f868de973b
   XLActionController: f1f2226d2c6629db197d4a41f2da907085a4cb9d
 
-PODFILE CHECKSUM: 85b1f2fdba5d4215327efc6039d3cc14e84a1f95
+PODFILE CHECKSUM: 12f51d4f1d92e3158a6c76f68753f812051beee8
 
 COCOAPODS: 1.15.2

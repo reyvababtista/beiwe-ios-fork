@@ -30,8 +30,10 @@ let GLOBAL_UTILITY_QUEUE = DispatchQueue.global(qos: .utility)
 let HEARTBEAT_QUEUE = DispatchQueue(label: "org.beiwe.heartbeat_queue", qos: .userInitiated, attributes: [])
 let BACKGROUND_DEVICE_INFO_QUEUE = DispatchQueue(label: "org.beiwe.background_device_info_queue", qos: .background, attributes: [])
 let TIMER_QUEUE = DispatchQueue(label: "org.beiwe.timer_queue", attributes: [])
-let RECLINE_QUEUE = DispatchQueue(label: "org.beiwe.recline_queue", qos: .userInteractive, attributes: []) // setting high on this queue because it is the database.
+let INNER_RECLINE_QUEUE = DispatchQueue(label: "org.beiwe.recline_queue_1", qos: .userInteractive, attributes: []) // setting high on this queue because it is the database.
+let OUTER_RECLINE_QUEUE = DispatchQueue(label: "org.beiwe.recline_queue_2", qos: .userInteractive, attributes: []) // setting high on this queue because it is the database.
 let PRE_UPLOAD_QUEUE = DispatchQueue(label: "org.beiwe.preupload_queue", qos: .default, attributes: [])
+let POST_UPLOAD_QUEUE = DispatchQueue(label: "org.beiwe.postupload_queue", qos: .default, attributes: [])
 
 struct Ephemerals {
     // device info statuses

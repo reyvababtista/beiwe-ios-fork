@@ -4,7 +4,6 @@ import EmitterKit
 import Firebase
 import Foundation
 import ObjectMapper
-import PromiseKit
 import ReachabilitySwift
 
 let DEVICE_SETTINGS_INTERVAL: Int64 = 30 * 60 // hardcoded thirty minutes
@@ -25,8 +24,8 @@ class StudyManager {
     var keyRef: SecKey? // the study's security key
     
     // State tracking variables
+    var files_in_flight = [String]() // the filees we are currently trying to upload.
     var sensorsStartedEver = false
-    var isUploading = false
     let surveysUpdatedEvent: Event<Int> = Event<Int>() // I don't know what this is. sometimes we emit events, like when closing a survey
     static var real_study_loaded = false
     
@@ -158,7 +157,7 @@ class StudyManager {
     }
     
     /// sets the study as consented, sets api credentials
-    // ok I have not tested whether removing the promise from this impactse registration
+    // ok I have not tested whether removing the promise from this impacts registration...
     func setConsented() {
         // fail if current study or study settings are null
         guard let study = currentStudy, let studySettings = study.studySettings else {
@@ -318,7 +317,6 @@ class StudyManager {
         UIApplication.shared.applicationIconBadgeNumber = study.activeSurveys.count
     }
     
-    
     func clear_out_submitted_surveys() -> Bool {
         guard let study = currentStudy else {
             return false
@@ -436,13 +434,13 @@ class StudyManager {
     ////////////////////////////////////////// Network Operations ////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     
-    /// some kind of reachability thing, calls periodicNetworkTransfers in a promise (of course it does)
+    /// some kind of reachability thing, calls periodicNetworkTransfers
     @objc func reachabilityChanged(_ notification: Notification) {
         print("Reachability changed, running periodic network transfers.")
         self.periodicNetworkTransfers()
     }
     
-    /// runs network operations inside of promises, handles checking and updating timer values on the timer.
+    /// runs network operations, handles checking and updating timer values on the timer.
     /// called from Timer and a couple other places.
     func periodicNetworkTransfers() {
         // fail early logic, get study settings and study.
@@ -450,7 +448,8 @@ class StudyManager {
             return
         }
         // check the uploadOverCellular study detail.
-        let reachable = studySettings.uploadOverCellular ? self.appDelegate.reachability!.isReachable : self.appDelegate.reachability!.isReachableViaWiFi
+        let reachable = studySettings.uploadOverCellular ?
+            self.appDelegate.reachability!.isReachable : self.appDelegate.reachability!.isReachableViaWiFi
         let now: Int64 = Int64(Date().timeIntervalSince1970)
         let nextSurvey = currentStudy.nextSurveyCheck ?? 0
         let nextUpload = currentStudy.nextUploadCheck ?? 0
@@ -474,7 +473,9 @@ class StudyManager {
             // This (missedUploadCheck?) will be saved because setNextUpload saves the study
             currentStudy.missedUploadCheck = !reachable // if not reachable we missed the upload check
             self.setNextUploadTime()
-            self.upload(!reachable)
+            if reachable {
+                self.upload()
+            }
         }
         
         // logic for updating the study's device settings.
@@ -528,7 +529,7 @@ class StudyManager {
                                     // we have survey data!
                                     study.surveys = newSurveys
                                     Recline.shared.save(study)
-                                    self.updateActiveSurveys()     // differs from other version of code.
+                                    self.updateActiveSurveys() // differs from other version of code.
                                 } else {
                                     error_message = "download surveys: \(response) - but body was nil"
                                 }
@@ -558,7 +559,6 @@ class StudyManager {
     // checkSurveys() was called from timers
     // The todo here is merge them, which is non trivial because setActiveSurveys and updateActiveSurveys now do different things.
         
-        
     /// there was a bunch of duplicated code, one version of the code was in appDelegate
     func downloadSurveys(surveyIds: [String], sentTime: TimeInterval = 0) {
         guard let study = self.currentStudy else {
@@ -566,7 +566,7 @@ class StudyManager {
         }
         print("inside duplicate survey checker function 2")
         
-        // this code always saved the study beforehand, I don't know why. -- AH it was because that started a chain of promises ok still stupid
+        // this code always saved the study beforehand
         Recline.shared.save(study)
         
         // our logic requires those passed-in parameters,
@@ -610,7 +610,6 @@ class StudyManager {
         )
     }
     
-    
     /// Queries the server for new study settings, hand off to completion handler
     func updateDeviceSettings() {
         // assert that these are instantiated
@@ -633,6 +632,7 @@ class StudyManager {
         case .success:
             if let statusCode = response.response?.statusCode {
                 if statusCode >= 200 && statusCode < 300 {
+                    // 200 codes
                     let body_response = BodyResponse(body: response.result.value)
                     if let body_string = body_response.body {
                         // use the custom-purpose JustStudySettings class
@@ -643,12 +643,15 @@ class StudyManager {
                         }
                     }
                 } else {
+                    // all other status codes
                     error_message = "update settings response: \(response) , statuscode: \(statusCode), value/body: \(String(describing: response.result.value))"
                 }
             } else {
+                // no status code
                 error_message = "update settings response: \(response) - no status code?"
             }
         case .failure:
+            // general failure
             error_message = "update settings response: \(response) - error: \(String(describing: response.error))"
         }
         
@@ -855,80 +858,107 @@ class StudyManager {
         }
     }
     
-    /// business logic of the upload, except it isn't because we use PromiseKit and can't have nice things.
-    func upload(_ processOnly: Bool) -> Promise<Void> {
-        log.info("Checking for uploads...")
-        // return immediately if already uploading
-        if self.isUploading {
-            return Promise()
+    /// This function always runs on the POST_UPLOAD_QUEUE
+    /// Beiwe servers only respond with statuscodes on data upload. 200 means it was uploaded
+    /// and we should delete the file, everything else means it didn't work and we should try again.
+    func uploadAttemptResponseHandler(
+        _ dataResponse: DataResponse<String>, filename: String, filePath: URL
+    ) {
+        var error_message = ""
+        switch dataResponse.result {
+        case .success:
+            if let statusCode = dataResponse.response?.statusCode {
+                var body_response_string = BodyResponse(body: dataResponse.result.value).body ?? "(no message)"
+                if body_response_string == "" { body_response_string = "(no message)" }
+                
+                if statusCode >= 200 && statusCode < 300 {
+                    print("Success uploading: \(filename) with message '\(body_response_string)'.")
+                    AppEventManager.sharedInstance.logAppEvent(
+                        event: "uploaded", msg: "Uploaded data file", d1: filename)
+                    AppEventManager.sharedInstance.logAppEvent(
+                        event: "upload_complete", msg: "Upload Complete")
+                    self.currentStudy!.lastUploadSuccess = Int64(NSDate().timeIntervalSince1970)
+                    Recline.shared.save(self.currentStudy!)
+                    
+                    do {
+                        try FileManager.default.removeItem(at: filePath) // ok I guess this can fail...?
+                    } catch {
+                        let minipath = filePath.path.split(separator: "/").last!
+                        
+                        // this seems to happen whenever we have overlapping runs of uploading the same file.
+                        print("Error deleting file '\(minipath)': \(error) (wtaf)")
+                        // fatalError("could not delete a file??")
+                    }
+                    
+                } else {
+                    // non-200 status codes
+                    error_message = "bad statuscode: \(statusCode) for file \(filename) with message '\(body_response_string)'"
+                }
+            } else {
+                error_message = "upload failed - no status code or .failure case? for file \(filename)"
+            }
+        case .failure:
+            // this case triggers when there are normal kinds of errors like a timeout.
+            error_message = "upload ERROR: \(String(describing: dataResponse.error)) for file \(filename)"
         }
         
-        // state tracking variables
-        self.isUploading = true
-        var numFiles = 0
-        RECLINE_QUEUE.sync { Recline.shared.compact() }
+        if error_message != "" {
+            print(error_message)
+        }
+        
+        // there should REALLY only be one of these but just in case we will do all of them
+        self.files_in_flight.removeAll(where: { $0 == filename })
+    }
+    
+    /// business logic of the upload.
+    /// processOnly means don't upload (it's based on reachability)
+    func upload() {
+        log.info("Checking for uploads...")
         DataStorageManager.sharedInstance.prepareForUpload()
-        // THIS ISN'T A PROMISECHAIN THAT'S A REAL THING AND NOT A THIS
-        let promiseChain: Promise<Bool> = Promise<Bool>.value(true)
-        // most of the function is after the return statement, duh.
-        return promiseChain.then(on: GLOBAL_DEFAULT_QUEUE) { (_: Bool) -> Promise<Bool> in
-            // if we can't enumerate files, that's insane, crash.
-            let fileEnumerator: FileManager.DirectoryEnumerator = FileManager.default.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)!
-            var filesToProcess: [String] = []
-            
-            // loop over all and check if each file can be uploaded, assemble the list.
-            while let filename = fileEnumerator.nextObject() as? String {
-                if DataStorageManager.sharedInstance.isUploadFile(filename) {
-                    filesToProcess.append(filename)
+        
+        // if we can't enumerate files, that's insane, crash.
+        let fileEnumerator: FileManager.DirectoryEnumerator =
+            FileManager.default.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)!
+        var filesToProcess: [String] = []
+        
+        // loop over all and check if each file can be uploaded, assemble the list.
+        while let filename = fileEnumerator.nextObject() as? String {
+            if DataStorageManager.sharedInstance.isUploadFile(filename) {
+                if self.files_in_flight.contains(filename) {
+                    let minipath = filename.split(separator: "/").last!
+                    print("skipping \(minipath) because its already being uploaded right now")
+                    continue
                 }
+                filesToProcess.append(filename)
             }
+        }
+        
+        for filename in filesToProcess {
+            let filePath: URL = DataStorageManager.uploadDataDirectory().appendingPathComponent(filename)
+            let uploadRequest = UploadRequest(fileName: filename, filePath: filePath.path)
             
-            // we call with processOnly=true when we have no network access
-            if !processOnly {
-                var uploadChain = Promise<Bool>.value(true) // iinstantiate the start (end? yeah its the end) of the promise chain
-                for filename in filesToProcess {
-                    let filePath = DataStorageManager.uploadDataDirectory().appendingPathComponent(filename)
-                    let uploadRequest = UploadRequest(fileName: filename, filePath: filePath.path)
+            // do an upload - this does not block. it dispatches the upload operation onto the
+            // AlamoFire root queue, and then eventually our callbacks get called.
+            ApiManager.sharedInstance.makeMultipartUploadRequest(
+                uploadRequest,
+                file: filePath,
+                completionQueue: POST_UPLOAD_QUEUE,
+                httpSuccessCompletionHandler: { (dataResponse: DataResponse<String>) in
+                    self.uploadAttemptResponseHandler(dataResponse, filename: filename, filePath: filePath)
+                },
+                encodingErrorHandler: { (error: Error) in
+                    AppEventManager.sharedInstance.logAppEvent(
+                        event: "upload_file_failed", msg: "Failed Uploaded data file", d1: filename)
+                    log.error("Encoding error?: \(error)")
                     
-                    // add the upload operation to the upload chain
-                    uploadChain = uploadChain.then { (_: Bool) -> Promise<Bool> in
-                        // do an upload
-                        ApiManager.sharedInstance.makeMultipartUploadRequest(uploadRequest, file: filePath).then { (_: (UploadRequest.ApiReturnType, Int)) -> Promise<Bool> in
-                            // print("Finished uploading: \(filename), deleting.")
-                            AppEventManager.sharedInstance.logAppEvent(event: "uploaded", msg: "Uploaded data file", d1: filename)
-                            numFiles = numFiles + 1
-                            try FileManager.default.removeItem(at: filePath) // ok I guess this can fail...?
-                            return .value(true)
-                        }
-                    }.recover { (_: Error) -> Promise<Bool> in
-                        // in case of errors...
-                        // log.warning("upload failed: \(filename)")
-                        AppEventManager.sharedInstance.logAppEvent(event: "upload_file_failed", msg: "Failed Uploaded data file", d1: filename)
-                        return .value(true)
-                    }
+                    // ok we will MINIMIZE the impact of this to once-per-app-launch by just never
+                    // removing it from files_in_flight.
+                    
+                    // fatalError("we need to find a way to report these? \(error)")
                 }
-                return uploadChain
-            } else {
-                // log.info("Skipping upload, processing only")
-                return .value(true)
-            }
-            // the rest of this is logging and then marking isUploading as false using ensure
-        }.then { (results: Bool) -> Promise<Void> in
-            // does this happen first? why are we using promises......
-            log.verbose("OK uploading \(numFiles). \(results)")
-            AppEventManager.sharedInstance.logAppEvent(event: "upload_complete", msg: "Upload Complete", d1: String(numFiles))
-            if let study = self.currentStudy {
-                study.lastUploadSuccess = Int64(NSDate().timeIntervalSince1970)
-                Recline.shared.save(study)
-                return Promise()
-            } else {
-                return Promise()
-            }
-        }.recover { _ in
-            log.verbose("Upload Recover")
-            AppEventManager.sharedInstance.logAppEvent(event: "upload_incomplete", msg: "Upload Incomplete")
-        }.ensure {
-            self.isUploading = false
+            )
+            self.files_in_flight.append(filename)
+            print("upload for \(filename) dispatched")
         }
     }
     

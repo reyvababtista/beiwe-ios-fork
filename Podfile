@@ -4,7 +4,6 @@ target 'Beiwe' do
   use_frameworks!
   pod 'Crashlytics', '~> 3.4'
   pod 'KeychainSwift', '~> 8.0'
-  pod "PromiseKit", '~> 6'
   pod 'Alamofire', '~> 4.5'
   pod 'ObjectMapper', :git => 'https://github.com/Hearst-DD/ObjectMapper.git', :branch => 'master'
   pod 'Eureka'
@@ -26,7 +25,7 @@ end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
-    next unless (target.name == 'PromiseKit' || target.name == 'ResearchKit')
+    next unless (target.name == 'ResearchKit')
     target.build_configurations.each do |config|
       config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
     end

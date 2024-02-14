@@ -1,7 +1,6 @@
 import Alamofire
 import Foundation
 import ObjectMapper
-import PromiseKit
 
 /// a type used in the api endpoint classes
 protocol ApiRequest {
@@ -65,7 +64,7 @@ class ApiManager {
         }
         parameters["patient_id"] = self.patientId
         
-        parameters["device_id"] = PersistentAppUUID.sharedInstance.uuid  // deprecated?
+        parameters["device_id"] = PersistentAppUUID.sharedInstance.uuid // deprecated?
         
         // basic device info, will be displayed on the participant page
         parameters["version_code"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
@@ -141,7 +140,7 @@ class ApiManager {
         for (key, value) in extra_parameters {
             parameters[key] = value
         }
-        Alamofire.request(baseApiUrl + endpoint, method: .post, parameters: parameters)
+        Alamofire.request(self.baseApiUrl + endpoint, method: .post, parameters: parameters)
         
         // if we want to extend it here's some code to do so - note that this executes asynchronously, so we would need a completion handler pattern
         // var return_code = 0
@@ -169,7 +168,7 @@ class ApiManager {
         _ requestObject: T,
         password: String? = nil,
         completion_queue: DispatchQueue? = nil,
-        completion_handler: ((DataResponse<String>)-> Void)? = nil
+        completion_handler: ((DataResponse<String>) -> Void)? = nil
     ) where T: Mappable {
         var parameters = requestObject.toJSON()
         parameters["password"] = (password == nil) ? self.hashedPassword : Crypto.sharedInstance.sha256Base64URL(password!) // I don't know what this line does
@@ -177,7 +176,7 @@ class ApiManager {
         
         // this is asynchronous, it ~immediately fires, and somehow we can attach the completion handler
         // afterwards and it all just works. cool.
-        let request = Alamofire.request(baseApiUrl + T.apiEndpoint, method: .post, parameters: parameters)
+        let request = Alamofire.request(self.baseApiUrl + T.apiEndpoint, method: .post, parameters: parameters)
         // pass the completion handler to the responseString method on the queue
         
         if let completion_handler = completion_handler {
@@ -185,77 +184,51 @@ class ApiManager {
         }
     }
     
-
-    // /// this is going to replace the first chunk of that multipartFormData upload code below
-    // func thingy(_ multipartFormData: MultipartFormData, parameters: [String: Any], file: URL) {
-    //     // add the parameters part by part...
-    //     for (k, v) in parameters {
-    //         multipartFormData.append(String(describing: v).data(using: .utf8)!, withName: k)
-    //     }
-    //     // add the file...
-    //     multipartFormData.append(file, withName: "file")
-    // }
-
-    func makeMultipartUploadRequest<T: ApiRequest>(_ requestObject: T, file: URL) -> Promise<(T.ApiReturnType, Int)> where T: Mappable {
+    func makeMultipartUploadRequest<T: ApiRequest>(
+        _ requestObject: T,
+        file: URL,
+        completionQueue: DispatchQueue,
+        httpSuccessCompletionHandler: @escaping (DataResponse<String>) -> Void,
+        encodingErrorHandler: @escaping (Error) -> Void
+    ) where T: Mappable {
         var parameters: [String: Any] = requestObject.toJSON()
         self.setDefaultParameters(&parameters)
         let url = self.baseApiUrl + T.apiEndpoint
 
-        return Promise { (resolver: Resolver<(T.ApiReturnType, Int)>) in
-            // this syntax is insane, what?
-            Alamofire.upload(
-                // this closure is absolutely gross, how to I refactor it out.
-                multipartFormData: { (multipartFormData: MultipartFormData) in // add the parameters part by part...
-                    for (k, v) in parameters {
-                        multipartFormData.append(String(describing: v).data(using: .utf8)!, withName: k)
-                    }
-                    // add the file...
-                    multipartFormData.append(file, withName: "file")
-                },
-
-                // these are actually more parameters, ignore header
-                to: url, method: .post, // headers: header
-
-                // oookay, I don't know what this is exaaactly, but it is a closure with some data - a string in some encoding that needs to be json transformed
-                encodingCompletion: { (encodingResult: SessionManager.MultipartFormDataEncodingResult) in
-                    switch encodingResult {
-                    case let .success(upload, _, _): // upload is an UploadRequest
-                        upload.responseString { (response: DataResponse<String>) in
-                            switch response.result {
-                            case let .failure(error): // hit a code error I think
-                                resolver.reject(error)
-
-                            case .success:
-                                let statusCode = response.response?.statusCode
-                                // bad return codes
-                                if let statusCode = statusCode, statusCode < 200 || statusCode >= 400 {
-                                    resolver.reject(ApiErrors.failedStatus(code: statusCode))
-                                } else {
-                                    // return type logic - there's only the one use so this can be dropped...
-                                    var returnObject: T.ApiReturnType?
-                                    
-                                    // If its a BodyResponse, attempt a cast of response.result.value, which is an optional String. (is T.ApiReturnType is usually a text encoding?)
-                                    // If its not a BodyResponse, process response.result.value as a json string.
-                                    if T.ApiReturnType.self == BodyResponse.self { // Type.self is the [compile-time] value of a class type.
-                                        returnObject = BodyResponse(body: response.result.value) as? T.ApiReturnType
-                                    } else {
-                                        returnObject = Mapper<T.ApiReturnType>().map(JSONString: response.result.value ?? "")
-                                    }
-
-                                    // return the object or error
-                                    if let returnObject = returnObject {
-                                        resolver.fulfill((returnObject, statusCode ?? 0))
-                                    } else {
-                                        resolver.reject(ApiManager.serialErr())
-                                    }
-                                }
-                            }
-                        }
-                    case let .failure(encodingError):
-                        resolver.reject(encodingError)
-                    }
+        Alamofire.upload(
+            // for some reason we need to do the multipart form elements first, otherwise
+            // swift complains that it has to precede the `to` and `method` parameters.
+            multipartFormData: { (multipartFormData: MultipartFormData) in
+                // all the parameters as multipart form data, and the file
+                for (k, v) in parameters {
+                    multipartFormData.append(String(describing: v).data(using: .utf8)!, withName: k)
                 }
-            )
-        }
+                multipartFormData.append(file, withName: "file")
+            },
+            
+            // target url and specify post. (why we have to specify that? seems implied? whatever.)
+            to: url,
+            method: .post,
+            
+            // the completion stuff
+            encodingCompletion: { (encodingResult: SessionManager.MultipartFormDataEncodingResult) in
+                // it looks like encoding data in the muiltipart upload section can fail
+                switch encodingResult {
+                // this failure is probably specific to local system stuff, but I guess it might
+                // be bad network requests too maybe? deleted files? unknown.
+                case let .failure(encodingError):
+                    completionQueue.async {
+                        encodingErrorHandler(encodingError)
+                    }
+                // and for the success case... we use the same architecture as makePostRequest,
+                // Provide A Completion Handler That Takes a DataResponse<String> object.
+                case let .success(uploadRequest, _streamingFromDisk, _streamFileURL): // UploadRequest, Bool, URL?
+                    uploadRequest.responseString(
+                        queue: completionQueue,
+                        completionHandler: httpSuccessCompletionHandler
+                    )
+                }
+            }
+        )
     }
 }
