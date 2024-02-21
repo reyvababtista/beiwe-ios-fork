@@ -32,8 +32,13 @@ let BACKGROUND_DEVICE_INFO_QUEUE = DispatchQueue(label: "org.beiwe.background_de
 let TIMER_QUEUE = DispatchQueue(label: "org.beiwe.timer_queue", attributes: [])
 let INNER_RECLINE_QUEUE = DispatchQueue(label: "org.beiwe.recline_queue_1", qos: .userInteractive, attributes: []) // setting high on this queue because it is the database.
 let OUTER_RECLINE_QUEUE = DispatchQueue(label: "org.beiwe.recline_queue_2", qos: .userInteractive, attributes: []) // setting high on this queue because it is the database.
-let PRE_UPLOAD_QUEUE = DispatchQueue(label: "org.beiwe.preupload_queue", qos: .default, attributes: [])
 let POST_UPLOAD_QUEUE = DispatchQueue(label: "org.beiwe.postupload_queue", qos: .default, attributes: [])
+
+let ACCELEROMETER_CACHE_SIZE = 100
+let DEVICE_MOTION_CACHE_SIZE = 100
+let GPS_CACHE_SIZE = 100
+let MAGNETOMETER_CACHE_SIZE = 100
+
 
 struct Ephemerals {
     // device info statuses
@@ -42,4 +47,5 @@ struct Ephemerals {
     static var significantLocationChangeMonitoringAvailable = "not populated, this is an app bug"
     static var backgroundRefreshStatus = "not populated, this is an app bug"
     static var transition_count = 0
+    static var background_task_count = "(not populated yet?)"
 }

@@ -4,6 +4,12 @@ protocol DataServiceProtocol {
     func startCollecting()
     func pauseCollecting()
     func finishCollecting()
+    func createNewFile()
+    
+    // Only some data streams benefit from collecting writes and flushing them, each
+    // data service is expected to handle this manually. (Was factored into data storage itself,
+    // it was really bad and would lose data.) Classes need to explain themselves.
+    func flush()
 }
 
 // defined class that is only used in TimerManager

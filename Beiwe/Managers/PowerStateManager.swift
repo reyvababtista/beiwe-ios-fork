@@ -11,11 +11,15 @@ let power_state_headers = [
 class PowerStateManager: DataServiceProtocol {
     // the basics
     let storeType = "powerState"
-    var store: DataStorage?
+    var dataStorage: DataStorage
     
     // contains some "listeners" (EmmitterKit class) - this might be a required variable name, I don't know, don't rename it.
     var listeners: [Listener] = []
 
+    init() {
+        self.dataStorage = DataStorageManager.sharedInstance.createStore(self.storeType, headers: power_state_headers)
+    }
+    
     /// the well-it-isn't-a-protocol function that is delegated for power state updates
     @objc func batteryStateDidChange(_ notification: Notification) {
         // The state change, currently known states are Charging, Full, Unplugged, PowerUnknown
@@ -34,7 +38,7 @@ class PowerStateManager: DataServiceProtocol {
         }
         data.append(state)
         data.append(String(UIDevice.current.batteryLevel))
-        self.store?.store(data)
+        self.dataStorage.store(data)
     }
 
     // used in the closure pattern effectively as a registered delegate function
@@ -46,12 +50,11 @@ class PowerStateManager: DataServiceProtocol {
         let state: String = isLocked ? "Locked" : "Unlocked"
         data.append(state)
         data.append(String(UIDevice.current.batteryLevel))
-        self.store?.store(data)
+        self.dataStorage.store(data)
     }
 
     /// protocol function
     func initCollecting() -> Bool {
-        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: power_state_headers)
         return true
     }
     
@@ -81,7 +84,15 @@ class PowerStateManager: DataServiceProtocol {
     func finishCollecting() {
         // print("Finishing \(self.storeType) collection")
         self.pauseCollecting()
-        self.store = nil
-        DataStorageManager.sharedInstance.closeStore(self.storeType)
+        self.createNewFile() // we have lazy file instantiation
+    }
+    
+    func createNewFile() {
+        self.dataStorage.reset()
+    }
+    
+    func flush() {
+        // PowerStateManager does not have potentially intensive write operations, it
+        // writes it's data immediately.
     }
 }

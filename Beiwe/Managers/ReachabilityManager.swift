@@ -10,8 +10,12 @@ let reachability_headers = [
 class ReachabilityManager: DataServiceProtocol {
     // tHe basics
     let storeType = "reachability"
-    var store: DataStorage?
+    var dataStorage: DataStorage
 
+    init () {
+        self.dataStorage = DataStorageManager.sharedInstance.createStore(self.storeType, headers: reachability_headers)
+    }
+    
     @objc func reachabilityChanged(_ notification: Notification) {
         // give up early logic
         guard let reachability = AppDelegate.sharedInstance().reachability else {
@@ -33,12 +37,11 @@ class ReachabilityManager: DataServiceProtocol {
         var data: [String] = []
         data.append(String(Int64(Date().timeIntervalSince1970 * 1000)))
         data.append(reachState)
-        self.store?.store(data)
+        self.dataStorage.store(data)
     }
 
     /// protocol function
     func initCollecting() -> Bool {
-        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: reachability_headers)
         return true
     }
 
@@ -62,7 +65,15 @@ class ReachabilityManager: DataServiceProtocol {
     func finishCollecting() {
         // print("Finishing \(self.storeType) collection")
         self.pauseCollecting()
-        self.store = nil
-        DataStorageManager.sharedInstance.closeStore(self.storeType)
+        self.dataStorage.reset()
+    }
+    
+    func createNewFile() {
+        self.dataStorage.reset()
+    }
+    
+    func flush() {
+        // ReachabilityManager does not have potentially intensive write operations, it
+        // writes it's data immediately.
     }
 }

@@ -1,15 +1,10 @@
-//
-//  Configuration.swift
-//  Beiwe
-//
-//  Created by Keary Griffin on 3/24/16.
-//  Copyright © 2016 Rocketfarm Studios. All rights reserved.
-//
-
 import Foundation
 
-class Configuration {
-    static let sharedInstance = Configuration();
+// I cannot even.
+// This was originally named just "Configuration" in a file named "Configuration.swift".
+// What the hell. It loads A File. That's it. It didn't Do Anything.
+class SentryConfiguration {
+    static let sharedInstance = SentryConfiguration();
     var settings: Dictionary<String, AnyObject> = [:];
 
     init() {

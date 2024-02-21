@@ -32,7 +32,6 @@ struct BodyResponse: Mappable {
 /// Our general purpose api endpoint hitting code.
 class ApiManager {
     static let sharedInstance = ApiManager()
-    fileprivate let defaultBaseApiUrl = Configuration.sharedInstance.settings["server-url"] as! String
     fileprivate var deviceId = PersistentAppUUID.sharedInstance.uuid
 
     fileprivate var hashedPassword = ""
@@ -54,7 +53,7 @@ class ApiManager {
     
     // get the url
     var baseApiUrl: String {
-        return self.customApiUrl ?? self.defaultBaseApiUrl
+        return self.customApiUrl ?? ""
     }
     
     func setDefaultParameters(_ parameters: inout [String: Any], skip_password: Bool = false) {

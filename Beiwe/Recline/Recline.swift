@@ -27,7 +27,7 @@ class Recline {
     /// this function only be called once at app instantiation. If this fails, the app fails.
     /// Sets self.db, self.typesView; defines view functions - whatever that means.
     func open(_ dbName: String = "default") {
-        OUTER_RECLINE_QUEUE.async {
+        OUTER_RECLINE_QUEUE.sync {
             self._open(dbName)
         }
     }

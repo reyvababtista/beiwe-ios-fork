@@ -70,7 +70,6 @@
 		83C7D3891CB5F43400BC7285 /* TaskListViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83C7D3881CB5F43400BC7285 /* TaskListViewController.swift */; };
 		83E3DE731CA37F7600EB5349 /* MiscHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E3DE721CA37F7600EB5349 /* MiscHelpers.swift */; };
 		83E3DE761CA3967A00EB5349 /* StudySettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E3DE751CA3967A00EB5349 /* StudySettings.swift */; };
-		83E3DE881CA3A75F00EB5349 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E3DE871CA3A75F00EB5349 /* Configuration.swift */; };
 		83E3DE8C1CA4600500EB5349 /* RegisterStudyRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E3DE8B1CA4600500EB5349 /* RegisterStudyRequest.swift */; };
 		83E3DE8E1CA477D200EB5349 /* ApiManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83E3DE8D1CA477D200EB5349 /* ApiManager.swift */; };
 		83F6C9681CA0F6CF00B85914 /* PersistentPasswordManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83F6C9671CA0F6CF00B85914 /* PersistentPasswordManager.swift */; };
@@ -81,6 +80,7 @@
 		83FDCFD81CBC8E4700AFF716 /* TrackingSurveyPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83FDCFD71CBC8E4700AFF716 /* TrackingSurveyPresenter.swift */; };
 		83FDCFDA1CBCB6D300AFF716 /* ChangePasswordViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83FDCFD91CBCB6D300AFF716 /* ChangePasswordViewController.swift */; };
 		84CACB8E2835A44B00663065 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 84CACB8D2835A44B00663065 /* GoogleService-Info.plist */; };
+		AA1FCADE2B854A31004BE0AF /* SentryUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1FCADD2B854A31004BE0AF /* SentryUtils.swift */; };
 		AA63EFB729C2E0FE0074F735 /* DataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA63EFB629C2E0FE0074F735 /* DataService.swift */; };
 		AA774E3B29DFA9440085BDF8 /* UpdateDeviceSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA774E3A29DFA9440085BDF8 /* UpdateDeviceSettings.swift */; };
 		AA92FB6729D5D1800009F620 /* TimerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA92FB6629D5D1800009F620 /* TimerManager.swift */; };
@@ -173,7 +173,6 @@
 		83E3DE7D1CA3A3A200EB5349 /* Config-Default.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Config-Default.plist"; sourceTree = "<group>"; };
 		83E3DE811CA3A3B900EB5349 /* Config-Dbg2.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Config-Dbg2.plist"; sourceTree = "<group>"; };
 		83E3DE831CA3A3C200EB5349 /* Config-Prod.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Config-Prod.plist"; sourceTree = "<group>"; };
-		83E3DE871CA3A75F00EB5349 /* Configuration.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
 		83E3DE8B1CA4600500EB5349 /* RegisterStudyRequest.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RegisterStudyRequest.swift; sourceTree = "<group>"; };
 		83E3DE8D1CA477D200EB5349 /* ApiManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ApiManager.swift; sourceTree = "<group>"; };
 		83F6C9671CA0F6CF00B85914 /* PersistentPasswordManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = PersistentPasswordManager.swift; sourceTree = "<group>"; };
@@ -187,6 +186,7 @@
 		83FDCFD91CBCB6D300AFF716 /* ChangePasswordViewController.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ChangePasswordViewController.swift; sourceTree = "<group>"; };
 		84CACB8D2835A44B00663065 /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		A42DC84D7FED35C57E1B1EE0 /* Pods_Beiwe.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Beiwe.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA1FCADD2B854A31004BE0AF /* SentryUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentryUtils.swift; sourceTree = "<group>"; };
 		AA63EFB629C2E0FE0074F735 /* DataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataService.swift; sourceTree = "<group>"; };
 		AA774E3A29DFA9440085BDF8 /* UpdateDeviceSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateDeviceSettings.swift; sourceTree = "<group>"; };
 		AA92FB6629D5D1800009F620 /* TimerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerManager.swift; sourceTree = "<group>"; };
@@ -346,7 +346,7 @@
 			children = (
 				83F6C9691CA0F6D900B85914 /* PersistentAppUUID.swift */,
 				83E3DE721CA37F7600EB5349 /* MiscHelpers.swift */,
-				83E3DE871CA3A75F00EB5349 /* Configuration.swift */,
+				AA1FCADD2B854A31004BE0AF /* SentryUtils.swift */,
 				8379B45B1CA4F02C00D4C605 /* Crypto.swift */,
 				83AF04181CAB843D00A37225 /* SwiftyRSA.swift */,
 				832FFC231CC863F400F2E1EF /* AppColors.swift */,
@@ -586,8 +586,8 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
-				"$BUILT_PRODUCTS_DIR/$INFOPLIST_PATH",
-				"$TARGET_BUILD_DIR/$INFOPLIST_PATH",
+				$BUILT_PRODUCTS_DIR/$INFOPLIST_PATH,
+				$TARGET_BUILD_DIR/$INFOPLIST_PATH,
 			);
 			name = "Run Script";
 			outputFileListPaths = (
@@ -705,6 +705,7 @@
 				83C7D37A1CB4E30C00BC7285 /* UploadRequest.swift in Sources */,
 				83C295F61CB8AF160016DD95 /* OneSelection.swift in Sources */,
 				83AF04131CAADE6200A37225 /* StudyManager.swift in Sources */,
+				AA1FCADE2B854A31004BE0AF /* SentryUtils.swift in Sources */,
 				32E1436324869B38009FAE5A /* TestNotificationRequest.swift in Sources */,
 				83F6C9681CA0F6CF00B85914 /* PersistentPasswordManager.swift in Sources */,
 				83AF20DA1CA310B100D3DF02 /* EurekaSwiftValidatorComponents.swift in Sources */,
@@ -740,7 +741,6 @@
 				832FFC321CC9C3CD00F2E1EF /* ActionData.swift in Sources */,
 				832FFC351CCED80200F2E1EF /* AudioQuestionViewController.swift in Sources */,
 				83F98C3A1C923C3600E0B64B /* AppDelegate.swift in Sources */,
-				83E3DE881CA3A75F00EB5349 /* Configuration.swift in Sources */,
 				3248853C2469ADC3002F0F81 /* FCMTokenRequest.swift in Sources */,
 				83E3DE8C1CA4600500EB5349 /* RegisterStudyRequest.swift in Sources */,
 				83AF04171CAB777200A37225 /* DataStorageManager.swift in Sources */,

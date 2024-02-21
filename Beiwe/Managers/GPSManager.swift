@@ -27,9 +27,11 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
     var isDeferringUpdates = false  // this doesn't seem to do anything in this subclass of CLLocationManagerDelegate, and also isn't part of the superclass.  unclear purpose.
 
     // gps storage
-    let storeType = "gps"
-    var gpsStore: DataStorage?
-
+    var datapoints = [[String]]()
+    static let static_storeType = "gps" // ok this is a little
+    let storeType = GPSManager.static_storeType
+    var dataStorage: DataStorage?
+    
     /// checks gps permission - IDE warning about UI unresponsiveness appears to never be an issue.
     func gpsAllowed() -> Bool {
         return CLLocationManager.locationServicesEnabled() && CLLocationManager.authorizationStatus() == .authorizedAlways
@@ -86,7 +88,10 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
             data.append(String(lng))
             data.append(String(loc.altitude))
             data.append(String(loc.horizontalAccuracy))
-            self.gpsStore?.store(data)
+            datapoints.append(data)
+            if self.datapoints.count > GPS_CACHE_SIZE {
+                self.flush()
+            }
         }
     }
 
@@ -98,7 +103,6 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
             log.error("GPS not enabled.  Not initializing collection")
             return false
         }
-        self.gpsStore = DataStorageManager.sharedInstance.createStore(self.storeType, headers: gps_headers)
         self.isCollectingGps = false
         return true
     }
@@ -125,10 +129,23 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
     /// only called in self.stopAndClear
     func finishCollecting() {
         // print("Finishing \(self.storeType) collection")
-
         self.pauseCollecting()
         self.isCollectingGps = false
-        self.gpsStore = nil
-        DataStorageManager.sharedInstance.closeStore(self.storeType)
+        self.dataStorage = nil
+        self.createNewFile() // we have lazy new file creation
+    }
+    
+    func createNewFile() {
+        self.flush()
+        self.dataStorage?.reset()
+    }
+    
+    func flush() {
+        // todo - bulk write?
+        let data_to_write = self.datapoints
+        self.datapoints = []
+        for data in data_to_write {
+            self.dataStorage?.store(data)
+        }
     }
 }

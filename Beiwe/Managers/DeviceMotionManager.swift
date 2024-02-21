@@ -27,11 +27,17 @@ class DeviceMotionManager: DataServiceProtocol {
 
     // the basics
     let storeType = "devicemotion"
-    var store: DataStorage?
-
+    let dataStorage: DataStorage
+    var datapoints = [[String]]()
+    let queue = OperationQueue()
+    
     // we need an offset timestamp for timecode calculations
     var offset_since_1970: Double = 0
-
+    
+    init () {
+        self.dataStorage = DataStorageManager.sharedInstance.createStore(self.storeType, headers: device_motion_headers)
+    }
+    
     /// protocol funciton
     func initCollecting() -> Bool {
         // give up early logic
@@ -39,20 +45,18 @@ class DeviceMotionManager: DataServiceProtocol {
             log.info("DeviceMotion not available.  Not initializing collection")
             return false
         }
-
-        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: device_motion_headers)
         // Get TimeInterval of uptime i.e. the delta: now - bootTime
         self.offset_since_1970 = Date().timeIntervalSince1970 - ProcessInfo.processInfo.systemUptime // Now since 1970
         self.motionManager.deviceMotionUpdateInterval = 0.1
         return true
     }
-
+    
     /// protocol function
     func startCollecting() {
         // print("Turning \(self.storeType) collection on")
 
-        let queue = OperationQueue()
-        self.motionManager.startDeviceMotionUpdates(using: CMAttitudeReferenceFrame.xArbitraryZVertical, to: queue) {
+        
+        self.motionManager.startDeviceMotionUpdates(using: CMAttitudeReferenceFrame.xArbitraryZVertical, to: self.queue) {
             (motionData: CMDeviceMotion?, _: Error?) in
             
             if let motionData = motionData {
@@ -90,8 +94,10 @@ class DeviceMotionManager: DataServiceProtocol {
                 data.append(String(motionData.magneticField.field.x))
                 data.append(String(motionData.magneticField.field.y))
                 data.append(String(motionData.magneticField.field.z))
-
-                self.store?.store(data)
+                self.datapoints.append(data)
+                if self.datapoints.count > DEVICE_MOTION_CACHE_SIZE {
+                    self.flush()
+                }
             }
         }
         AppEventManager.sharedInstance.logAppEvent(event: "devicemotion_on", msg: "DeviceMotion collection on")
@@ -106,7 +112,20 @@ class DeviceMotionManager: DataServiceProtocol {
     func finishCollecting() {
         // print("Finishing \(self.storeType) collection")
         self.pauseCollecting()
-        self.store = nil
-        DataStorageManager.sharedInstance.closeStore(self.storeType)
+        self.createNewFile() // file creation is lazy
+    }
+    
+    func createNewFile() {
+        self.flush()
+        self.dataStorage.reset()
+    }
+    
+    func flush() {
+        // todo - bulk write?
+        let data_to_write = self.datapoints
+        self.datapoints = []
+        for data in data_to_write {
+            self.dataStorage.store(data)
+        }
     }
 }

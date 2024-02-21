@@ -20,7 +20,7 @@ class AppEventManager: DataServiceProtocol {
     
     // iOS Log stuff
     let storeType = "ios_log"
-    var store: DataStorage?
+    var dataStorage: DataStorage
     
     // basics
     var isCollecting: Bool = false
@@ -36,6 +36,10 @@ class AppEventManager: DataServiceProtocol {
         return String(Int64(self.launchTimestamp.timeIntervalSince1970 * 1000))
     }
 
+    init() {
+        dataStorage = DataStorageManager.sharedInstance.createStore(self.storeType, headers: app_event_headers)
+    }
+    
     /// Called on app launch, sets the launch timestamp()
     func didLaunch(launchOptions: [UIApplication.LaunchOptionsKey: Any]?) {
         self.launchOptions = ""
@@ -60,14 +64,12 @@ class AppEventManager: DataServiceProtocol {
                  self.launchOptions = self.launchOptions + String(describing: kind)
              }
          }*/
-        log.verbose("AppEvent didLaunch, launchId: \(self.launchId) (launch options are ignored) (launch options are ignored) (launch options are ignored), options: \(self.launchOptions) (launch options are ignored) (launch options are ignored) (launch options are ignored)")
+        // log.verbose("AppEvent didLaunch, launchId: \(self.launchId) (launch options are ignored) (launch options are ignored) (launch options are ignored), options: \(self.launchOptions) (launch options are ignored) (launch options are ignored) (launch options are ignored)")
     }
     
     /// writes an app event to the iOS Log
     func logAppEvent(event: String, msg: String = "", d1: String = "", d2: String = "", d3: String = "") {
-        if self.store == nil { // data storage is not instantiated, give up early.
-            return
-        }
+        
         // our string list of data
         var data: [String] = []
         data.append(String(Int64(Date().timeIntervalSince1970 * 1000)))
@@ -80,18 +82,12 @@ class AppEventManager: DataServiceProtocol {
         data.append(d2)
         data.append(d3)
         data.append(String(self.eventCount))
-        self.store?.store(data)
+        dataStorage.store(data)
         self.eventCount += 1  // update state
     }
 
     /// protocol function - iniitalize data, always returns true. Logs only on first call
     func initCollecting() -> Bool {
-        if self.store != nil {  // only instantiate once
-            return true
-        }
-        // instantiate the DataStorage object
-        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: app_event_headers)
-        
         // log that a recording session has started - why? legacy I guess.
         if !self.didLogLaunch {
             self.didLogLaunch = true
@@ -119,8 +115,16 @@ class AppEventManager: DataServiceProtocol {
         // print("Finishing \(self.storeType) collection")
         self.logAppEvent(event: "stop_collecting", msg: "Stop Collecting Data")
         self.pauseCollecting()
-        self.store = nil
-        DataStorageManager.sharedInstance.closeStore(self.storeType)
+        self.createNewFile() // we have lazy file creation
+    }
+    
+    func createNewFile() {
+        self.dataStorage.reset()
+    }
+    
+    func flush() {
+        // AppEventManager does not have potentially intensive write operations, it
+        // writes it's data immediately.
     }
     
     /// Gets a String like "used megabytes: 5" (ts an int) of the current app usage, uses an incorrect value to define megabyte.

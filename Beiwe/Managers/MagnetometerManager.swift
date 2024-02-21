@@ -13,11 +13,19 @@ class MagnetometerManager: DataServiceProtocol {
 
     // the basics
     let storeType = "magnetometer"
-    var store: DataStorage?
-
+    var dataStorage: DataStorage
+    var datapoints = [[String]]()
+    
+    // magnetometer's callback has a non-optional queue, we want exactly one queue.
+    let queue = OperationQueue()
+    
     // the offset
     var offset_since_1970: Double = 0
 
+    init() {
+        self.dataStorage = DataStorageManager.sharedInstance.createStore(self.storeType, headers: magnetometer_headers)
+    }
+    
     /// protocol function
     func initCollecting() -> Bool {
         // give up early logic
@@ -26,7 +34,6 @@ class MagnetometerManager: DataServiceProtocol {
             return false
         }
 
-        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: magnetometer_headers)
         // we need an offset for time calculations
         self.offset_since_1970 = Date().timeIntervalSince1970 - ProcessInfo.processInfo.systemUptime
         self.motionManager.magnetometerUpdateInterval = 0.1
@@ -36,9 +43,8 @@ class MagnetometerManager: DataServiceProtocol {
     /// protocol function
     func startCollecting() {
         // print("Turning \(self.storeType) collection on")
-        let queue = OperationQueue()
         // this closure is the function that records data
-        self.motionManager.startMagnetometerUpdates(to: queue) { (magData: CMMagnetometerData?, _: Error?) in
+        self.motionManager.startMagnetometerUpdates(to: self.queue) { (magData: CMMagnetometerData?, _: Error?) in
             if let magData = magData {
                 var data: [String] = []
                 let timestamp: Double = magData.timestamp + self.offset_since_1970
@@ -47,7 +53,10 @@ class MagnetometerManager: DataServiceProtocol {
                 data.append(String(magData.magneticField.x))
                 data.append(String(magData.magneticField.y))
                 data.append(String(magData.magneticField.z))
-                self.store?.store(data)
+                self.datapoints.append(data)
+                if self.datapoints.count > MAGNETOMETER_CACHE_SIZE {
+                    self.flush()
+                }
             }
         }
         AppEventManager.sharedInstance.logAppEvent(event: "magnetometer_on", msg: "Magnetometer collection on")
@@ -64,7 +73,20 @@ class MagnetometerManager: DataServiceProtocol {
     func finishCollecting() {
         // print("Finishing \(self.storeType) collection")
         self.pauseCollecting()
-        self.store = nil
-        DataStorageManager.sharedInstance.closeStore(self.storeType)
+        self.createNewFile() // file creation is lazy
+    }
+    
+    func createNewFile() {
+        self.flush()
+        self.dataStorage.reset()
+    }
+    
+    func flush() {
+        // todo - bulk write?
+        let data_to_write = self.datapoints
+        self.datapoints = []
+        for data in data_to_write {
+            self.dataStorage.store(data)
+        }
     }
 }

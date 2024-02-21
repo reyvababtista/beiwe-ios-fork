@@ -7,7 +7,26 @@ enum DataStorageErrors: Error {
     case notInitialized
 }
 
-// TODO: convert All fatalError calls to sentry error reports with real error information.
+/// all file paths in the scope of the app are of this form:
+/// /var/mobile/Containers/Data/Application/49ECF24B-85A4-40C1-BC57-92B742C6ED64/Library/Caches/currentdat(a/patientid_accel_1698721703289.csv
+/// the uuid is randomized per installation. We could remove it with a splice, but regex would be better. (not implemented)
+func shortenPath(_ path_string: String) -> String {
+    return shortenPathMore(path_string.replacingOccurrences(of: "/var/mobile/Containers/Data/Application/", with: ""))
+}
+
+func shortenPath(_ url: URL) -> String {
+    return shortenPath(url.path)
+}
+
+// some file paths are also inside uuid/Library/, need to cut that too.
+func shortenPathMore(_ path_string: String) -> String {
+    if path_string.contains("Library/") {
+        return path_string.components(separatedBy: "Library/")[1].description
+    }
+    // split at library, take the second half, and then remove the first character (a slash)
+    return path_string
+}
+
 
 //////////////////////////////////////////////////////////// DataStorage Manager //////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// DataStorage Manager //////////////////////////////////////////////////////
@@ -16,13 +35,13 @@ class DataStorageManager {
     static let sharedInstance = DataStorageManager()
     static let dataFileSuffix = ".csv"
 
-    var storageTypes: [String: DataStorage] = [:]
     var secKeyRef: SecKey?
     var initted = false
 
     ///////////////////////////////////////////////// Setup //////////////////////////////////////////////////////
     
     /// instantiates your DataStorage object - called in every manager
+    // All of these error cases are going to crash the app. If you hit these, you did something wrong.
     func createStore(_ type: String, headers: [String]) -> DataStorage {
         //! in order to avoid a race condition we cannot stash data on this object and then access it later, we need to access
         //! it through the StudyManager
@@ -34,32 +53,29 @@ class DataStorageManager {
             log.error("createStore called before the DataStorageManager received secKeyRef, app should crash now.")
         }
         
-        if self.storageTypes[type] == nil {
-            if let study = StudyManager.sharedInstance.currentStudy {
-                if let patientId = study.patientId { // FIXME: need to identify if this has a patient id that is null or a public key
-                    if let studySettings = study.studySettings {
-                        if let publicKey = studySettings.clientPublicKey {
-                            self.storageTypes[type] = DataStorage(
-                                type: type,
-                                headers: headers,
-                                patientId: patientId,
-                                publicKey: publicKey,
-                                keyRef: self.secKeyRef
-                            )
-                        } else {
-                            fatalError("(createStore) No public key found!")
-                        }
+        if let study = StudyManager.sharedInstance.currentStudy {
+            if let patientId = study.patientId {
+                if let studySettings = study.studySettings {
+                    if let publicKey = studySettings.clientPublicKey {
+                        return DataStorage(
+                            type: type,  // the file name needs the data type
+                            headers: headers,  // the csv headers
+                            patientId: patientId,
+                            publicKey: publicKey,
+                            keyRef: self.secKeyRef
+                        )
                     } else {
-                        fatalError("(createStore) No study settings found!")
+                        fatalError("(createStore) No public key found!")
                     }
                 } else {
-                    fatalError("(createStore) No patient id found!")
+                    fatalError("(createStore) No study settings found!")
                 }
             } else {
-                fatalError("(createStore) No study found!")
+                fatalError("(createStore) No patient id found!")
             }
+        } else {
+            fatalError("(createStore) No study found!")
         }
-        return self.storageTypes[type]!
     }
 
     func dataStorageManagerInit(_ study: Study, secKeyRef: SecKey?) {
@@ -114,7 +130,7 @@ class DataStorageManager {
     }
     
     /// creates the currentData and upload directories. app crashes if this fails because that is a fundamental app failure.
-    func createDirectories(recur: Int = Constants.RECUR_DEPTH) {
+    func ensureDirectoriesExist(recur: Int = Constants.RECUR_DEPTH) {
         do {
             try FileManager.default.createDirectory(
                 atPath: DataStorageManager.currentDataDirectory().path,
@@ -131,7 +147,7 @@ class DataStorageManager {
             if recur > 0 {
                 log.error("create_directories recur at \(recur).")
                 Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
-                return self.createDirectories(recur: recur - 1)
+                return self.ensureDirectoriesExist(recur: recur - 1)
             }
             log.error("Failed to create directories. \(error)")
             fatalError("Failed to create directories. \(error)")
@@ -143,11 +159,21 @@ class DataStorageManager {
     // TODO: we are using the cache directory, we should be using applicationSupportDirectory (Library/Application support/)
     // https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html
     static func currentDataDirectory() -> URL {
-        let cacheDir = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true)[0]
+        let cacheDir = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true)[0]
         return URL(fileURLWithPath: cacheDir).appendingPathComponent("currentdata")
     }
 
     static func uploadDataDirectory() -> URL {
+        let cacheDir = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true)[0]
+        return URL(fileURLWithPath: cacheDir).appendingPathComponent("uploaddata")
+    }
+    
+    static func oldCurrentDataDirectory() -> URL {
+        let cacheDir = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true)[0]
+        return URL(fileURLWithPath: cacheDir).appendingPathComponent("currentdata")
+    }
+
+    static func oldUploadDataDirectory() -> URL {
         let cacheDir = NSSearchPathForDirectoriesInDomains(.cachesDirectory, .userDomainMask, true)[0]
         return URL(fileURLWithPath: cacheDir).appendingPathComponent("uploaddata")
     }
@@ -156,48 +182,73 @@ class DataStorageManager {
         return filename.hasSuffix(DataStorageManager.dataFileSuffix) || filename.hasSuffix(".mp4") || filename.hasSuffix(".wav")
     }
     
-    ///////////////////////////////////////////////// Teardown //////////////////////////////////////////////////////
+    ///////////////////////////////////////////////// Upload //////////////////////////////////////////////////////
     
-    func closeStore(_ type: String) {
-        // deletes a DataStorage object from the list
-        // TODO: there is no corresponding close mechasims on datastorage objects themselves so... this is dangerous?
-        self.storageTypes.removeValue(forKey: type)
-    }
-
-    // calls reset for all files
-    private func resetAll() {
-        for (_, storage) in self.storageTypes {
-            storage.reset()
+    func moveUnknownJunkToUpload() {
+        var filesToUpload: [String] = []
+        if let enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path) {
+            // for each file check its file type and add to list
+            while let filename = enumerator.nextObject() as? String {
+                if self.isUploadFile(filename) {
+                    filesToUpload.append(filename)
+                } else {
+                    log.warning("Non upload file sitting in currentDataDirectory: \(filename)")
+                }
+            }
+        }
+        // move all data in the current data directory to the upload file directory.
+        // active files are stored in a temp directory, then moved to the currentDataDirectory. this moves them to the upload directory.
+        for filename in filesToUpload {
+            self.moveFile(DataStorageManager.currentDataDirectory().appendingPathComponent(filename),
+                          dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
         }
     }
     
-    ///////////////////////////////////////////////// Upload //////////////////////////////////////////////////////
-    
-
-    // private func prepareForUpload_actual() {
-    func prepareForUpload() {
-        // this is the only use of PRE_UPLOAD_QUEUE
-        PRE_UPLOAD_QUEUE.sync {
-            // TODO: this is a really dangerous general solution to ensuring files are getting uploaded...
-            // Reset once to get all of the currently processing file paths.
-            self.resetAll()
-            var filesToUpload: [String] = []
-            if let enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path) {
+    // added to cover migration to new app version issue on 2024-2-20 when we updated the app
+    // to no longer use the caches folder because that is just AWFUL WHY WAS IT DOING THAT AAUUGGUGU
+    func moveOldUnknownJunkToUpload() {
+        var filesToUpload: [String] = []
+        let old_current_folder = DataStorageManager.oldCurrentDataDirectory()
+        
+        // check if this folder exists, if it does we need to move files to the new upload director
+        if FileManager.default.fileExists(atPath: old_current_folder.path) {
+            if let enumerator = FileManager.default.enumerator(atPath: old_current_folder.path) {
                 // for each file check its file type and add to list
                 while let filename = enumerator.nextObject() as? String {
                     if self.isUploadFile(filename) {
                         filesToUpload.append(filename)
                     } else {
-                        log.warning("Non upload file sitting in directory: \(filename)")
+                        print("Non upload file sitting in (old files) directory: \(shortenPath(filename))")
                     }
                 }
             }
-            // move all data in the current data directory to the upload file directory.
-            // active files are stored in a temp directory, then moved to the currentDataDirectory. this moves them to the upload directory.
             for filename in filesToUpload {
-                self.moveFile(DataStorageManager.currentDataDirectory().appendingPathComponent(filename),
+                self.moveFile(old_current_folder.appendingPathComponent(filename),
                               dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
             }
+        } else {
+            print("oldCurrentDataDirectory does not exist, no files to move.")
+        }
+        
+        let old_upload_folder = DataStorageManager.oldUploadDataDirectory()
+        // and then the same for the old upload files, if present.
+        if FileManager.default.fileExists(atPath: old_upload_folder.path) {
+            if let enumerator = FileManager.default.enumerator(atPath: old_upload_folder.path) {
+                // for each file check its file type and add to list
+                while let filename = enumerator.nextObject() as? String {
+                    if self.isUploadFile(filename) {
+                        filesToUpload.append(filename)
+                    } else {
+                        print("Non upload file sitting in (old uploads) directory: \(shortenPath(filename))")
+                    }
+                }
+            }
+            for filename in filesToUpload {
+                self.moveFile(old_upload_folder.appendingPathComponent(filename),
+                              dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
+            }
+        } else {
+            print("oldUploadDataDirectory does not exist, no files to move.")
         }
     }
     
@@ -274,10 +325,10 @@ class DataStorage {
     var lazy_reset_active = false
     
     init(type: String, headers: [String], patientId: String, publicKey: String, moveOnClose: Bool = false, keyRef: SecKey?) {
-        self.type = type
+        self.type = type  // the type of data stream
         self.patientId = patientId
         self.publicKey = publicKey
-        self.headers = headers
+        self.headers = headers // the headers for the csv file
         self.moveOnClose = moveOnClose
         self.secKeyRef = keyRef
         self.sanitize = false
@@ -304,7 +355,8 @@ class DataStorage {
         self._store(data)
     }
     
-    /// The public reset (create new file) function, all calls that are internal to the class should be to _reset() so lock.
+    /// The public reset (create new file) function, all calls that are internal to the class should
+    /// be to _reset() so lock.
     public func reset() {
         defer {
             self.lock_file_level_operation.unlock()
@@ -379,35 +431,35 @@ class DataStorage {
     
     /////////////////////////////////// Complex Functions (manages state) ///////////////////////////////////
     
-    // generally resets all object assets and creates a new filename.
-    // called when max filesize is reached, and inside resetAll.
+    // Generally resets all file assets, creates the new filename.
+    // called when max filesize is reached, and in the timer reset files logic
     private func _reset(recur: Int = Constants.RECUR_DEPTH) {
-        // we don't want to lazy reset while pending a new file due to an existing lazy reset.
+        // We don't want to lazy reset while pending a new file due to an existing lazy reset.
         // (this is the singular file io condition under which we actually want to not do anything.)
         if self.lazy_reset_active {
             return
         }
-            
+        
         // log.info("DataStorage.reset called on \(self.name)...")
         if self.moveOnClose == true {
             do {
                 if self.check_file_exists() {
                     try FileManager.default.moveItem(at: self.filename, to: self.realFilename)
-                    print("moved temp data file \(self.filename) to \(self.realFilename)")
+                    print("moved temp data file \(shortenPath(self.filename)) to \(shortenPath(self.realFilename))")
                 }
             } catch {
                 print("\(error)")
-                log.error("Error moving temp data \(self.filename) to \(self.realFilename)")
+                log.error("Error moving temp data \(shortenPath(self.filename)) to \(shortenPath(self.realFilename))")
                 if recur > 0 {
                     log.error("reset recur at \(recur).")
                     Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                     return self._reset(recur: recur - 1)
                 }
-                fatalError("Error moving temp data \(self.filename) to \(self.realFilename) \(error)")
+                fatalError("Error moving temp data \(shortenPath(self.filename)) to \(shortenPath(self.realFilename)) \(error)")
             }
         }
         
-        // set new filename and real filename mased on move on close
+        // set new filename and real filename based on move on close
         self.name = self.patientId + "_" + self.type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
         self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
         if self.moveOnClose {
@@ -422,22 +474,12 @@ class DataStorage {
         self.lazy_reset_active = true
     }
     
-    /// all file paths in the scope of the app are of this form:
-    /// /var/mobile/Containers/Data/Application/49ECF24B-85A4-40C1-BC57-92B742C6ED64/Library/Caches/currentdat(a/patientid_accel_1698721703289.csv
-    /// the uuid is randomized per installation. We could remove it with a splice, but regex would be better. (not implemented)
-    func shortenPath(_ path_string: String) -> String {
-        return path_string.replacingOccurrences(of: "/var/mobile/Containers/Data/Application/", with: "")
-    }
-
-    func shortenPath(_ url: URL) -> String {
-        return self.shortenPath(url.path)
-    }
     
     /// unlocked function to ensure that a file exists.
     private func _ensure_file_exists(recur: Int) {
         // if there is no file, create it with these permissions and no data
         if !self.check_file_exists() {
-            // print("creating file '\(self.shortenPath(self.filename))'...")
+            // print("creating file '\(shortenPath(self.filename))'...")
             let created = FileManager.default.createFile(
                 atPath: self.filename.path,
                 contents: "".data(using: String.Encoding.utf8),
@@ -449,8 +491,9 @@ class DataStorage {
             if !created {
                 // TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
                 if recur > 0 {
-                    log.error("ensure_file_exists recur at \(recur).")
-                    print("COULD NOT CREATE FILE '\(self.shortenPath(self.filename))'...")
+                    // log.error("ensure_file_exists recur at \(recur).")
+                    print("COULD NOT CREATE FILE '\(shortenPath(self.filename))'...")
+                    print("check file exists:", check_file_exists())
                     Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                     return self._ensure_file_exists(recur: recur - 1) // needs to actually call the _ version of the function (2.3.1 was incorrect, oops)
                 }
@@ -640,8 +683,17 @@ class EncryptedStorage {
     private func close_actual() {
         self.file_handle?.closeFile()
         self.file_handle = nil
-        try! FileManager.default.moveItem(at: self.filename, to: self.eventualFilename)
-        // log.info("moved temp data file \(self.filename) to \(self.eventualFilename)")
+        print("(closing and) moving temp data file \(shortenPath(self.filename)) to \(shortenPath(self.eventualFilename))")
+        do {
+            try FileManager.default.moveItem(at: self.filename, to: self.eventualFilename)
+        } catch CocoaError.fileNoSuchFile {
+            print("close_actual - File not found? \(shortenPath(self.filename))")
+        } catch CocoaError.fileWriteFileExists {
+            print("close_actual - File already exists \(shortenPath(self.eventualFilename)) - wtf?")
+        } catch {
+            // print("Error moving file: \(error)")
+            fatalError("An Unknown Error occurred moving file \(shortenPath(self.filename)) to \(shortenPath(self.eventualFilename)): \(error)")
+        }
     }
 
     private func write_actual(_ data: NSData?, writeLen: Int) -> Int {

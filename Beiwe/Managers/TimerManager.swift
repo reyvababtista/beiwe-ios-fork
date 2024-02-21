@@ -17,6 +17,7 @@ class TimerManager {
     var nextSurveyUpdate: Date = Date(timeIntervalSince1970: 0)
     var nextDataServicesCheck: Date = Date(timeIntervalSince1970: 0)
     var nextHeartbeat: Date = Date(timeIntervalSince1970: 0)
+    var nextNewFiles: Date = Date(timeIntervalSince1970: 0)
     
     /// a core function that enables many sensor managers (DataServiceProtocols)
     func addDataService(on_duration: Int, off_duration: Int, dataService: DataServiceProtocol) {
@@ -45,7 +46,7 @@ class TimerManager {
     }
     
     /// stops timers for everything
-    func stop() {
+    func stop_all_services() {
         self.areServicesRunning = false
         self.clearPollTimer()
         // call finishCollecting on every collection service in dataCollectionServices
@@ -54,6 +55,13 @@ class TimerManager {
             dataStatus.dataService.finishCollecting()
         }
         self.dataCollectionServices.removeAll()  // clear out the registered services entirely
+    }
+    
+    // hit the new files function on all running services
+    func all_services_new_files() {
+        for dataStatus in self.dataCollectionServices {
+            dataStatus.dataService.createNewFile() // should call flush if necessary
+        }
     }
     
     /// used in unregistering
@@ -129,6 +137,14 @@ class TimerManager {
             }
             // print("")
         }
+        
+        if now > self.nextNewFiles.timeIntervalSince1970 {
+            self.all_services_new_files()
+            // (900 is also the hardcoded default on createNewDataFileFrequencySeconds)
+            var next_time = StudyManager.sharedInstance.currentStudy?.studySettings?.createNewDataFileFrequencySeconds ?? 900
+            self.nextNewFiles = Date(timeIntervalSince1970: now + Double(next_time))
+        }
+        
         // print("=========== next_toggle_check determined to be \(smartformat(next_toggle_check)) (in \(next_toggle_check - now) seconds) ==========")
         return Date(timeIntervalSince1970: next_toggle_check)
     }

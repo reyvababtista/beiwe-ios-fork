@@ -9,20 +9,23 @@ let proximity_headers = [
 class ProximityManager: DataServiceProtocol {
     // for once all we need are the basics!
     let storeType = "proximity"
-    var store: DataStorage?
+    var dataStorage: DataStorage
 
+    init () {
+        self.dataStorage = DataStorageManager.sharedInstance.createStore(self.storeType, headers: proximity_headers)
+    }
+    
     /// This function is the well-its-not-a-protocol function that is required to delegate to get proximity updates
     @objc func proximityStateDidChange(_ notification: Notification) {
         // The stage did change: plugged, unplugged, full charge...
         var data: [String] = []
         data.append(String(Int64(Date().timeIntervalSince1970 * 1000)))
         data.append(UIDevice.current.proximityState ? "NearUser" : "NotNearUser")
-        self.store?.store(data)
+        dataStorage.store(data)
     }
 
     /// protocol function
     func initCollecting() -> Bool {
-        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: proximity_headers)
         return true
     }
 
@@ -49,7 +52,15 @@ class ProximityManager: DataServiceProtocol {
     func finishCollecting() {
         // print("Finishing \(self.storeType) collection")
         self.pauseCollecting()
-        self.store = nil
-        DataStorageManager.sharedInstance.closeStore(self.storeType)
+        self.dataStorage.reset()
+    }
+    
+    func createNewFile() {
+        self.dataStorage.reset()
+    }
+    
+    func flush() {
+        // todo: proximity manager probably doesn't need a flush pattern because it's input is based
+        // actions the participant takes.
     }
 }

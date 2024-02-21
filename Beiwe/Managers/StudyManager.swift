@@ -107,14 +107,22 @@ class StudyManager {
         
         if self.sensorsStartedEver {
             self.timerManager.clearPollTimer()
-            self.timerManager.stop() // this one may take real time on another thread soooooo I guess we sleep?
+            self.timerManager.stop_all_services()  // it's a little weird but the Timers actually holds the list of data services
             self.timerManager.clear()
-            Thread.sleep(forTimeInterval: 0.5)
         }
         
-        DataStorageManager.sharedInstance.createDirectories()
-        // Move non current files out.  (Probably unnecessary, would happen later anyway)
-        DataStorageManager.sharedInstance.prepareForUpload()
+        
+        DataStorageManager.sharedInstance.ensureDirectoriesExist() // required on first run
+        
+        // legacy case - we were using a bad location, the CACHE directory, and we may
+        // still have files there. adding this on 2024-2-20.
+        DataStorageManager.sharedInstance.moveUnknownJunkToUpload()
+        DataStorageManager.sharedInstance.moveOldUnknownJunkToUpload()
+        
+        // There may be files in the current data directory, this should only happen if the app crashed,
+        // move those files to the upload directory where the backend can identify if they have any data
+        // and will tell the app to delete them.
+        DataStorageManager.sharedInstance.moveUnknownJunkToUpload()
         
         // GPS, Check if gps fuzzing is enabled for currentStudy
         self.gpsManager = GPSManager()
@@ -173,7 +181,7 @@ class StudyManager {
         study.participantConsented = true
         // some io stuff
         DataStorageManager.sharedInstance.dataStorageManagerInit(study, secKeyRef: self.keyRef)
-        DataStorageManager.sharedInstance.createDirectories()
+        DataStorageManager.sharedInstance.ensureDirectoriesExist()
         // update study stuff?
         Recline.shared.save(study)
         self.checkSurveys()
@@ -212,6 +220,7 @@ class StudyManager {
             // get the survey data and write it out
             var trackingSurvey: TrackingSurveyPresenter
             if surveyPresenter == nil {
+                print("hitting case where we were expiring the survey timings? what the fuck?")
                 // expiration logic? what is "expired?"
                 trackingSurvey = TrackingSurveyPresenter(surveyId: surveyId, activeSurvey: activeSurvey, survey: survey)
                 trackingSurvey.addTimingsEvent("expired", question: nil)
@@ -240,7 +249,11 @@ class StudyManager {
         // removeNotificationForSurvey(activeSurvey)  // I don't know why we don't call this, but we don't.
         if let surveyId = activeSurvey.survey?.surveyId {
             let timingsName = TrackingSurveyPresenter.timingDataType + "_" + surveyId
-            DataStorageManager.sharedInstance.closeStore(timingsName)
+            // This should be fine. Survey Tracking files always write their output, and even if a
+            // file is never retired it will be found the next time the app opens.
+            // print("looking for a file named \(timingsName) but don't have enough information to find the DataStorage object")
+            // self.surveyTimingsFile?.reset()
+            // DataStorageManager.sharedInstance.closeStore(timingsName)
         }
     }
     
@@ -490,7 +503,7 @@ class StudyManager {
         print("Scheduling dispatchqueue heartbeat...")
         HEARTBEAT_QUEUE.asyncAfter(deadline: .now() + Constants.HEARTBEAT_INTERVAL, execute: {
             print("running heartbeat on dispatch queue \(Date())")
-            self.heartbeat("DispatchQueue \(Constants.HEARTBEAT_INTERVAL) secondly - \(countBackgroundTasks())")
+            self.heartbeat("DispatchQueue \(Constants.HEARTBEAT_INTERVAL) secondly - \(Ephemerals.background_task_count)")
             self.heartbeat_on_dispatch_queue()
         })
     }
@@ -914,8 +927,6 @@ class StudyManager {
     /// processOnly means don't upload (it's based on reachability)
     func upload() {
         log.info("Checking for uploads...")
-        DataStorageManager.sharedInstance.prepareForUpload()
-        
         // if we can't enumerate files, that's insane, crash.
         let fileEnumerator: FileManager.DirectoryEnumerator =
             FileManager.default.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)!
@@ -977,7 +988,7 @@ class StudyManager {
             self.gpsManager!.stopGps()
         }
         // stop all timers
-        self.timerManager.stop()
+        self.timerManager.stop_all_services()
         self.timerManager.clear()
         
         // kill notifications
@@ -1042,14 +1053,14 @@ class StudyManager {
     
     /// only called from AppDelegate.applicationWillTerminate
     func stop() {
-        // stop gps because it interacts with app persistence...?
+        // this is the reference to the object attached to StudyManager, need to dereference
         if self.gpsManager != nil {
             self.gpsManager!.stopGps()
             self.gpsManager = nil
         }
         
         // stop all recording, clear registered timer events
-        self.timerManager.stop()
+        self.timerManager.stop_all_services()
         self.timerManager.clear()
         
         // clear currentStudy - this originally ran on the default background queue inside a promisekit promise,

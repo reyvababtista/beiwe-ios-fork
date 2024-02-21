@@ -1,4 +1,7 @@
 import BackgroundTasks
+import Sentry
+
+
 
 func scheduleRefreshHeartbeat() {
     print("scheduling refresh heartbeat")
@@ -7,6 +10,16 @@ func scheduleRefreshHeartbeat() {
     do {
         try BGTaskScheduler.shared.submit(request)
     } catch {
+        // capture and report this error to sentry.
+        if let sentry_client = Client.shared {
+            sentry_client.snapshotStacktrace {
+                let event = Event(level: .error)
+                event.message = "\(error)"
+                event.environment = "app?"
+                sentry_client.appendStacktrace(to: event)
+                sentry_client.send(event: event)
+            }
+        }
         fatalError("Could not schedule app refresh: \(error)")
     }
 }
@@ -19,8 +32,19 @@ func scheduleProcessingHeartbeat() {
     request.requiresNetworkConnectivity = true
     do {
         try BGTaskScheduler.shared.submit(request)
+        sleep(2)
     } catch {
-        fatalError("Could not schedule app processing: \(error)")
+        // capture and report this error to sentry.
+        if let sentry_client = Client.shared {
+            sentry_client.snapshotStacktrace {
+                let event = Event(level: .error)
+                event.message = "\(error)"
+                event.environment = "app?"
+                sentry_client.appendStacktrace(to: event)
+                sentry_client.send(event: event)
+            }
+        }
+        // fatalError("Could not schedule app processing: \(error)")
     }
 }
 
@@ -35,6 +59,16 @@ func scheduleHealthHeartbeat() {
     do {
         try BGTaskScheduler.shared.submit(request)
     } catch {
+        // capture and report this error to sentry.
+        if let sentry_client = Client.shared {
+            sentry_client.snapshotStacktrace {
+                let event = Event(level: .error)
+                event.message = "\(error)"
+                event.environment = "app?"
+                sentry_client.appendStacktrace(to: event)
+                sentry_client.send(event: event)
+            }
+        }
         fatalError("Could not schedule app health processing: \(error)")
     }
 }
@@ -48,7 +82,7 @@ func scheduleAllHeartbeats() {
 }
 
 // Counts the outstanding background tasks (unclear if this includes any currently running background tasks.)
-func countBackgroundTasks() -> String {
+func updateBackgroundTasksCount() {
     var info: [String] = []
     
     BGTaskScheduler.shared.getPendingTaskRequests { (taskRequests: [BGTaskRequest]) in
@@ -73,27 +107,27 @@ func countBackgroundTasks() -> String {
                 }
             }
         }
+        Ephemerals.background_task_count = info.joined(separator: ",")
+        print(Ephemerals.background_task_count) // debug print
     }
-    print(info.joined(separator: ","))
-    return info.joined(separator: ",")
 }
 
 func handleHeartbeatRefresh(task: BGAppRefreshTask) {
     print("BGAppRefreshTask - the handler is getting called \(dateFormatLocal(Date()))")
-    StudyManager.sharedInstance.heartbeat("BGAppRefreshTask - \(countBackgroundTasks())")
+    StudyManager.sharedInstance.heartbeat("BGAppRefreshTask - \(Ephemerals.background_task_count)")
     scheduleRefreshHeartbeat()
 }
 
 func handleHeartbeatProcessing(task: BGProcessingTask) {
     print("BGProcessingTask - the handler is getting called \(dateFormatLocal(Date()))")
-    StudyManager.sharedInstance.heartbeat("BGProcessingTask - \(countBackgroundTasks())")
+    StudyManager.sharedInstance.heartbeat("BGProcessingTask - \(Ephemerals.background_task_count)")
     scheduleProcessingHeartbeat()
 }
 
 @available(iOS 17.0, *)
 func handleHeartbeatHealth(task: BGHealthResearchTask) {
     print("BGHealthResearchTask - the handler is getting called \(dateFormatLocal(Date()))")
-    StudyManager.sharedInstance.heartbeat("BGHealthResearchTask - \(countBackgroundTasks())")
+    StudyManager.sharedInstance.heartbeat("BGHealthResearchTask - \(Ephemerals.background_task_count)")
     scheduleHealthHeartbeat()
 }
 

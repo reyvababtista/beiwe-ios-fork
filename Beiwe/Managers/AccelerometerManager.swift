@@ -11,14 +11,22 @@ let accelerometer_headers = [
 
 class AccelerometerManager: DataServiceProtocol {
     let motionManager = AppDelegate.sharedInstance().motionManager // weird singleton instance attached to appdelegate - ah, shares with gyro
-
+    
     // the base
     let storeType = "accel"
-    var store: DataStorage?
-
-    // we need an offset for timestamp calculations
+    let dataStorage: DataStorage
+    var datapoints = [[String]]()
+    
+    // we need an offset for timestamp calculations, that's just how it works.
     var offset_since_1970: Double = 0
-
+    
+    // accelerometer's callback has a non-optional queue, we want exactly one queue.
+    let queue = OperationQueue()
+    
+    init() {
+        self.dataStorage = DataStorageManager.sharedInstance.createStore(self.storeType, headers: accelerometer_headers)
+    }
+    
     /// protocol function - sets up frequency
     func initCollecting() -> Bool {
         guard self.motionManager.isAccelerometerAvailable else {
@@ -27,7 +35,6 @@ class AccelerometerManager: DataServiceProtocol {
         }
         // TimeInterval of uptime, boottime as unix timestamp
         self.offset_since_1970 = Date().timeIntervalSince1970 - ProcessInfo.processInfo.systemUptime
-        self.store = DataStorageManager.sharedInstance.createStore(self.storeType, headers: accelerometer_headers)
         let frequency_base = StudyManager.sharedInstance.currentStudy?.studySettings?.accelerometerFrequency ?? 10
         self.motionManager.accelerometerUpdateInterval = 1.0 / Double(frequency_base)
         // print("accelerometerUpdateInterval: \(motionManager.accelerometerUpdateInterval)")
@@ -38,17 +45,20 @@ class AccelerometerManager: DataServiceProtocol {
     func startCollecting() {
         // print("Turning \(self.storeType) collection on")
         // print("accelerometerUpdateInterval: \(motionManager.accelerometerUpdateInterval)")
-        let queue = OperationQueue()
+        
         // set the closure function as the delegate for updates
-        self.motionManager.startAccelerometerUpdates(to: queue) { (accelData: CMAccelerometerData?, _: Error?) in
+        self.motionManager.startAccelerometerUpdates(to: self.queue) { (accelData: CMAccelerometerData?, _: Error?) in
             if let accelData = accelData {
                 var data: [String] = []
-                data.append(String(Int64((accelData.timestamp + self.offset_since_1970) * 1000)))
+                data.append(String(Int64((accelData.timestamp + self.offset_since_1970) * 1000.0)))
                 data.append("unknown")
                 data.append(String(accelData.acceleration.x))
                 data.append(String(accelData.acceleration.y))
                 data.append(String(accelData.acceleration.z))
-                self.store?.store(data)
+                self.datapoints.append(data)
+                if self.datapoints.count > ACCELEROMETER_CACHE_SIZE {
+                    self.flush()
+                }
             }
         }
         AppEventManager.sharedInstance.logAppEvent(event: "accel_on", msg: "Accel collection on")
@@ -65,7 +75,20 @@ class AccelerometerManager: DataServiceProtocol {
     func finishCollecting() {
         // print("Finishing \(self.storeType) collection")
         self.pauseCollecting()
-        self.store = nil
-        DataStorageManager.sharedInstance.closeStore(self.storeType)
+        self.createNewFile() // file creation is lazy
+    }
+    
+    func createNewFile() {
+        self.flush()
+        self.dataStorage.reset()
+    }
+    
+    func flush() {
+        // todo - bulk write?
+        let data_to_write = self.datapoints
+        self.datapoints = []
+        for data in data_to_write {
+            self.dataStorage.store(data)
+        }
     }
 }

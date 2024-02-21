@@ -41,8 +41,8 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     var task: ORKTask?
     
     // survey timings information
-    let timingsName: String
-    var timingsStore: DataStorage?
+    let timingsName: String // unnecessary now?
+    var surveyTimingsFile: DataStorage?
     
     // the current question (do display?)
     var currentQuestion: GenericSurveyQuestion?
@@ -65,8 +65,10 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         self.survey = survey
         
         // timings file setup begins immediately
-        self.timingsStore = DataStorageManager.sharedInstance.createStore(self.timingsName, headers: TrackingSurveyPresenter.timingsHeaders)
-        self.timingsStore!.sanitize = true // ok, dumb factoring but here's where we set the sanitize flag
+        self.surveyTimingsFile = DataStorageManager.sharedInstance.createStore(
+            self.timingsName, headers: TrackingSurveyPresenter.timingsHeaders
+        )
+        self.surveyTimingsFile!.sanitize = true // ok, dumb factoring but here's where we set the sanitize flag
         
         // this TODO is ancient, its from Keary
         // TODO: handle if stepOrder is null, throw error if it is not valid if it is valid, figure out why and under what conditions
@@ -373,7 +375,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         return (typeString, optionsString, answersString)
     }
 
-    // stores survey answers on the DataStorage
+    // stores survey answers on a new DataStorage
     func finalizeSurveyAnswers() {
         guard let activeSurvey = activeSurvey,
               let survey = activeSurvey.survey,
@@ -419,7 +421,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
             data.append(answersString)
             dataFile.store(data)
         }
-        dataFile.reset() // clear out the file
+        dataFile.reset() // clears out the file
     }
     
     // writes a timing event for the provided question (and value)
@@ -443,7 +445,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         }
         data.append(event)
         // print("TimingsEvent: \(data.joined(separator: ","))")  // we don't need to see every timings event
-        self.timingsStore?.store(data)
+        self.surveyTimingsFile?.store(data)
     }
     
     // very poorly named, records survey dismissal I think.
@@ -457,8 +459,11 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         }
     }
     
+    // TODO: test if this is our only exit point from having a survey open and visible, we need to
+    // now add the data storage reset calls
     func closeSurvey() {
         self.retainSelf = nil // clear the reference to self...
+        self.surveyTimingsFile?.reset()
         StudyManager.sharedInstance.surveysUpdatedEvent.emit(0) // also unknown
         self.parent?.dismiss(animated: true, completion: nil) // dismiss the researchkit survey
     }
@@ -660,7 +665,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
     }
     
     deinit {
-        _ = DataStorageManager.sharedInstance.closeStore(timingsName)
+        self.surveyTimingsFile?.reset()
         self.the_continue_button = nil
         self.the_internal_continue_button = nil
     }

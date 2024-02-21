@@ -70,11 +70,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         self.lastAppStart = Date()
         
-        // Due to a line of documentation about backgroundtasks that says "do this before didFinishLaunchingWithOptions finishes"
-        // we are just going to stick it before everything else.  At least it doesn't crash when you remove background app refresh permissions.
-        // register the ios Background task scheduler target for the org.beiwe.heartbeatl task and then call it's scheduler
-        self.setupBackgroundAppRefresh()
-        self.initialSetup(launchOptions)
+        // runs operations that are part of ui setup, AppEventLog? - well that's a bug.
+        self.initialSetup()
+        self.initialize_database()
+        
+        // we still have unnecessary app start setup that deals with waiting for the database to start
+        self.setupBackgroundAppRefresh() // setupThatDependsOnDatabase calls scheduleHeartbeats.
         self.setupThatDependsOnDatabase(launchOptions)
         
         // start some background looping for core app functionality
@@ -82,6 +83,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         BACKGROUND_DEVICE_INFO_QUEUE.asyncAfter(deadline: .now() + 60, execute: self.deviceInfoUpdateLoop)
                 
         // self.isLoggedIn = true // uncomment to auto log in
+        
+        // just set's the launch time variable, but changing refactoring DataStorage causes
+        // `AppEventManager.sharedInstance` to crash because the encryption key is not present yet.
+        // Todo: finish refactoring app launch away from the old async garbage, work out where this can safely go.
+        // Todo: WE ARE HANDED THE LAUNCH TIMESTAMP!? see like accelerometer for why we should use it - we can have coordinated timestamps across data streams.
+        AppEventManager.sharedInstance.didLaunch(launchOptions: launchOptions)
         return true
     }
     
@@ -165,12 +172,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     /// These are the basics that we need to be able to Use The App At All (or Debug the app).
     /// If your setup does not require the database it can go in here.
-    func initialSetup(_ launchOptions: [UIApplication.LaunchOptionsKey: Any]?) {
+    func initialSetup() {
         // initialize Sentry IMMEDIATELY
         self.setupSentry()
         self.setupLogging()
         // setupCrashLytics()  // not currently using crashlytics
-        AppEventManager.sharedInstance.didLaunch(launchOptions: launchOptions)
         // appStartLog()  // this is too verbose and usually unnecessary, uncomment if you want but don't commit.
         self.initializeReachability()
         self.initializeUI()
@@ -179,12 +185,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         self.canOpenTel = UIApplication.shared.canOpenURL(URL(string: "tel:6175551212")!) // (should be true ios 10+? or is there a permission you have to ask for?)
     }
     
-    func setupThatDependsOnDatabase(_ launchOptions: [UIApplication.LaunchOptionsKey: Any]?) {
-        // Start the database, eg LOAD STUDY STUFF
+    func initialize_database() {
         Recline.shared.open()
-        Recline.shared.compact()
         StudyManager.sharedInstance.loadDefaultStudy()
-        
+        Recline.shared.compact()
+    }
+    
+    func setupThatDependsOnDatabase(_ launchOptions: [UIApplication.LaunchOptionsKey: Any]?) {
         // IF A NOTIFICATION WAS RECEIVED while app was in killed state there will be launch options!
         if launchOptions != nil {
             if let informationDictionary = launchOptions?[UIApplication.LaunchOptionsKey.remoteNotification] as? Dictionary<AnyHashable, Any> {
@@ -234,7 +241,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             }
         }
         
-        _ = countBackgroundTasks() // this is purely for logging/development purposes
+        updateBackgroundTasksCount()
         
         BACKGROUND_DEVICE_INFO_QUEUE.asyncAfter(deadline: .now() + 60, execute: self.deviceInfoUpdateLoop)
     }
@@ -367,8 +374,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         
         AppEventManager.sharedInstance.logAppEvent(event: "terminate", msg: "Application terminating")
         
-        // stop used to be wrapped in a DispatchGroup and run on the default background queue,
-        // probably because of promisekit promises making async code weird?
+        // StudyManager.stop() includes a call to TimerManager.stop(), which calls finishCollecting on
+        // data services, which always includes a call to DataStorage.reset(), which will FLUSH,
+        // retire, and move live files to the upload folder.
+        // Survey and SurveyTimings files - should be left in the folder to be moved on next app
+        // launch to the uploads folders - but they don't have background writes so that's fine.
         StudyManager.sharedInstance.stop()
         print("applicationWillTerminate exiting")
     }
@@ -795,7 +805,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func setupSentry() {
         // loads sentry key, prints an error if it doesn't work.
         do {
-            let dsn = Configuration.sharedInstance.settings["sentry-dsn"] as? String ?? "dev"
+            let dsn = SentryConfiguration.sharedInstance.settings["sentry-dsn"] as? String ?? "dev"
             if dsn == "release" {
                 Client.shared = try Client(dsn: SentryKeys.release_dsn)
             } else if dsn == "dev" {
