@@ -7,7 +7,7 @@ func scheduleRefreshHeartbeat() {
     do {
         try BGTaskScheduler.shared.submit(request)
     } catch {
-        fatalError("Could not schedule app refresh: \(error)")
+        // fatalError("Could not schedule app refresh: \(error)")
     }
 }
 
@@ -20,7 +20,7 @@ func scheduleProcessingHeartbeat() {
     do {
         try BGTaskScheduler.shared.submit(request)
     } catch {
-        fatalError("Could not schedule app processing: \(error)")
+        // fatalError("Could not schedule app processing: \(error)")
     }
 }
 
@@ -35,7 +35,7 @@ func scheduleHealthHeartbeat() {
     do {
         try BGTaskScheduler.shared.submit(request)
     } catch {
-        fatalError("Could not schedule app health processing: \(error)")
+        // fatalError("Could not schedule app health processing: \(error)")
     }
 }
 
