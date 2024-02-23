@@ -20,7 +20,7 @@ class AppEventManager: DataServiceProtocol {
     
     // iOS Log stuff
     let storeType = "ios_log"
-    var dataStorage: DataStorage
+    var dataStorage: DataStorage?
     
     // basics
     var isCollecting: Bool = false
@@ -34,10 +34,6 @@ class AppEventManager: DataServiceProtocol {
     // an identifier value that is unique to whenever AppDelegate started - only used locally?
     var launchId: String {
         return String(Int64(self.launchTimestamp.timeIntervalSince1970 * 1000))
-    }
-
-    init() {
-        dataStorage = DataStorageManager.sharedInstance.createStore(self.storeType, headers: app_event_headers)
     }
     
     /// Called on app launch, sets the launch timestamp()
@@ -69,6 +65,9 @@ class AppEventManager: DataServiceProtocol {
     
     /// writes an app event to the iOS Log
     func logAppEvent(event: String, msg: String = "", d1: String = "", d2: String = "", d3: String = "") {
+        guard let dataStorage = self.dataStorage else {
+            return
+        }
         
         // our string list of data
         var data: [String] = []
@@ -88,6 +87,7 @@ class AppEventManager: DataServiceProtocol {
 
     /// protocol function - iniitalize data, always returns true. Logs only on first call
     func initCollecting() -> Bool {
+        self.dataStorage = DataStorageManager.sharedInstance.createStore(self.storeType, headers: app_event_headers)
         // log that a recording session has started - why? legacy I guess.
         if !self.didLogLaunch {
             self.didLogLaunch = true
@@ -119,7 +119,7 @@ class AppEventManager: DataServiceProtocol {
     }
     
     func createNewFile() {
-        self.dataStorage.reset()
+        self.dataStorage?.reset()
     }
     
     func flush() {

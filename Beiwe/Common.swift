@@ -1,3 +1,4 @@
+import Sentry
 
 /// Extend the DispatchQueue to have a function called Background
 extension DispatchQueue {
@@ -113,3 +114,37 @@ public func print(_ items: Any..., separator: String = " ", terminator: String =
     }
     Swift.print(terminator, separator: "", terminator: "")
 }
+
+
+
+
+
+func sentry_warning(_ title: String, _ extra1: String? = nil, _ extra2: String? = nil, _ extra3: String? = nil) {
+    if let sentry_client = Client.shared {
+        sentry_client.snapshotStacktrace {
+            let event = Event(level: .warning)
+            event.message = title
+            event.environment = Constants.APP_INFO_TAG
+            
+            // todo does this always exist?
+            if event.extra == nil {
+                event.extra = [:]
+            }
+            if var extras = event.extra {
+                if let extra = extra1 {
+                    extras["extra1"] = extra
+                }
+                if let extra = extra2 {
+                    extras["extra2"] = extra
+                }
+                if let extra = extra3 {
+                    extras["extra3"] = extra
+                }
+            }
+            sentry_client.appendStacktrace(to: event)
+            sentry_client.send(event: event)
+        }
+    }
+}
+
+

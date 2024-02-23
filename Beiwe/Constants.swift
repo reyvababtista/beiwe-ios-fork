@@ -13,6 +13,20 @@ struct Constants {
     static let DEFAULT_UNPOPULATED_APPINFO = "never_populated"
     
     static let HEARTBEAT_INTERVAL = 300.0 // 5 minutes
+    
+    static let APP_VERSION: () -> String = {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+    }
+    
+    static let APP_BUILD: () -> String = {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+    }
+    
+    static let APP_COMMIT: () -> String = {
+        Bundle.main.infoDictionary?["GitCommitHash"] as? String ?? "Unknown"
+    }
+    
+    static let APP_INFO_TAG = "iOS Version: \(String(describing: Constants.APP_VERSION)) Build: \(String(describing: Constants.APP_BUILD)) Commit: \(String(describing: Constants.APP_COMMIT))"
 }
 
 let DEV_TIMEZONE = "America/New_York"
@@ -38,7 +52,6 @@ let ACCELEROMETER_CACHE_SIZE = 100
 let DEVICE_MOTION_CACHE_SIZE = 100
 let GPS_CACHE_SIZE = 100
 let MAGNETOMETER_CACHE_SIZE = 100
-
 
 struct Ephemerals {
     // device info statuses

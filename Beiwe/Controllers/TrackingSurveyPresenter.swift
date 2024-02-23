@@ -387,10 +387,13 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
         guard let stepOrder = activeSurvey.stepOrder, survey.questions.count > 0 else {
             return
         }
-        guard activeSurvey.bwAnswers.count > 0 else {
-            // print("No questions answered, not submitting.")
-            return
-        }
+        
+        // starting in build 2024.6 we will disable this specific case-handling to see if this has any effect.
+        // if we start getting empty survey files that means we reinvestigate.
+        // guard activeSurvey.bwAnswers.count > 0 else {
+        //     // print("No questions answered, not submitting.")
+        //     return
+        // }
         
         // set up data file
         let name = TrackingSurveyPresenter.surveyDataType + "_" + surveyId

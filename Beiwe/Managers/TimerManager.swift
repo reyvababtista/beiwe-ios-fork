@@ -138,6 +138,7 @@ class TimerManager {
             // print("")
         }
         
+        // reset files periodically - exact behavior varies by data stream.
         if now > self.nextNewFiles.timeIntervalSince1970 {
             self.all_services_new_files()
             // (900 is also the hardcoded default on createNewDataFileFrequencySeconds)

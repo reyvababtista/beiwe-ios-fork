@@ -1,6 +1,7 @@
 import Foundation
 import IDZSwiftCommonCrypto
 import Security
+import Sentry
 
 enum DataStorageErrors: Error {
     case cantCreateFile
@@ -256,14 +257,45 @@ class DataStorageManager {
     private func moveFile(_ src: URL, dst: URL, recur: Int = Constants.RECUR_DEPTH) {
         do {
             try FileManager.default.moveItem(at: src, to: dst)
+        } catch CocoaError.fileNoSuchFile {
+            print("File not found (for moving)? \(shortenPath(src))")
+            sentry_warning("File not found (for moving).", shortenPath(src))
+        } catch CocoaError.fileWriteFileExists {
+            print("File already exists (for moving) \(shortenPath(dst)), giving up for now because that's crazy?")
+            sentry_warning("File already exists (for moving).", shortenPath(dst))
+        } catch CocoaError.fileWriteOutOfSpace {
+            print("Out of space (for moving) \(shortenPath(dst))")
+            // sentry_warning("Out of space (for moving).", shortenPath(dst)) // never report out of space like this.
         } catch {
+            // known and not handling: fileWriteVolumeReadOnly, fileWriteInvalidFileName
+            // print("moving file \(shortenPath(src)) to \(shortenPath(dst))")
+            // fatalError("Error moving file \(error)")
             if recur > 0 {
                 log.error("moveFile recur at \(recur).")
                 Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                 return self.moveFile(src, dst: dst, recur: recur - 1)
             }
-            log.error("Error moving \(src) to \(dst)")
+            log.error("Error moving(1) \(src) to \(dst)")
             print("\(error)")
+            
+            if let sentry_client = Client.shared {
+                sentry_client.snapshotStacktrace {
+                    let event = Event(level: .error)
+                    event.message = "Error moving file 1"
+                    event.environment = Constants.APP_INFO_TAG
+                    
+                    if event.extra == nil {
+                        event.extra = [:]
+                    }
+                    if var extras = event.extra {
+                        extras["from"] = shortenPath(src)
+                        extras["to"] = shortenPath(dst)
+                        extras["error"] = "\(error)"
+                    }
+                    sentry_client.appendStacktrace(to: event)
+                    sentry_client.send(event: event)
+                }
+            }
         }
     }
     
@@ -455,6 +487,26 @@ class DataStorage {
                     Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                     return self._reset(recur: recur - 1)
                 }
+                
+                if let sentry_client = Client.shared {
+                    sentry_client.snapshotStacktrace {
+                        let event = Event(level: .error)
+                        event.message = "Error moving file on reset after \(Constants.RECUR_DEPTH) tries."
+                        event.environment = Constants.APP_INFO_TAG
+                        
+                        
+                        if event.extra == nil {
+                            event.extra = [:]
+                        }
+                        if var extras = event.extra {
+                            extras["from"] = shortenPath(self.filename)
+                            extras["to"] = shortenPath(self.realFilename)
+                            extras["error"] = "\(error)"
+                        }
+                        sentry_client.appendStacktrace(to: event)
+                        sentry_client.send(event: event)
+                    }
+                }
                 fatalError("Error moving temp data \(shortenPath(self.filename)) to \(shortenPath(self.realFilename)) \(error)")
             }
         }
@@ -489,13 +541,30 @@ class DataStorage {
             var message = if created { "Create new data file" } else { "Could not create new data file" }
             self.conditionalApplog(event: "file_create", msg: message, d1: self.name)
             if !created {
-                // TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
                 if recur > 0 {
                     // log.error("ensure_file_exists recur at \(recur).")
                     print("COULD NOT CREATE FILE '\(shortenPath(self.filename))'...")
                     print("check file exists:", check_file_exists())
                     Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
+                    // fatalError(message)
                     return self._ensure_file_exists(recur: recur - 1) // needs to actually call the _ version of the function (2.3.1 was incorrect, oops)
+                }
+                // TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
+                if let sentry_client = Client.shared {
+                    sentry_client.snapshotStacktrace {
+                        let event = Event(level: .error)
+                        event.message = "Error creating file inside _ensure_file_exists after \(Constants.RECUR_DEPTH) tries, app will now crash."
+                        event.environment = Constants.APP_INFO_TAG
+                        
+                        if event.extra == nil {
+                            event.extra = [:]
+                        }
+                        if var extras = event.extra {
+                            extras["filename"] = shortenPath(self.filename)
+                        }
+                        sentry_client.appendStacktrace(to: event)
+                        sentry_client.send(event: event)
+                    }
                 }
                 fatalError(message)
             }

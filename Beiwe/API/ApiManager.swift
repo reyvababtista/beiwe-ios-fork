@@ -66,8 +66,8 @@ class ApiManager {
         parameters["device_id"] = PersistentAppUUID.sharedInstance.uuid // deprecated?
         
         // basic device info, will be displayed on the participant page
-        parameters["version_code"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
-        parameters["version_name"] = Bundle.main.infoDictionary?["GitCommitHash"] as? String ?? "Unknown"
+        parameters["version_code"] = Constants.APP_VERSION
+        parameters["version_name"] = Constants.APP_COMMIT
         
         parameters["os_version"] = UIDevice.current.systemVersion
         parameters["timezone"] = TimeZone.current.identifier

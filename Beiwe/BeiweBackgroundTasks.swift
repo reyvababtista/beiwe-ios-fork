@@ -1,8 +1,6 @@
 import BackgroundTasks
 import Sentry
 
-
-
 func scheduleRefreshHeartbeat() {
     print("scheduling refresh heartbeat")
     let request = BGAppRefreshTaskRequest(identifier: BACKGROUND_TASK_NAME_HEARTBEAT_BGREFRESH)
@@ -14,13 +12,12 @@ func scheduleRefreshHeartbeat() {
         if let sentry_client = Client.shared {
             sentry_client.snapshotStacktrace {
                 let event = Event(level: .error)
-                event.message = "\(error)"
-                event.environment = "app?"
+                event.message = "scheduling refresh heartbeat: \(error)"
+                event.environment = Constants.APP_INFO_TAG
                 sentry_client.appendStacktrace(to: event)
                 sentry_client.send(event: event)
             }
         }
-        fatalError("Could not schedule app refresh: \(error)")
     }
 }
 
@@ -32,19 +29,17 @@ func scheduleProcessingHeartbeat() {
     request.requiresNetworkConnectivity = true
     do {
         try BGTaskScheduler.shared.submit(request)
-        sleep(2)
     } catch {
         // capture and report this error to sentry.
         if let sentry_client = Client.shared {
             sentry_client.snapshotStacktrace {
                 let event = Event(level: .error)
-                event.message = "\(error)"
-                event.environment = "app?"
+                event.message = "scheduling processing heartbeat: \(error)"
+                event.environment = Constants.APP_INFO_TAG
                 sentry_client.appendStacktrace(to: event)
                 sentry_client.send(event: event)
             }
         }
-        // fatalError("Could not schedule app processing: \(error)")
     }
 }
 
@@ -63,13 +58,12 @@ func scheduleHealthHeartbeat() {
         if let sentry_client = Client.shared {
             sentry_client.snapshotStacktrace {
                 let event = Event(level: .error)
-                event.message = "\(error)"
-                event.environment = "app?"
+                event.message = "scheduling health heartbeat: \(error)"
+                event.environment = Constants.APP_INFO_TAG
                 sentry_client.appendStacktrace(to: event)
                 sentry_client.send(event: event)
             }
         }
-        fatalError("Could not schedule app health processing: \(error)")
     }
 }
 
