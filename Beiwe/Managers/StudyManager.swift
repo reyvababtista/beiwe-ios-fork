@@ -6,8 +6,6 @@ import Foundation
 import ObjectMapper
 import ReachabilitySwift
 
-let DEVICE_SETTINGS_INTERVAL: Int64 = 30 * 60 // hardcoded thirty minutes
-let DEFAULT_INTERVAL: Double = 15.0 * 60.0
 
 /// Contains all sorts of miiscellaneous study related functionality - this is badly factored and should be refactored into classes that contain their own well-defirned things
 class StudyManager {
@@ -111,7 +109,6 @@ class StudyManager {
             self.timerManager.clear()
         }
         
-        
         DataStorageManager.sharedInstance.ensureDirectoriesExist() // required on first run
         
         // legacy case - we were using a bad location, the CACHE directory, and we may
@@ -184,7 +181,7 @@ class StudyManager {
         DataStorageManager.sharedInstance.ensureDirectoriesExist()
         // update study stuff?
         Recline.shared.save(study)
-        self.checkSurveys()
+        self.checkForNewSurveys()
     }
     
     // FIXME: This function has 4 unacceptable failure modes -- called only from setConsented (study registration) and startStudyDataServices
@@ -416,14 +413,14 @@ class StudyManager {
         return surveyDataModified
     }
     
-    /// Timers! They now do what they say they do and aren't even complicated! Holy !#*&$@#*!
-    /// AND NOW THEY DON'T USE PROMISES
-    
+    /// The Persistant timers, these get set and are checked even across app termination.
     func setNextUploadTime() {
         guard let study = currentStudy, let studySettings = study.studySettings else {
             return
         }
+        if let t = study.nextUploadCheck { print("previous study.nextUploadCheck:", study.nextUploadCheck!, Date(timeIntervalSince1970: Double(t))) }
         study.nextUploadCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.uploadDataFileFrequencySeconds)
+        if let t = study.nextUploadCheck { print("updated study.nextUploadCheck:", study.nextUploadCheck!, Date(timeIntervalSince1970: Double(t))) }
         Recline.shared.save(study)
     }
     
@@ -431,7 +428,9 @@ class StudyManager {
         guard let study = currentStudy, let studySettings = study.studySettings else {
             return
         }
+        if let t = study.nextSurveyCheck { print("previous study.nextSurveyCheck:", study.nextSurveyCheck!, Date(timeIntervalSince1970: Double(t))) }
         study.nextSurveyCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.checkForNewSurveysFreqSeconds)
+        if let t = study.nextSurveyCheck { print("updated study.nextSurveyCheck:", study.nextSurveyCheck!, Date(timeIntervalSince1970: Double(t))) }
         Recline.shared.save(study)
     }
     
@@ -439,7 +438,9 @@ class StudyManager {
         guard let study = currentStudy else {
             return
         }
+        if let t = study.nextDeviceSettingsCheck { print("previous study.nextDeviceSettingsCheck:", study.nextDeviceSettingsCheck!, Date(timeIntervalSince1970: Double(t))) }
         study.nextDeviceSettingsCheck = Int64(Date().timeIntervalSince1970) + DEVICE_SETTINGS_INTERVAL
+        if let t = study.nextDeviceSettingsCheck { print("updated study.nextDeviceSettingsCheck:", study.nextDeviceSettingsCheck!, Date(timeIntervalSince1970: Double(t))) }
         Recline.shared.save(study)
     }
     
@@ -450,20 +451,26 @@ class StudyManager {
     /// some kind of reachability thing, calls periodicNetworkTransfers
     @objc func reachabilityChanged(_ notification: Notification) {
         print("Reachability changed, running periodic network transfers.")
-        self.periodicNetworkTransfers()
+        self.timerManager.pollServices()
     }
     
-    /// runs network operations, handles checking and updating timer values on the timer.
-    /// called from Timer and a couple other places.
-    func periodicNetworkTransfers() {
+    /// TODO: move this over to TimerManager
+    /// These operations all happen to be network operations, and we want them to run
+    /// as soon as a network connection is available, which means we need to handle
+    /// the case of the app closing.
+    /// (currently reverted to easier strategy would return a date with a reasonable next time for timer logic to check.)
+    func persistentTimerActions(_ now_date: Date) {
         // fail early logic, get study settings and study.
         guard let currentStudy = currentStudy, let studySettings = currentStudy.studySettings else {
             return
         }
+        
         // check the uploadOverCellular study detail.
         let reachable = studySettings.uploadOverCellular ?
             self.appDelegate.reachability!.isReachable : self.appDelegate.reachability!.isReachableViaWiFi
-        let now: Int64 = Int64(Date().timeIntervalSince1970)
+        let now_int: Int64 = Int64(now_date.timeIntervalSince1970)
+        
+        // Todo - make these TimeIntervals (doubles)
         let nextSurvey = currentStudy.nextSurveyCheck ?? 0
         let nextUpload = currentStudy.nextUploadCheck ?? 0
         let nextDeviceSettings = currentStudy.nextDeviceSettingsCheck ?? 0
@@ -472,31 +479,67 @@ class StudyManager {
         // print("now: \(now), nextSurvey: \(nextSurvey), nextUpload: \(nextUpload), nextDeviceSettings: \(nextDeviceSettings)")
         
         // logic for checking for surveys
-        if now > nextSurvey || (reachable && currentStudy.missedSurveyCheck) {
+        if now_int > nextSurvey || (reachable && currentStudy.missedSurveyCheck) {
             // This (missedSurveyCheck?) will be saved because setNextSurveyTime saves the study
             currentStudy.missedSurveyCheck = !reachable // if not reachable we missed the survey check
             self.setNextSurveyTime()
             if reachable {
-                self.checkSurveys()
+                self.checkForNewSurveys()
             }
         }
         
         // logic for running uploads code
-        if now > nextUpload || (reachable && currentStudy.missedUploadCheck) {
+        if now_int > nextUpload || (reachable && currentStudy.missedUploadCheck) {
             // This (missedUploadCheck?) will be saved because setNextUpload saves the study
             currentStudy.missedUploadCheck = !reachable // if not reachable we missed the upload check
             self.setNextUploadTime()
             if reachable {
-                self.upload()
+                self.upload() // this is actually pretty fast, alamofire doesn't block
             }
         }
         
         // logic for updating the study's device settings.
-        if now > nextDeviceSettings && reachable {
+        if now_int > nextDeviceSettings && reachable {
             // print("Checking for updated device settings...")
             self.setNextDeviceSettingsTime()
             self.updateDeviceSettings()
         }
+        
+        // currently disabling the logic here in favor of an easier strategy.
+        
+        // get the next timer - data type is weird.
+        // let earliest_timer: Int64 = minThatIsntZeroForStudyTimerDetermination(
+        //     currentStudy.nextUploadCheck ?? 0,
+        //     currentStudy.nextSurveyCheck ?? 0,
+        //     currentStudy.nextDeviceSettingsCheck ?? 0
+        // )
+        
+        // // case: everything was zero - I think this can happen at registration.
+        // // case: the earliest timer is in the past
+        // if earliest_timer == 0 || earliest_timer < (now_int + 3000 {
+        //     return default_interval_from_now()
+        // } else {
+        //     // case: normal case, return a Date object of the time of the earliest timer
+        //     return Date(timeIntervalSince1970: TimeInterval(earliest_timer))
+        // }
+    }
+    
+    // assumes positive integers but the typing isn't UInts because it ... isn't.
+    // this works in our context.... probably....
+    func minThatIsntZeroForStudyTimerDetermination(_ ints: Int64...) -> Int64 {
+        var min = Int64.max
+        /// get the smallest that isn't zero
+        for i in ints {
+            if i > 0 && i < min {
+                min = i
+            }
+        }
+        // case: everything was zero (or int64.max, which won't be a thing
+        if min == Int64.max {
+            return 0
+        }
+        // case: something wasn't zero
+        return min
     }
     
     func heartbeat_on_dispatch_queue() {
@@ -519,7 +562,7 @@ class StudyManager {
     
     /// called from self.setConsented, periodicNetworkTasks, and a debug menu button (I think)
     /// THE RETURN VALUE IS NOT USED BECAUSE OF COURSE NOT
-    func checkSurveys() {
+    func checkForNewSurveys() {
         guard let study = currentStudy else {
             return
         }
@@ -622,6 +665,11 @@ class StudyManager {
             }
         )
     }
+    
+    
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////// UPDATE DEVICE SETTINGS /////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////
     
     /// Queries the server for new study settings, hand off to completion handler
     func updateDeviceSettings() {
@@ -870,6 +918,38 @@ class StudyManager {
             self.prepareDataServices()
         }
     }
+    
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////// Data Upload ///////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    ///
+    /// Notes:
+    ///
+    /// It is possible for AlamoFire to say that an upload failed due to a timeout, but the server
+    /// still somehow fully accepts the file - here is an example of what the data looks like for
+    /// a random test participant that had this occur - this code gets the uploaded file
+    /// and compares it to the other instance of it, the files were the same:
+    ///
+    /// In [30]: list(p.upload_trackers.filter(file_path__icontains="f37twhxm/devicemotion/1708719536932").values())
+    /// Out[30]:
+    /// [{'id': 7913053,
+    ///   'file_path': 'f37twhxm/devicemotion/1708719536932.csv',
+    ///   'file_size': 41907,
+    ///   'timestamp': datetime.datetime(2024, 2, 23, 21, 42, 56, 147142, tzinfo=<UTC>),
+    ///   'participant_id': 1557},
+    ///  {'id': 7913088,
+    ///   'file_path': 'f37twhxm/devicemotion/1708719536932.csv-duplicate-7wglblddmt',
+    ///   'file_size': 41907,
+    ///   'timestamp': datetime.datetime(2024, 2, 23, 21, 48, 46, 335498, tzinfo=<UTC>),
+    ///   'participant_id': 1557}]
+    ///
+    /// In [31]: a,b = p.upload_trackers.filter(file_path__icontains="f37twhxm/devicemotion/1708719536932")
+    ///
+    /// In [32]: a.s3_retrieve() == b.s3_retrieve()
+    /// Out[32]: True
+    ///
+    /// It would be _nice_ if we could fix this, but it shouldn't be a huge issue.
+    
     
     /// This function always runs on the POST_UPLOAD_QUEUE
     /// Beiwe servers only respond with statuscodes on data upload. 200 means it was uploaded

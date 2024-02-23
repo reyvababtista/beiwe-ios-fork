@@ -28,6 +28,8 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
 
     // gps storage
     var datapoints = [[String]]()
+    let cacheLock = NSLock()
+    
     static let static_storeType = "gps" // ok this is a little
     let storeType = GPSManager.static_storeType
     var dataStorage: DataStorage?
@@ -88,7 +90,11 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
             data.append(String(lng))
             data.append(String(loc.altitude))
             data.append(String(loc.horizontalAccuracy))
+            
+            self.cacheLock.lock()
             datapoints.append(data)
+            self.cacheLock.unlock()
+            
             if self.datapoints.count > GPS_CACHE_SIZE {
                 self.flush()
             }
@@ -142,8 +148,10 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
     
     func flush() {
         // todo - bulk write?
+        self.cacheLock.lock()
         let data_to_write = self.datapoints
         self.datapoints = []
+        self.cacheLock.unlock()
         for data in data_to_write {
             self.dataStorage?.store(data)
         }

@@ -8,16 +8,25 @@ let magnetometer_headers = [
     "z",
 ]
 
+struct MagnetometerDataPoint {
+    var timestamp: TimeInterval
+    var x: Double
+    var y: Double
+    var z: Double
+}
+
 class MagnetometerManager: DataServiceProtocol {
     let motionManager = AppDelegate.sharedInstance().motionManager // weird singleton reference attached to AppDelegate
-
+    
     // the basics
     let storeType = "magnetometer"
     var dataStorage: DataStorage
-    var datapoints = [[String]]()
+    var datapoints = [MagnetometerDataPoint]()
     
     // magnetometer's callback has a non-optional queue, we want exactly one queue.
+    // We need a lock because arrays are not atomic and flush can be called mid-update.
     let queue = OperationQueue()
+    let cacheLock = NSLock()
     
     // the offset
     var offset_since_1970: Double = 0
@@ -45,15 +54,20 @@ class MagnetometerManager: DataServiceProtocol {
         // print("Turning \(self.storeType) collection on")
         // this closure is the function that records data
         self.motionManager.startMagnetometerUpdates(to: self.queue) { (magData: CMMagnetometerData?, _: Error?) in
+            
+            // assemble our struct, safely append to list, flush after enough data points
             if let magData = magData {
-                var data: [String] = []
-                let timestamp: Double = magData.timestamp + self.offset_since_1970
-                data.append(String(Int64(timestamp * 1000)))
-                // data.append(AppDelegate.sharedInstance().modelVersionId)  // random extra datapoint
-                data.append(String(magData.magneticField.x))
-                data.append(String(magData.magneticField.y))
-                data.append(String(magData.magneticField.z))
+                let data = MagnetometerDataPoint(
+                    timestamp: magData.timestamp,
+                    x: magData.magneticField.x,
+                    y: magData.magneticField.y,
+                    z: magData.magneticField.z
+                )
+                
+                self.cacheLock.lock()
                 self.datapoints.append(data)
+                self.cacheLock.unlock()
+                
                 if self.datapoints.count > MAGNETOMETER_CACHE_SIZE {
                     self.flush()
                 }
@@ -83,10 +97,20 @@ class MagnetometerManager: DataServiceProtocol {
     
     func flush() {
         // todo - bulk write?
-        let data_to_write = self.datapoints
+        self.cacheLock.lock()
+        let data_to_write: [MagnetometerDataPoint] = self.datapoints
         self.datapoints = []
-        for data in data_to_write {
-            self.dataStorage.store(data)
+        self.cacheLock.unlock()
+        // maximize compiler optimization and cpu loop unrolling with an array literal in a loop?
+        for magDataPoint in data_to_write {
+            self.dataStorage.store(
+                [
+                    String(Int64((magDataPoint.timestamp + self.offset_since_1970) * 1000)),
+                    String(magDataPoint.x),
+                    String(magDataPoint.y),
+                    String(magDataPoint.z),
+                ]
+            )
         }
     }
 }

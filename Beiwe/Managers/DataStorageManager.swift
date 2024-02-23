@@ -102,7 +102,8 @@ class DataStorageManager {
     /// in very similar code over there.
     func createEncryptedFile(type: String, suffix: String) -> EncryptedStorage {
         if !self.initted {
-            log.error("createEncryptedFile called before the DataStorageManager received secKeyRef, app should crash now.")
+            // return
+            fatalError("createEncryptedFile called before the DataStorageManager received secKeyRef, app should crash now.")
         }
         
         if let study = StudyManager.sharedInstance.currentStudy {

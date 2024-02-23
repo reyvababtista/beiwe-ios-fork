@@ -9,13 +9,24 @@ let headers = [
     "z",
 ]
 
+struct GyroDataPoint {
+    var timestamp: TimeInterval
+    var x: Double
+    var y: Double
+    var z: Double
+}
+
 class GyroManager: DataServiceProtocol {
     let motionManager = AppDelegate.sharedInstance().motionManager  // weird singleton instance attached to appdelegate - ah, shares with accelerometer
 
     // the basics
     let storeType = "gyro"
     let dataStorage: DataStorage
-    var datapoints = [[String]]()
+    var datapoints = [GyroDataPoint]()
+    
+    // Gyro's callback has a non-optional queue, we want exactly one queue.
+    // We need a lock because arrays are not atomic and flush can be called mid-update.
+    let cachelock = NSLock()
     let queue = OperationQueue()
     
     // we need an offset for time calculations
@@ -48,12 +59,22 @@ class GyroManager: DataServiceProtocol {
         // set the closure as the delegate function
         self.motionManager.startGyroUpdates(to: self.queue) { (gyroData: CMGyroData?, _: Error?) in
             if let gyroData = gyroData {
-                var data: [String] = []
-                data.append(String(Int64((gyroData.timestamp + self.offset_since_1970) * 1000)))
-                data.append(String(gyroData.rotationRate.x))
-                data.append(String(gyroData.rotationRate.y))
-                data.append(String(gyroData.rotationRate.z))
                 
+                // assemble our struct, safely append to list, flush after enough data points
+                let data = GyroDataPoint(
+                    timestamp: gyroData.timestamp,
+                    x: gyroData.rotationRate.x,
+                    y: gyroData.rotationRate.y,
+                    z: gyroData.rotationRate.z
+                )
+                
+                self.cachelock.lock()
+                self.datapoints.append(data)
+                self.cachelock.unlock()
+                
+                if self.datapoints.count > GYRO_CACHE_SIZE {
+                    self.flush()
+                }
             }
         }
         AppEventManager.sharedInstance.logAppEvent(event: "gyro_on", msg: "Gyro collection on")
@@ -77,14 +98,24 @@ class GyroManager: DataServiceProtocol {
         self.flush()
         self.dataStorage.reset()
     }
-    
+
     func flush() {
         // todo - bulk write?
-        let data_to_write = self.datapoints
+        self.cachelock.lock()
+        let data_to_write: [GyroDataPoint] = self.datapoints
         self.datapoints = []
-        for data in data_to_write {
-            self.dataStorage.store(data)
+        self.cachelock.unlock()
+        
+        // maximize compiler optimization and cpu loop unrolling with an array literal in a loop?
+        for gyroData in data_to_write {
+            self.dataStorage.store(
+                [
+                    String(Int64((gyroData.timestamp + self.offset_since_1970) * 1000)),
+                    String(gyroData.x),
+                    String(gyroData.y),
+                    String(gyroData.z)
+                ]
+            )
         }
     }
-
 }

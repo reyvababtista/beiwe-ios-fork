@@ -51,6 +51,7 @@ let POST_UPLOAD_QUEUE = DispatchQueue(label: "org.beiwe.postupload_queue", qos: 
 let ACCELEROMETER_CACHE_SIZE = 100
 let DEVICE_MOTION_CACHE_SIZE = 100
 let GPS_CACHE_SIZE = 100
+let GYRO_CACHE_SIZE = 100
 let MAGNETOMETER_CACHE_SIZE = 100
 
 struct Ephemerals {
