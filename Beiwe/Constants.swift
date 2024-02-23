@@ -14,19 +14,19 @@ struct Constants {
     
     static let HEARTBEAT_INTERVAL = 300.0 // 5 minutes
     
-    static let APP_VERSION: () -> String = {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+    static var APP_VERSION: String {
+        return Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
     }
     
-    static let APP_BUILD: () -> String = {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
+    static var APP_BUILD: String {
+        return Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
     }
     
-    static let APP_COMMIT: () -> String = {
-        Bundle.main.infoDictionary?["GitCommitHash"] as? String ?? "Unknown"
+    static var APP_COMMIT: String {
+        return Bundle.main.infoDictionary?["GitCommitHash"] as? String ?? "Unknown"
     }
     
-    static let APP_INFO_TAG = "iOS Version: \(String(describing: Constants.APP_VERSION)) Build: \(String(describing: Constants.APP_BUILD)) Commit: \(String(describing: Constants.APP_COMMIT))"
+    static let APP_INFO_TAG = "iOS Version: \(Constants.APP_VERSION) Build: \(Constants.APP_BUILD) Commit: \(Constants.APP_COMMIT)"
 }
 
 let DEV_TIMEZONE = "America/New_York"
