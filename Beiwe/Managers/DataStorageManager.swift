@@ -578,7 +578,7 @@ class DataStorage {
     private func encrypted_write(_ line: String) {
         self.ensure_file_exists()
         let iv: Data = Crypto.sharedInstance.randomBytes(16)
-        let encrypted = Crypto.sharedInstance.aesEncrypt(iv, key: self.aesKey, plainText: line)!
+        let encrypted = Crypto.sharedInstance.aesEncrypt(iv, key: self.aesKey, plainText: line)
         let base64_data = (
             Crypto.sharedInstance.base64ToBase64URL(iv.base64EncodedString(options: []))
                 + ":"

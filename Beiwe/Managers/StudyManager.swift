@@ -5,6 +5,7 @@ import Firebase
 import Foundation
 import ObjectMapper
 import ReachabilitySwift
+import Sentry
 
 
 /// Contains all sorts of miiscellaneous study related functionality - this is badly factored and should be refactored into classes that contain their own well-defirned things
@@ -22,9 +23,8 @@ class StudyManager {
     var keyRef: SecKey? // the study's security key
     
     // State tracking variables
-    var files_in_flight = [String]() // the filees we are currently trying to upload.
     var sensorsStartedEver = false
-    let surveysUpdatedEvent: Event<Int> = Event<Int>() // I don't know what this is. sometimes we emit events, like when closing a survey
+    let surveysUpdatedEvent: EmitterKit.Event<Int> = EmitterKit.Event<Int>() // I don't know what this is. sometimes we emit events, like when closing a survey
     static var real_study_loaded = false
     
     var isStudyLoaded: Bool { // returns true if self.currentStudy is populated
@@ -494,7 +494,9 @@ class StudyManager {
             currentStudy.missedUploadCheck = !reachable // if not reachable we missed the upload check
             self.setNextUploadTime()
             if reachable {
-                self.upload() // this is actually pretty fast, alamofire doesn't block
+                UPLOAD_DISPATCH_QUEUE.async {
+                    self.upload() // this is actually pretty fast, alamofire doesn't block
+                }
             }
         }
         
@@ -951,6 +953,14 @@ class StudyManager {
     /// It would be _nice_ if we could fix this, but it shouldn't be a huge issue.
     
     
+    // after sticking upload dispatch on a queue (with a file-in-flight count maximum) we no longer
+    // need this list to block overlapping runs by caching the names, could use a counter. But,
+    // then we have no info?
+    var files_in_flight = [String]() // the files we are currently trying to upload.
+    var files_with_encoding_errors = [String]()
+    let files_in_flight_lock = NSLock()
+    
+    
     /// This function always runs on the POST_UPLOAD_QUEUE
     /// Beiwe servers only respond with statuscodes on data upload. 200 means it was uploaded
     /// and we should delete the file, everything else means it didn't work and we should try again.
@@ -967,7 +977,7 @@ class StudyManager {
                 if statusCode >= 200 && statusCode < 300 {
                     print("Success uploading: \(filename) with message '\(body_response_string)'.")
                     AppEventManager.sharedInstance.logAppEvent(
-                        event: "uploaded", msg: "Uploaded data file", d1: filename)
+                        event: "uploaded", msg: "Uploaded data file", d1: filename, d2: body_response_string)
                     AppEventManager.sharedInstance.logAppEvent(
                         event: "upload_complete", msg: "Upload Complete")
                     self.currentStudy!.lastUploadSuccess = Int64(NSDate().timeIntervalSince1970)
@@ -979,16 +989,15 @@ class StudyManager {
                         let minipath = filePath.path.split(separator: "/").last!
                         
                         // this seems to happen whenever we have overlapping runs of uploading the same file.
-                        print("Error deleting file '\(minipath)': \(error) (wtaf)")
+                        print("Error deleting file '\(minipath)': \(error)")
                         // fatalError("could not delete a file??")
                     }
-                    
                 } else {
                     // non-200 status codes
                     error_message = "bad statuscode: \(statusCode) for file \(filename) with message '\(body_response_string)'"
                 }
             } else {
-                error_message = "upload failed - no status code or .failure case? for file \(filename)"
+                error_message = "upload failed - not a status code or other .failure case? for file \(filename)"
             }
         case .failure:
             // this case triggers when there are normal kinds of errors like a timeout.
@@ -997,60 +1006,114 @@ class StudyManager {
         
         if error_message != "" {
             print(error_message)
+            AppEventManager.sharedInstance.logAppEvent(
+                event: "upload error", msg: error_message, d1: filename)
         }
         
+        self.files_in_flight_lock.lock()
         // there should REALLY only be one of these but just in case we will do all of them
         self.files_in_flight.removeAll(where: { $0 == filename })
+        self.files_in_flight_lock.unlock()
     }
     
     /// business logic of the upload.
     /// processOnly means don't upload (it's based on reachability)
     func upload() {
-        log.info("Checking for uploads...")
+        Ephemerals.start_last_upload = dateFormat(Date())
+        print("Checking for uploads...")
+        
         // if we can't enumerate files, that's insane, crash.
         let fileEnumerator: FileManager.DirectoryEnumerator =
-            FileManager.default.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)!
+        FileManager.default.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)!
         var filesToProcess: [String] = []
         
         // loop over all and check if each file can be uploaded, assemble the list.
         while let filename = fileEnumerator.nextObject() as? String {
             if DataStorageManager.sharedInstance.isUploadFile(filename) {
-                if self.files_in_flight.contains(filename) {
-                    let minipath = filename.split(separator: "/").last!
-                    print("skipping \(minipath) because its already being uploaded right now")
+                // don't actually know if this can cause a thread confict, don't care, wrapping.
+                files_in_flight_lock.lock()
+                let skip = self.files_in_flight.contains(filename)
+                files_in_flight_lock.unlock()
+                
+                // this skip check should never fire because we are on a queue.
+                if skip {
+                    let just_the_filename = filename.split(separator: "/").last!
+                    print("skipping \(just_the_filename) because its already being uploaded right now")
                     continue
+                } else {
+                    dispatch_upload(filename)
                 }
+                
+                self.files_in_flight_lock.lock()
                 filesToProcess.append(filename)
+                self.files_in_flight_lock.unlock()
+                
+                // rate limit dispatching any more upload attempts (which will die inside Alamofire
+                // with a _timeout_ error for some reason... and also some files that
+                // time out _actually_ _upload_ _which_ _is_ _insane_) by waiting for one second
+                // until there are fewer than... 11.
+                while self.files_in_flight.count > 10 {
+                    print("self.files_in_flight.count:", self.files_in_flight.count)
+                    sleep(1)
+                }
             }
         }
+        Ephemerals.end_last_upload = dateFormat(Date())
+        print("Done with uploads.")
+    }
+    
+    func dispatch_upload(_ filename: String) {
+        let filePath: URL = DataStorageManager.uploadDataDirectory().appendingPathComponent(filename)
+        let uploadRequest = UploadRequest(fileName: filename, filePath: filePath.path)
         
-        for filename in filesToProcess {
-            let filePath: URL = DataStorageManager.uploadDataDirectory().appendingPathComponent(filename)
-            let uploadRequest = UploadRequest(fileName: filename, filePath: filePath.path)
-            
-            // do an upload - this does not block. it dispatches the upload operation onto the
-            // AlamoFire root queue, and then eventually our callbacks get called.
-            ApiManager.sharedInstance.makeMultipartUploadRequest(
-                uploadRequest,
-                file: filePath,
-                completionQueue: POST_UPLOAD_QUEUE,
-                httpSuccessCompletionHandler: { (dataResponse: DataResponse<String>) in
-                    self.uploadAttemptResponseHandler(dataResponse, filename: filename, filePath: filePath)
-                },
-                encodingErrorHandler: { (error: Error) in
-                    AppEventManager.sharedInstance.logAppEvent(
-                        event: "upload_file_failed", msg: "Failed Uploaded data file", d1: filename)
-                    log.error("Encoding error?: \(error)")
-                    
-                    // ok we will MINIMIZE the impact of this to once-per-app-launch by just never
-                    // removing it from files_in_flight.
-                    
-                    // fatalError("we need to find a way to report these? \(error)")
+        // do an upload - this does not block. it dispatches the upload operation onto the
+        // AlamoFire root queue, and then eventually our callbacks get called.
+        ApiManager.sharedInstance.makeMultipartUploadRequest(
+            uploadRequest,
+            file: filePath,
+            completionQueue: POST_UPLOAD_QUEUE,
+            httpSuccessCompletionHandler: { (dataResponse: DataResponse<String>) in
+                self.uploadAttemptResponseHandler(dataResponse, filename: filename, filePath: filePath)
+            },
+            encodingErrorHandler: { (error: Error) in
+                AppEventManager.sharedInstance.logAppEvent(
+                    event: "upload_file_failed", msg: "Failed Uploaded data file", d1: filename)
+                log.error("Encoding error?: \(error)")
+                
+                // we don't know when this error happens, but the upload has failed, remove from list
+                self.files_in_flight_lock.lock()
+                self.files_in_flight.removeAll(where: { $0 == filename })
+                self.files_in_flight_lock.unlock()
+                
+                // report this error to Sentry (but only once per app launch, by checking/appending
+                // file name to a list)
+                if !self.files_with_encoding_errors.contains(filename) {
+                    if let sentry_client = Client.shared {
+                        sentry_client.snapshotStacktrace {
+                            let event = Sentry.Event(level: .error)
+                            event.message = "Encountered encoding error while uploading file"
+                            event.environment = Constants.APP_INFO_TAG
+                            
+                            // todo does this always exist?
+                            if event.extra == nil {
+                                event.extra = [:]
+                            }
+                            if var extras = event.extra {
+                                extras["error"] = "\(error)"
+                                extras["filename"] = filename
+                            }
+                            sentry_client.appendStacktrace(to: event)
+                            sentry_client.send(event: event)
+                        }
+                    }
+                    self.files_with_encoding_errors.append(filename)
                 }
-            )
-            self.files_in_flight.append(filename)
-            print("upload for \(filename) dispatched")
-        }
+            }
+        )
+        files_in_flight_lock.lock()
+        self.files_in_flight.append(filename)
+        files_in_flight_lock.unlock()
+        print("upload for \(filename) dispatched")
     }
     
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

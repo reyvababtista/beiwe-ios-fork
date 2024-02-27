@@ -119,6 +119,12 @@ class ApiManager {
         // background refresh
         device_status_report["background_refresh_status"] = Ephemerals.backgroundRefreshStatus
         
+        // uploads info
+        device_status_report["last_upload_start"] = Ephemerals.start_last_upload
+        device_status_report["last_upload_end"] = Ephemerals.end_last_upload
+        // is there a possible threading error here on accessing files_in_flight?
+        device_status_report["number_uploads_queued"] = String(StudyManager.sharedInstance.files_in_flight.count)
+        
         // object cannot fail to be serialized, data types are valid.
         // stupid. We need to convert a [String:String] to a json object, which is a Data (bytes) and then we need to convert THAT to a string.
         let statusAsJsonDictData = try! JSONSerialization.data(withJSONObject: device_status_report, options: [])

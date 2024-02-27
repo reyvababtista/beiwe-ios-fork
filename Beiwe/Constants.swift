@@ -47,6 +47,7 @@ let TIMER_QUEUE = DispatchQueue(label: "org.beiwe.timer_queue", attributes: [])
 let INNER_RECLINE_QUEUE = DispatchQueue(label: "org.beiwe.recline_queue_1", qos: .userInteractive, attributes: []) // setting high on this queue because it is the database.
 let OUTER_RECLINE_QUEUE = DispatchQueue(label: "org.beiwe.recline_queue_2", qos: .userInteractive, attributes: []) // setting high on this queue because it is the database.
 let POST_UPLOAD_QUEUE = DispatchQueue(label: "org.beiwe.postupload_queue", qos: .default, attributes: [])
+let UPLOAD_DISPATCH_QUEUE = DispatchQueue(label: "org.beiwe.run_upload_queue", qos: .background, attributes: [])
 
 let ACCELEROMETER_CACHE_SIZE = 100
 let DEVICE_MOTION_CACHE_SIZE = 100
@@ -62,4 +63,6 @@ struct Ephemerals {
     static var backgroundRefreshStatus = "not populated, this is an app bug"
     static var transition_count = 0
     static var background_task_count = "(not populated yet?)"
+    static var start_last_upload = "not populated"
+    static var end_last_upload = "not populated"
 }
