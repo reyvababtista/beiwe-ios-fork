@@ -67,7 +67,7 @@ class ApiManager {
         
         // basic device info, will be displayed on the participant page
         parameters["version_code"] = Constants.APP_VERSION
-        parameters["version_name"] = Constants.APP_COMMIT
+        parameters["version_name"] = Constants.APP_BUILD
         
         parameters["os_version"] = UIDevice.current.systemVersion
         parameters["timezone"] = TimeZone.current.identifier
@@ -75,6 +75,7 @@ class ApiManager {
         // various device metrics to be improved on over time, meant for developer use to debug issues.
         var device_status_report = [String: String]()
         
+        device_status_report["app_commit"] = Constants.APP_COMMIT
         device_status_report["timestamp"] = timestampString() + " " + TimeZone.current.identifier
         device_status_report["transition_count"] = Ephemerals.transition_count.description
         
