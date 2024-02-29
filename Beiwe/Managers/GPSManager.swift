@@ -11,6 +11,44 @@ let gps_headers = [
     "accuracy",
 ]
 
+
+// accuracy options:
+// kCLLocationAccuracyBestForNavigation
+// kCLLocationAccuracyBest
+// kCLLocationAccuracyNearestTenMeters
+// kCLLocationAccuracyHundredMeters
+// kCLLocationAccuracyKilometer
+// kCLLocationAccuracyThreeKilometers
+
+// self.locationManager.distanceFilter:
+// Specifies the minimum update distance in meters. Client will not be notified of movements of less
+// than the stated value, unless the accuracy has improved. Pass in kCLDistanceFilterNone to be
+// notified of all movements. By default, kCLDistanceFilterNone is used.
+
+// Worst accuracy (off but still connected to gps)
+// self.locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers // loose accuracy?
+// self.locationManager.distanceFilter = 99999 // value in meters - "Pass in kCLDistanceFilterNone to be notified of all movements"
+
+// probably still not viable
+// self.locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+// self.locationManager.distanceFilter = 50  // ?
+
+// reasonable accuracy - we will test this
+// self.locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+// self.locationManager.distanceFilter = 10
+
+// best accuracy
+// self.locationManager.desiredAccuracy = kCLLocationAccuracyBest
+// self.locationManager.distanceFilter = kCLDistanceFilterNone
+
+// set the desired
+let THE_DESIRED_ACTIVE_ACCURACY = kCLLocationAccuracyBest
+let THE_DESIRED_ACTIVE_DISTANCE_FILTER = kCLDistanceFilterNone
+
+let THE_DESIRED_INACTIVE_ACCURACY = kCLLocationAccuracyBest
+let THE_DESIRED_INACTIVE_DISTANCE_FILTER = kCLDistanceFilterNone
+
+
 /// The GPS Manager.
 /// The GPSManager is a critical component of app persistence, it is instantiated even if the study
 /// is not using the GPS data stream, it just doesn't do anything with the data.
@@ -48,34 +86,8 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
         self.locationManager.activityType = CLActivityType.other // most permissive I think
         self.locationManager.allowsBackgroundLocationUpdates = true // do not require app be in foreground
         
-        // accuracy options:
-        // kCLLocationAccuracyBestForNavigation
-        // kCLLocationAccuracyBest
-        // kCLLocationAccuracyNearestTenMeters
-        // kCLLocationAccuracyHundredMeters
-        // kCLLocationAccuracyKilometer
-        // kCLLocationAccuracyThreeKilometers
-        
-        // self.locationManager.distanceFilter:
-        // Specifies the minimum update distance in meters. Client will not be notified of movements of less
-        // than the stated value, unless the accuracy has improved. Pass in kCLDistanceFilterNone to be
-        // notified of all movements. By default, kCLDistanceFilterNone is used.
-        
-        // Worst accuracy (off but still connected to gps)
-        // self.locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers // loose accuracy?
-        // self.locationManager.distanceFilter = 99999 // value in meters - "Pass in kCLDistanceFilterNone to be notified of all movements"
-        
-        // probably still not viable
-        // self.locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-        // self.locationManager.distanceFilter = 50
-        
-        // reasonable accuracy - we should test this
-        // self.locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
-        // self.locationManager.distanceFilter = 5
-        
-        // best accuracy
-        self.locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        self.locationManager.distanceFilter = kCLDistanceFilterNone
+        self.locationManager.desiredAccuracy = THE_DESIRED_INACTIVE_ACCURACY
+        self.locationManager.distanceFilter = THE_DESIRED_INACTIVE_DISTANCE_FILTER
         
         // permission check
         self.locationManager.requestAlwaysAuthorization()
@@ -187,8 +199,8 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
         AppEventManager.sharedInstance.logAppEvent(event: "gps_on", msg: "GPS collection on")
         self.isCollectingGps = true
         // disable changing this at all
-        // self.locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        // self.locationManager.distanceFilter = kCLDistanceFilterNone
+        self.locationManager.desiredAccuracy = THE_DESIRED_ACTIVE_ACCURACY
+        self.locationManager.distanceFilter = THE_DESIRED_ACTIVE_DISTANCE_FILTER
     }
 
     /// stop collecting
@@ -196,10 +208,8 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
         // print("Pausing \(self.storeType) collection")
         AppEventManager.sharedInstance.logAppEvent(event: "gps_off", msg: "GPS collection off")
         self.isCollectingGps = false
-        
-        // currently testing disabling these so that it is always at best filter, other filter rates, etc.
-        // self.locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
-        // self.locationManager.distanceFilter = 99999
+        self.locationManager.desiredAccuracy = THE_DESIRED_INACTIVE_ACCURACY
+        self.locationManager.distanceFilter = THE_DESIRED_INACTIVE_DISTANCE_FILTER
     }
 
     /// only called in self.stopAndClear
