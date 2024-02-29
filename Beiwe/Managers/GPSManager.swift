@@ -42,11 +42,11 @@ let gps_headers = [
 // self.locationManager.distanceFilter = kCLDistanceFilterNone
 
 // set the desired
-let THE_DESIRED_ACTIVE_ACCURACY = kCLLocationAccuracyBest
-let THE_DESIRED_ACTIVE_DISTANCE_FILTER = kCLDistanceFilterNone
+let THE_DESIRED_ACTIVE_ACCURACY = kCLLocationAccuracyNearestTenMeters
+let THE_DESIRED_ACTIVE_DISTANCE_FILTER = 10.0
 
-let THE_DESIRED_INACTIVE_ACCURACY = kCLLocationAccuracyBest
-let THE_DESIRED_INACTIVE_DISTANCE_FILTER = kCLDistanceFilterNone
+let THE_DESIRED_INACTIVE_ACCURACY = kCLLocationAccuracyNearestTenMeters
+let THE_DESIRED_INACTIVE_DISTANCE_FILTER = 10.0
 
 
 /// The GPS Manager.
