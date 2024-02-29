@@ -186,8 +186,9 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
         // print("Turning \(self.storeType) collection on")
         AppEventManager.sharedInstance.logAppEvent(event: "gps_on", msg: "GPS collection on")
         self.isCollectingGps = true
-        self.locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        self.locationManager.distanceFilter = kCLDistanceFilterNone
+        // disable changing this at all
+        // self.locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        // self.locationManager.distanceFilter = kCLDistanceFilterNone
     }
 
     /// stop collecting
