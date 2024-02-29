@@ -553,12 +553,12 @@ class StudyManager {
         })
     }
     
-    /// dispatches the heartbeat task to run in a loop forever every 5 minutes.
+    /// dispatches the heartbeat signal to the server
     func heartbeat(_ message: String) {
         print("Sending heartbeat...")
         ApiManager.sharedInstance.extremelySimplePostRequest(
             "/mobile-heartbeat/",
-            extra_parameters: ["message": message]
+            extra_parameters: ["message": "(" + message + ")"]
         )
     }
     
@@ -975,11 +975,14 @@ class StudyManager {
                 if body_response_string == "" { body_response_string = "(no message)" }
                 
                 if statusCode >= 200 && statusCode < 300 {
-                    print("Success uploading: \(filename) with message '\(body_response_string)'.")
+                    if !body_response_string.contains("upload successful") {
+                        print("Success uploading: \(filename) with message '\(body_response_string)'.")
+                    }
                     AppEventManager.sharedInstance.logAppEvent(
                         event: "uploaded", msg: "Uploaded data file", d1: filename, d2: body_response_string)
                     AppEventManager.sharedInstance.logAppEvent(
                         event: "upload_complete", msg: "Upload Complete")
+                    
                     self.currentStudy!.lastUploadSuccess = Int64(NSDate().timeIntervalSince1970)
                     Recline.shared.save(self.currentStudy!)
                     
@@ -1053,7 +1056,7 @@ class StudyManager {
                 // time out _actually_ _upload_ _which_ _is_ _insane_) by waiting for one second
                 // until there are fewer than... 11.
                 while self.files_in_flight.count > 10 {
-                    print("self.files_in_flight.count:", self.files_in_flight.count)
+                    // print("self.files_in_flight.count:", self.files_in_flight.count)
                     sleep(1)
                 }
             }
@@ -1113,7 +1116,7 @@ class StudyManager {
         files_in_flight_lock.lock()
         self.files_in_flight.append(filename)
         files_in_flight_lock.unlock()
-        print("upload for \(filename) dispatched")
+        // print("upload for \(filename) dispatched")
     }
     
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

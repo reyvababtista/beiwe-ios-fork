@@ -11,63 +11,131 @@ let gps_headers = [
     "accuracy",
 ]
 
-/// The GPS Manager.  Note that GPS is a critical component of the app being able to stay persistent
+/// The GPS Manager.
+/// The GPSManager is a critical component of app persistence, it is instantiated even if the study
+/// is not using the GPS data stream, it just doesn't do anything with the data.
 class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
     // Location
     let locationManager = CLLocationManager()
     var lastLocations: [CLLocation]?
-
+    
     // settings
     var enableGpsFuzzing: Bool = false
     var fuzzGpsLatitudeOffset: Double = 0.0
     var fuzzGpsLongitudeOffset: Double = 0.0
-
+    
     // State
     var isCollectingGps: Bool = false
-    var isDeferringUpdates = false  // this doesn't seem to do anything in this subclass of CLLocationManagerDelegate, and also isn't part of the superclass.  unclear purpose.
-
+    
     // gps storage
     var datapoints = [[String]]()
     let cacheLock = NSLock()
     
-    static let static_storeType = "gps" // ok this is a little
-    let storeType = GPSManager.static_storeType
+    // ok this is a little dumb but we need to do it to conform to the DataServiceProtocol
+    static let static_storeType = "gps"
+    let storeType = "gps"
     var dataStorage: DataStorage?
     
     /// checks gps permission - IDE warning about UI unresponsiveness appears to never be an issue.
     func gpsAllowed() -> Bool {
-        return CLLocationManager.locationServicesEnabled() && CLLocationManager.authorizationStatus() == .authorizedAlways
+        return CLLocationManager.locationServicesEnabled()
+            && CLLocationManager.authorizationStatus() == .authorizedAlways
     }
-
+    
     /// starts GPS
     func startGps() {
         self.locationManager.delegate = self // assigns this instance of the class as the gps delegate class
         self.locationManager.activityType = CLActivityType.other // most permissive I think
-        self.locationManager.allowsBackgroundLocationUpdates = true // does not require app be in foreground
-        self.locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers // loose accuracy?
-        self.locationManager.distanceFilter = 99999 // value in meters - "Pass in kCLDistanceFilterNone to be notified of all movements"
+        self.locationManager.allowsBackgroundLocationUpdates = true // do not require app be in foreground
+        
+        // accuracy options:
+        // kCLLocationAccuracyBestForNavigation
+        // kCLLocationAccuracyBest
+        // kCLLocationAccuracyNearestTenMeters
+        // kCLLocationAccuracyHundredMeters
+        // kCLLocationAccuracyKilometer
+        // kCLLocationAccuracyThreeKilometers
+        
+        // self.locationManager.distanceFilter:
+        // Specifies the minimum update distance in meters. Client will not be notified of movements of less
+        // than the stated value, unless the accuracy has improved. Pass in kCLDistanceFilterNone to be
+        // notified of all movements. By default, kCLDistanceFilterNone is used.
+        
+        // Worst accuracy (off but still connected to gps)
+        // self.locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers // loose accuracy?
+        // self.locationManager.distanceFilter = 99999 // value in meters - "Pass in kCLDistanceFilterNone to be notified of all movements"
+        
+        // probably still not viable
+        // self.locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        // self.locationManager.distanceFilter = 50
+        
+        // reasonable accuracy - we should test this
+        // self.locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        // self.locationManager.distanceFilter = 5
+        
+        // best accuracy
+        self.locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        self.locationManager.distanceFilter = kCLDistanceFilterNone
+        
+        // permission check
         self.locationManager.requestAlwaysAuthorization()
+        
+        // never stop
         self.locationManager.pausesLocationUpdatesAutomatically = false
+        
         // start!
         self.locationManager.startUpdatingLocation()
         self.locationManager.startMonitoringSignificantLocationChanges()
     }
     
-    /// stops the location manager from receiving updates
+    /// Stops the location manager from receiving updates
+    /// This is only called from special locations within the app, like when the app is terminated,
+    /// it is not part of general usage.
     func stopGps() {
         self.locationManager.stopUpdatingLocation()
+        AppEventManager.sharedInstance.logAppEvent(event: "gps stopped due to app termination")
     }
  
     /// this misnamed function records a single location datapoint but safely - this is an overridden function afaik
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        // we don't record data when a recording session is not active
         if self.isCollectingGps && StudyManager.sharedInstance.timerManager.areServicesRunning {
             self.recordGpsData(manager, locations: locations)
         }
     }
 
-    /// this misnamed function sets self.isDeferringUpdates to false? literally never called... (part of a superclass)
-    func locationManager(_ manager: CLLocationManager, didFinishDeferredUpdatesWithError error: Error?) {
-        self.isDeferringUpdates = false
+    /// gps paused
+    //Invoked when location updates are automatically paused.
+    func locationManagerDidPauseLocationUpdates(_ manager: CLLocationManager) {
+        print("gps paused message received")
+        AppEventManager.sharedInstance.logAppEvent(event: "gps paused message received")
+    }
+
+    /// gps resumed
+    // Invoked when location updates are automatically resumed. In the event that your
+    // application is terminated while suspended, you will not receive this notification. */
+    func locationManagerDidResumeLocationUpdates(_ manager: CLLocationManager) {
+        print("gps resumed message received")
+        AppEventManager.sharedInstance.logAppEvent(event: "gps resumed message received")
+    }
+    
+    // Invoked when deferred updates will no longer be delivered. Stopping location, disallowing deferred
+    // updates, and meeting a specified criterion are all possible reasons for finishing deferred updates.
+    // An error will be returned if deferred updates end before the specified
+    // criteria are met (see CLError), otherwise error will be nil.
+    func locationManager(_ manager: CLLocationManager, didFinishDeferredUpdatesWithError error: Error?){
+        let error_message: String
+        if let error = error { error_message = error.localizedDescription } else { error_message = "no error"}
+        print("gps \"FinishDeferredUpdatesWithError\" error message received '\(error_message)")
+        AppEventManager.sharedInstance.logAppEvent(event: "gps \"FinishDeferredUpdatesWithError\" error message received", d1: error_message)
+    }
+    
+    /*  locationManager:didFailWithError:
+    Invoked when an error has occurred. Error types are defined in "CLError.h". */
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        let error_message = error.localizedDescription
+        print("gps \"didFailWithError\" error message received '\(error_message)")
+        AppEventManager.sharedInstance.logAppEvent(event: "gps \"didFailWithError\" error message received", d1: error_message)
     }
 
     /// records a single line of data to the gps csv, implements gps fuzzing
@@ -127,9 +195,10 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
         // print("Pausing \(self.storeType) collection")
         AppEventManager.sharedInstance.logAppEvent(event: "gps_off", msg: "GPS collection off")
         self.isCollectingGps = false
-        // TODO: test disabling these so that it is always at best filter, other filter rates, etc.
-        self.locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
-        self.locationManager.distanceFilter = 99999
+        
+        // currently testing disabling these so that it is always at best filter, other filter rates, etc.
+        // self.locationManager.desiredAccuracy = kCLLocationAccuracyThreeKilometers
+        // self.locationManager.distanceFilter = 99999
     }
 
     /// only called in self.stopAndClear
@@ -157,3 +226,105 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
         }
     }
 }
+
+
+/// These are the other GPS hooks and their documentation
+
+/// deferred updates - why on earth are these called "deferred"? These are just gps updates! wtf
+/// receive deferred
+/*  locationManager:didUpdateLocations:
+Invoked when new locations are available.  Required for delivery of deferred locations.
+If implemented, updates will not be delivered to locationManager:didUpdateToLocation:fromLocation:
+locations is an array of CLLocation objects in chronological order. */
+// optional func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation])
+/// deferred error
+/*  locationManager:didFinishDeferredUpdatesWithError:
+Invoked when deferred updates will no longer be delivered. Stopping location, disallowing deferred
+updates, and meeting a specified criterion are all possible reasons for finishing deferred updates.
+An error will be returned if deferred updates end before the specified
+criteria are met (see CLError), otherwise error will be nil. */
+// optional func locationManager(_ manager: CLLocationManager, didFinishDeferredUpdatesWithError error: Error?)
+
+
+/// Heading? probably part of navigation apps.
+
+/// part of driving mode? not useful.
+/*  locationManager:didUpdateHeading: Invoked when a new heading is available. */
+// optional func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading)
+
+/// part of driving? not useful
+/*  locationManagerShouldDisplayHeadingCalibration:
+Invoked when a new heading is available. Return YES to display heading calibration info. The display
+will remain until heading is calibrated, unless dismissed early via dismissHeadingCalibrationDisplay. */
+// optional func locationManagerShouldDisplayHeadingCalibration(_ manager: CLLocationManager) -> Bool
+
+
+/// "important" location updates?
+
+/// part of important location updates? not useful
+/*  locationManager:didVisit:
+Invoked when the CLLocationManager determines that the device has visited a
+location, if visit monitoring is currently started (possibly from a prior launch). */
+// optional func locationManager(_ manager: CLLocationManager, didVisit visit: CLVisit)
+
+
+
+/// Regions?
+
+/// "DetermineState"??
+/*  locationManager:didDetermineState:forRegion:
+Invoked when there's a state transition for a monitored region or in response to a request for state via a
+a call to requestStateForRegion:. */
+// optional func locationManager(_ manager: CLLocationManager, didDetermineState state: CLRegionState, for region: CLRegion)
+/// Enter
+/*  locationManager:didEnterRegion:
+Invoked when the user enters a monitored region.  This callback will be invoked for every allocated
+CLLocationManager instance with a non-nil delegate that implements this method. */
+// optional func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion)
+/// Exit
+/*  locationManager:didExitRegion:
+Invoked when the user exits a monitored region.  This callback will be invoked for every allocated
+CLLocationManager instance with a non-nil delegate that implements this method. */
+// optional func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion)
+/// Region errors
+/*  locationManager:monitoringDidFailForRegion:withError:
+Invoked when a region monitoring error has occurred. Error types are defined in "CLError.h". */
+// optional func locationManager(_ manager: CLLocationManager, monitoringDidFailFor region: CLRegion?, withError error: Error)
+/// start monitoring regions
+/*  locationManager:didStartMonitoringForRegion:
+      Invoked when a monitoring for a region started successfully. */
+// optional func locationManager(_ manager: CLLocationManager, didStartMonitoringFor region: CLRegion)
+
+
+///Beacons?
+
+/// what are beacons...
+/*  locationManager:didRangeBeacons:inRegion:
+Invoked when a new set of beacons are available in the specified region. beacons is an array of CLBeacon objects.
+If beacons is empty, it may be assumed no beacons that match the specified region are nearby.
+Similarly if a specific beacon no longer appears in beacons, it may be assumed the beacon is no longer received
+by the device. */
+// optional func locationManager(_ manager: CLLocationManager, didRangeBeacons beacons: [CLBeacon], in region: CLBeaconRegion)
+/// more beacons
+/*  locationManager:rangingBeaconsDidFailForRegion:withError:
+Invoked when an error has occurred ranging beacons in a region. Error types are defined in "CLError.h". */
+// optional func locationManager(_ manager: CLLocationManager, rangingBeaconsDidFailFor region: CLBeaconRegion, withError error: Error)
+/// even more beacons
+// optional func locationManager(_ manager: CLLocationManager, didRange beacons: [CLBeacon], satisfying beaconConstraint: CLBeaconIdentityConstraint)
+// optional func locationManager(_ manager: CLLocationManager, didFailRangingFor beaconConstraint: CLBeaconIdentityConstraint, error: Error)
+
+
+/// errors....
+/*  locationManager:didFailWithError:
+Invoked when an error has occurred. Error types are defined in "CLError.h". */
+// optional func locationManager(_ manager: CLLocationManager, didFailWithError error: Error)
+
+/// Authorization changed
+/// auth change 1
+/*  locationManager:didChangeAuthorizationStatus:
+Invoked when the authorization status changes for this application. */
+// optional func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus)
+/// auth change 2
+/*  locationManagerDidChangeAuthorization:
+Invoked when either the authorizationStatus or accuracyAuthorization properties change */
+// optional func locationManagerDidChangeAuthorization(_ manager: CLLocationManager)
