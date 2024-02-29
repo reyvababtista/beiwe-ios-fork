@@ -65,4 +65,10 @@ struct Ephemerals {
     static var background_task_count = "(not populated yet?)"
     static var start_last_upload = "not populated"
     static var end_last_upload = "not populated"
+    
+    static var lastAppStart = Constants.DEFAULT_UNPOPULATED_APPINFO
+    static var lastApplicationDidBecomeActive = Constants.DEFAULT_UNPOPULATED_APPINFO
+    static var lastApplicationDidEnterBackground = Constants.DEFAULT_UNPOPULATED_APPINFO
+    static var lastApplicationDidReceiveMemoryWarning = Constants.DEFAULT_UNPOPULATED_APPINFO
+    static var lastSuccessfulLogin = Constants.DEFAULT_UNPOPULATED_APPINFO
 }

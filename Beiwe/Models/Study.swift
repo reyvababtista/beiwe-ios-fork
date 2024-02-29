@@ -21,7 +21,6 @@ class Study: ReclineObject {
     var nextUploadCheck: Int64?
     var nextSurveyCheck: Int64?
     var nextDeviceSettingsCheck: Int64?
-    var lastUploadSuccess: Int64 = 0
     var missedSurveyCheck: Bool = false
     var missedUploadCheck: Bool = false
     var lastBadgeCnt = 0
@@ -31,20 +30,9 @@ class Study: ReclineObject {
     var submittedTrackingSurveys: Int = 0 // TODO: what is this and is it breaking uploads
 
     // app state tracking - default value is "never_populated"
-    var lastAppStart = Constants.DEFAULT_UNPOPULATED_APPINFO
-    var lastSuccessfulLogin = Constants.DEFAULT_UNPOPULATED_APPINFO
-    var lastFailedToRegisterForNotification = Constants.DEFAULT_UNPOPULATED_APPINFO
     var lastBackgroundPushNotificationReceived = Constants.DEFAULT_UNPOPULATED_APPINFO
     var lastForegroundPushNotificationReceived = Constants.DEFAULT_UNPOPULATED_APPINFO
-    var lastApplicationWillEnterForeground = Constants.DEFAULT_UNPOPULATED_APPINFO
-    var lastApplicationWillFinishLaunchingWithOptions = Constants.DEFAULT_UNPOPULATED_APPINFO
     var lastApplicationWillTerminate = Constants.DEFAULT_UNPOPULATED_APPINFO
-    var lastApplicationWillResignActive = Constants.DEFAULT_UNPOPULATED_APPINFO
-    var lastApplicationDidBecomeActive = Constants.DEFAULT_UNPOPULATED_APPINFO
-    var lastApplicationDidEnterBackground = Constants.DEFAULT_UNPOPULATED_APPINFO
-    var lastApplicationDidReceiveMemoryWarning = Constants.DEFAULT_UNPOPULATED_APPINFO
-    var lastApplicationProtectedDataDidBecomeAvailable = Constants.DEFAULT_UNPOPULATED_APPINFO
-    var lastApplicationProtectedDataWillBecomeUnavailable = Constants.DEFAULT_UNPOPULATED_APPINFO
     
     // Survey app state
     var surveys: [Survey] = []
@@ -85,27 +73,15 @@ class Study: ReclineObject {
         self.submittedTrackingSurveys <- map["submittedTrackingSurveys"]
         self.missedSurveyCheck <- map["missedSurveyCheck"]
         self.missedUploadCheck <- map["missedUploadCheck"]
-        self.lastUploadSuccess <- map["lastUploadSuccess"]
         self.customApiUrl <- map["customApiUrl"]
         self.fuzzGpsLongitudeOffset <- map["fuzzGpsLongitudeOffset"]
         self.fuzzGpsLatitudeOffset <- map["fuzzGpsLatitudeOffset"]
         
         // this is so stupid. The way this works and What On Earth Recline is and how this mapping function I define could even possibly
         // magically be a 2-way binding for data simply isn't documented anywhere.  It just magically exists and is saved without explanaition.
-        self.lastAppStart <- map["lastAppStart"]
-        self.lastSuccessfulLogin <- map["lastSuccessfulLogin"]
-        self.lastFailedToRegisterForNotification <- map["lastFailedToRegisterForNotification"]
         self.lastBackgroundPushNotificationReceived <- map["lastBackgroundPushNotificationReceived"]
         self.lastForegroundPushNotificationReceived <- map["lastForegroundPushNotificationReceived"]
-        self.lastApplicationWillEnterForeground <- map["lastApplicationWillEnterForeground"]
-        self.lastApplicationWillFinishLaunchingWithOptions <- map["lastApplicationWillFinishLaunchingWithOptions"]
         self.lastApplicationWillTerminate <- map["lastApplicationWillTerminate"]
-        self.lastApplicationWillResignActive <- map["lastApplicationWillResignActive"]
-        self.lastApplicationDidBecomeActive <- map["lastApplicationDidBecomeActive"]
-        self.lastApplicationDidEnterBackground <- map["lastApplicationDidEnterBackground"]
-        self.lastApplicationDidReceiveMemoryWarning <- map["lastApplicationDidReceiveMemoryWarning"]
-        self.lastApplicationProtectedDataDidBecomeAvailable <- map["lastApplicationProtectedDataDidBecomeAvailable"]
-        self.lastApplicationProtectedDataWillBecomeUnavailable <- map["lastApplicationProtectedDataWillBecomeUnavailable"]
     }
 
     func surveyExists(surveyId: String?) -> Bool {

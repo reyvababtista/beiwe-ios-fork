@@ -59,7 +59,7 @@ class StudyManager {
         guard let study = self.currentStudy else {
             return
         }
-        self.surveysUpdatedEvent.emit(0) // what is this>?
+        self.surveysUpdatedEvent.emit(0) // what is this?
         Recline.shared.save(study)
     }
     
@@ -319,7 +319,8 @@ class StudyManager {
             }
         }
         
-        // Emits a surveyUpdated event to the listener
+        // this is two saves in close succession
+        // Emits a surveyUpdated event to the listener (_what_ listener - this is why signals are an antipattern)
         StudyManager.sharedInstance.surveysUpdatedEvent.emit(0)
         Recline.shared.save(study)
         
@@ -413,6 +414,9 @@ class StudyManager {
         return surveyDataModified
     }
     
+    // to reduce calls to save there is a single save call in persistentTimerActions
+    // instead of one in each of these setnext functions.
+    
     /// The Persistant timers, these get set and are checked even across app termination.
     func setNextUploadTime() {
         guard let study = currentStudy, let studySettings = study.studySettings else {
@@ -421,7 +425,6 @@ class StudyManager {
         if let t = study.nextUploadCheck { print("previous study.nextUploadCheck:", study.nextUploadCheck!, Date(timeIntervalSince1970: Double(t))) }
         study.nextUploadCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.uploadDataFileFrequencySeconds)
         if let t = study.nextUploadCheck { print("updated study.nextUploadCheck:", study.nextUploadCheck!, Date(timeIntervalSince1970: Double(t))) }
-        Recline.shared.save(study)
     }
     
     func setNextSurveyTime() {
@@ -431,7 +434,6 @@ class StudyManager {
         if let t = study.nextSurveyCheck { print("previous study.nextSurveyCheck:", study.nextSurveyCheck!, Date(timeIntervalSince1970: Double(t))) }
         study.nextSurveyCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.checkForNewSurveysFreqSeconds)
         if let t = study.nextSurveyCheck { print("updated study.nextSurveyCheck:", study.nextSurveyCheck!, Date(timeIntervalSince1970: Double(t))) }
-        Recline.shared.save(study)
     }
     
     func setNextDeviceSettingsTime() {
@@ -441,7 +443,6 @@ class StudyManager {
         if let t = study.nextDeviceSettingsCheck { print("previous study.nextDeviceSettingsCheck:", study.nextDeviceSettingsCheck!, Date(timeIntervalSince1970: Double(t))) }
         study.nextDeviceSettingsCheck = Int64(Date().timeIntervalSince1970) + DEVICE_SETTINGS_INTERVAL
         if let t = study.nextDeviceSettingsCheck { print("updated study.nextDeviceSettingsCheck:", study.nextDeviceSettingsCheck!, Date(timeIntervalSince1970: Double(t))) }
-        Recline.shared.save(study)
     }
     
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -507,7 +508,9 @@ class StudyManager {
             self.updateDeviceSettings()
         }
         
-        // currently disabling the logic here in favor of an easier strategy.
+        Recline.shared.save(currentStudy)
+        
+        // currently disabling the complex logic here in favor of an easier strategy.
         
         // get the next timer - data type is weird.
         // let earliest_timer: Int64 = minThatIsntZeroForStudyTimerDetermination(
@@ -569,10 +572,7 @@ class StudyManager {
             return
         }
         print("inside duplicate survey checker function 1")
-        
-        // save the study and then....
-        Recline.shared.save(study)
-        
+               
         ApiManager.sharedInstance.makePostRequest(
             GetSurveysRequest(), completion_handler: { (response: DataResponse<String>) in
                 var error_message = ""
@@ -623,9 +623,6 @@ class StudyManager {
             return
         }
         print("inside duplicate survey checker function 2")
-        
-        // this code always saved the study beforehand
-        Recline.shared.save(study)
         
         // our logic requires those passed-in parameters,
         ApiManager.sharedInstance.makePostRequest(
@@ -982,9 +979,6 @@ class StudyManager {
                         event: "uploaded", msg: "Uploaded data file", d1: filename, d2: body_response_string)
                     AppEventManager.sharedInstance.logAppEvent(
                         event: "upload_complete", msg: "Upload Complete")
-                    
-                    self.currentStudy!.lastUploadSuccess = Int64(NSDate().timeIntervalSince1970)
-                    Recline.shared.save(self.currentStudy!)
                     
                     do {
                         try FileManager.default.removeItem(at: filePath) // ok I guess this can fail...?
