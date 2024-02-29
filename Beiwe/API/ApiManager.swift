@@ -80,18 +80,12 @@ class ApiManager {
         device_status_report["transition_count"] = Ephemerals.transition_count.description
         
         if let study = StudyManager.sharedInstance.currentStudy {
-            device_status_report["last_application_will_enter_foreground"] = study.lastApplicationWillEnterForeground
-            device_status_report["last_application_will_finish_launching_with_options"] = study.lastApplicationWillFinishLaunchingWithOptions
             device_status_report["last_application_will_terminate"] = study.lastApplicationWillTerminate
-            device_status_report["last_application_will_resign_active"] = study.lastApplicationWillResignActive
-            device_status_report["last_application_did_become_active"] = study.lastApplicationDidBecomeActive
-            device_status_report["last_application_did_enter_background"] = study.lastApplicationDidEnterBackground
-            device_status_report["last_application_did_receive_memory_warning"] = study.lastApplicationDidReceiveMemoryWarning
-            device_status_report["last_application_protected_data_did_become_available"] = study.lastApplicationProtectedDataDidBecomeAvailable
-            device_status_report["last_application_protected_data_will_become_unavailable"] = study.lastApplicationProtectedDataWillBecomeUnavailable
-            device_status_report["last_app_start"] = study.lastAppStart
-            device_status_report["last_successful_login"] = study.lastSuccessfulLogin
-            device_status_report["last_failed_to_register_for_notification"] = study.lastFailedToRegisterForNotification
+            device_status_report["last_application_did_become_active"] = Ephemerals.lastApplicationDidBecomeActive
+            device_status_report["last_application_did_enter_background"] = Ephemerals.lastApplicationDidEnterBackground
+            device_status_report["last_application_did_receive_memory_warning"] = Ephemerals.lastApplicationDidReceiveMemoryWarning
+            device_status_report["last_app_start"] = Ephemerals.lastAppStart
+            device_status_report["last_successful_login"] = Ephemerals.lastSuccessfulLogin
             device_status_report["last_background_push_notification_received"] = study.lastBackgroundPushNotificationReceived
             device_status_report["last_foreground_push_notification_received"] = study.lastForegroundPushNotificationReceived
         }
