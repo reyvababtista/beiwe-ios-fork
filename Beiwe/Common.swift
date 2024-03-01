@@ -140,6 +140,9 @@ func sentry_warning(_ title: String, _ extra1: String? = nil, _ extra2: String? 
                 if let extra = extra3 {
                     extras["extra3"] = extra
                 }
+                if let patient_id = StudyManager.sharedInstance.currentStudy?.patientId {
+                    extras["user_id"] = StudyManager.sharedInstance.currentStudy?.patientId
+                }
             }
             sentry_client.appendStacktrace(to: event)
             sentry_client.send(event: event)

@@ -1098,6 +1098,7 @@ class StudyManager {
                             if var extras = event.extra {
                                 extras["error"] = "\(error)"
                                 extras["filename"] = filename
+                                extras["user_id"] = self.currentStudy!.patientId
                             }
                             sentry_client.appendStacktrace(to: event)
                             sentry_client.send(event: event)

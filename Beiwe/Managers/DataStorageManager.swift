@@ -292,6 +292,9 @@ class DataStorageManager {
                         extras["from"] = shortenPath(src)
                         extras["to"] = shortenPath(dst)
                         extras["error"] = "\(error)"
+                        if let patient_id = StudyManager.sharedInstance.currentStudy?.patientId {
+                            extras["user_id"] = StudyManager.sharedInstance.currentStudy?.patientId
+                        }
                     }
                     sentry_client.appendStacktrace(to: event)
                     sentry_client.send(event: event)
@@ -425,6 +428,17 @@ class DataStorage {
         self._ensure_file_exists(recur: recur)
     }
     
+    /// synchronized with ensure_file_exists
+    /// returns boolean about whether a file exists on the file system for self.
+    private func check_file_exists() -> Bool {
+        // check_file_exists is (hoping for was) ALWAYS in the check_file_exists/ensure_file_exists crashes.
+        defer {
+            self.lock_exists.unlock()
+        }
+        self.lock_exists.lock()
+        return _check_file_exists()
+    }
+    
     ////////////////////////////////////// Informational Functions /////////////////////////////////////////
     
     /// Returns the entire raw string of the first line of a file containing an RSA-encoded decryption key.
@@ -448,8 +462,9 @@ class DataStorage {
         }
     }
     
-    /// returns boolean about whether a file exists on the file system for self.
-    private func check_file_exists() -> Bool {
+   
+    
+    private func _check_file_exists() -> Bool {
         // operation profiled on an iphone 8 plus to take roughly 400-450us average/rms, standard deviation of 200us
         // print("checking that '\(self.filename.path)' exists...")
         return FileManager.default.fileExists(atPath: self.filename.path)
@@ -476,6 +491,18 @@ class DataStorage {
         // log.info("DataStorage.reset called on \(self.name)...")
         if self.moveOnClose == true {
             do {
+                // this operation locks with ensure_file_exists
+                if self.lock_exists.try() {
+                    self.lock_exists.unlock()
+                } else {
+                    sentry_warning("YO DataStorage.reset() is blocked on \(self.type) by file_exists lock, backing off and retrying.")
+                    if recur > 0 {
+                        log.error("reset recur at \(recur).")
+                        Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
+                        return self._reset(recur: recur - 1)
+                    }
+                }
+                
                 if self.check_file_exists() {
                     try FileManager.default.moveItem(at: self.filename, to: self.realFilename)
                     print("moved temp data file \(shortenPath(self.filename)) to \(shortenPath(self.realFilename))")
@@ -489,12 +516,12 @@ class DataStorage {
                     return self._reset(recur: recur - 1)
                 }
                 
+                // report errors to sentry including extras
                 if let sentry_client = Client.shared {
                     sentry_client.snapshotStacktrace {
                         let event = Event(level: .error)
                         event.message = "Error moving file on reset after \(Constants.RECUR_DEPTH) tries."
                         event.environment = Constants.APP_INFO_TAG
-                        
                         
                         if event.extra == nil {
                             event.extra = [:]
@@ -503,6 +530,7 @@ class DataStorage {
                             extras["from"] = shortenPath(self.filename)
                             extras["to"] = shortenPath(self.realFilename)
                             extras["error"] = "\(error)"
+                            extras["user_id"] = self.patientId
                         }
                         sentry_client.appendStacktrace(to: event)
                         sentry_client.send(event: event)
@@ -531,8 +559,8 @@ class DataStorage {
     /// unlocked function to ensure that a file exists.
     private func _ensure_file_exists(recur: Int) {
         // if there is no file, create it with these permissions and no data
-        if !self.check_file_exists() {
-            // print("creating file '\(shortenPath(self.filename))'...")
+        if !self._check_file_exists() {
+            print("creating file '\(shortenPath(self.filename))'...")
             let created = FileManager.default.createFile(
                 atPath: self.filename.path,
                 contents: "".data(using: String.Encoding.utf8),
@@ -545,7 +573,7 @@ class DataStorage {
                 if recur > 0 {
                     // log.error("ensure_file_exists recur at \(recur).")
                     print("COULD NOT CREATE FILE '\(shortenPath(self.filename))'...")
-                    print("check file exists:", check_file_exists())
+                    // print("check file exists:", check_file_exists())  //// nooooo lock conflict
                     Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
                     // fatalError(message)
                     return self._ensure_file_exists(recur: recur - 1) // needs to actually call the _ version of the function (2.3.1 was incorrect, oops)
@@ -562,6 +590,7 @@ class DataStorage {
                         }
                         if var extras = event.extra {
                             extras["filename"] = shortenPath(self.filename)
+                            extras["user_id"] = self.patientId
                         }
                         sentry_client.appendStacktrace(to: event)
                         sentry_client.send(event: event)
