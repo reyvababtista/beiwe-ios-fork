@@ -1016,12 +1016,14 @@ class StudyManager {
     /// business logic of the upload.
     /// processOnly means don't upload (it's based on reachability)
     func upload() {
-        Ephemerals.start_last_upload = dateFormat(Date())
         print("Checking for uploads...")
+
+        Ephemerals.start_last_upload = dateFormat(Date())
+        DataStorageManager.sharedInstance.moveLeftBehindFilesToUpload()
         
         // if we can't enumerate files, that's insane, crash.
         let fileEnumerator: FileManager.DirectoryEnumerator =
-        FileManager.default.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)!
+            FileManager.default.enumerator(atPath: DataStorageManager.uploadDataDirectory().path)!
         var filesToProcess: [String] = []
         
         // loop over all and check if each file can be uploaded, assemble the list.

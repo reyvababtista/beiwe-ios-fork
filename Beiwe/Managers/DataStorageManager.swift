@@ -33,6 +33,12 @@ enum DataStorageError: Error {
     case fileCreationError
 }
 
+// we can't resolve an error where it is not possible to move a file to the upload
+// folder, but we can try again later. LEFT_BEHIND_FILES is our list of these files.
+var LEFT_BEHIND_FILES = [String]()
+let LEFT_BEHIND_FILES_LOCK = NSLock()
+
+
 //////////////////////////////////////////////////////////// DataStorage Manager //////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// DataStorage Manager //////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// DataStorage Manager //////////////////////////////////////////////////////
@@ -162,8 +168,7 @@ class DataStorageManager {
     
     ///////////////////////////////////////////////// Informational //////////////////////////////////////////////////////
     
-    // TODO: we are using the cache directory, we should be using applicationSupportDirectory (Library/Application support/)
-    // https://developer.apple.com/library/archive/documentation/FileManagement/Conceptual/FileSystemProgrammingGuide/FileSystemOverview/FileSystemOverview.html
+    // for years we used the .cache directory. wtaf.
     static func currentDataDirectory() -> URL {
         let cacheDir = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true)[0]
         return URL(fileURLWithPath: cacheDir).appendingPathComponent("currentdata")
@@ -190,6 +195,29 @@ class DataStorageManager {
     
     ///////////////////////////////////////////////// Upload //////////////////////////////////////////////////////
     
+    func moveLeftBehindFilesToUpload() {
+        LEFT_BEHIND_FILES_LOCK.lock()
+        let left_behind_files = LEFT_BEHIND_FILES
+        LEFT_BEHIND_FILES = []
+        LEFT_BEHIND_FILES_LOCK.unlock()
+        
+        var filesToMove: [String] = []
+        if let enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path) {
+            // for each file check its file type and add to list
+            while let filename = enumerator.nextObject() as? String {
+                if left_behind_files.contains(filename) {
+                    filesToMove.append(filename)
+                    print("found left behind file \(filename) to move to uploads.")
+                }
+            }
+        }
+        for filename in filesToMove {
+            self.moveFile(DataStorageManager.currentDataDirectory().appendingPathComponent(filename),
+                          dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
+            print("Moved left behind file \(shortenPath(filename)) to upload directory.")
+        }
+    }
+    
     func moveUnknownJunkToUpload() {
         var filesToUpload: [String] = []
         if let enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path) {
@@ -207,6 +235,7 @@ class DataStorageManager {
         for filename in filesToUpload {
             self.moveFile(DataStorageManager.currentDataDirectory().appendingPathComponent(filename),
                           dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
+            print("Moved \(shortenPath(filename)) to upload directory.")
         }
     }
     
@@ -349,12 +378,10 @@ class DataStorage {
     var type: String // data stream type
     var name: String // name of this data storage object
     var sanitize: Bool // flag for the store function, replace commas with semicolons. TODO: factor out
-    let moveOnClose: Bool // flag for whether to move the file (to the upload folder) when it is reset.
     
     // file state
     var aesKey: Data // the current encryption key
     var filename: URL // the current file name
-    var realFilename: URL // the target file name that will be used eventually when the file is moved into the upload folder
     
     // Locks to deal with critical code. We have at-upload-time threading conflicts, and tighter write conflicts.
     var op_queue: DispatchQueue
@@ -363,12 +390,11 @@ class DataStorage {
     var file_exists = false
     var file_handle: FileHandle
     
-    init(type: String, headers: [String], patientId: String, publicKey: String, moveOnClose: Bool = false, keyRef: SecKey?) {
+    init(type: String, headers: [String], patientId: String, publicKey: String, keyRef: SecKey?) {
         self.type = type // the type of data stream
         self.patientId = patientId
         self.publicKey = publicKey
         self.headers = headers // the headers for the csv file
-        self.moveOnClose = moveOnClose
         self.secKeyRef = keyRef
         self.sanitize = false
         self.op_queue = DispatchQueue(label: "org.beiwe.\(self.type).write.queue")
@@ -376,8 +402,8 @@ class DataStorage {
         //!!! These values are correct but will be reset on first write over in lazy_new_file_setup.
         self.aesKey = Crypto.sharedInstance.newAesKey(Constants.KEYLENGTH)
         self.name = self.patientId + "_" + self.type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
-        self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
-        self.filename = self.realFilename
+        self.filename = DataStorageManager.currentDataDirectory()
+            .appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
         
         // the critical state-management
         self.file_handle = FileHandle()
@@ -449,14 +475,8 @@ class DataStorage {
         
         // set new filename and real filename based on move on close
         self.name = self.patientId + "_" + self.type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
-        self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
-        
-        // slightly different logic for moveOnClose and non-moveOnClose
-        if self.moveOnClose {
-            self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
-        } else {
-            self.filename = self.realFilename
-        }
+        self.filename = DataStorageManager.currentDataDirectory()
+            .appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
         
         // generate a new encryption key
         self.aesKey = Crypto.sharedInstance.newAesKey(Constants.KEYLENGTH)
@@ -507,25 +527,34 @@ class DataStorage {
         self.file_exists = false
     }
     
-    /// attempts to move a file to its upload location
+    /// attempts to move a file to its upload location -- OH WAIT NO OF COURSE THIS CONCEPT WAS BUGGED
     private func try_move_on_close(recur: Int = Constants.RECUR_DEPTH) {
-        // if move on close fails repeatedly it just gets left in place until the person exits the app.
-        if self.moveOnClose {
-            do {
-                try FileManager.default.moveItem(at: self.filename, to: self.realFilename)
-                print("moved temp data file \(shortenPath(self.filename)) to \(shortenPath(self.realFilename))")
-            } catch {
-                print("Error moving temp data \(shortenPath(self.filename)) to \(shortenPath(self.realFilename))")
-                if recur > 0 {
-                    Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
-                    return self.try_move_on_close(recur: recur - 1)
-                }
-                self.io_error_report(
-                    "Error moving file on reset after \(Constants.RECUR_DEPTH) tries.",
-                    error: error,
-                    more: ["from": shortenPath(self.filename), "to": shortenPath(self.realFilename)]
-                )
+        // if move on close fails repeatedly we add it to LEFT_BEHIND_FILES_LOCK and try again
+        // later. If THAT fails then it will be moved into the upload folder on app restart.
+        
+        let target_location = DataStorageManager.uploadDataDirectory()
+            .appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
+        // print("moving")
+        // print(self.filename)
+        // print(target_location)
+        
+        do {
+            try FileManager.default.moveItem(at: self.filename, to: target_location)
+            print("moved temp data file \(shortenPath(self.filename)) to \(shortenPath(target_location))")
+        } catch {
+            print("Error moving temp data \(shortenPath(self.filename)) to \(shortenPath(target_location))")
+            if recur > 0 {
+                Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
+                return self.try_move_on_close(recur: recur - 1)
             }
+            self.io_error_report(
+                "Error moving file on reset after \(Constants.RECUR_DEPTH) tries.",
+                error: error,
+                more: ["from": shortenPath(self.filename), "to": shortenPath(target_location)]
+            )
+            LEFT_BEHIND_FILES_LOCK.lock()
+            LEFT_BEHIND_FILES.append(self.filename.path)
+            LEFT_BEHIND_FILES_LOCK.unlock()
         }
     }
     
