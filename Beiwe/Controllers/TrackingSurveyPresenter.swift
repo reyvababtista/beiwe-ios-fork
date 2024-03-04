@@ -424,7 +424,7 @@ class TrackingSurveyPresenter: NSObject, ORKTaskViewControllerDelegate {
             data.append(answersString)
             dataFile.store(data)
         }
-        dataFile.reset() // clears out the file
+        dataFile.reset() // retires the file
     }
     
     // writes a timing event for the provided question (and value)

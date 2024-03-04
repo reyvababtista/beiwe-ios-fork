@@ -7,7 +7,7 @@ struct Constants {
     static let KEYLENGTH = 128 // encryption key length for any given line of encrypted data.
     
     // settings for functions that have retry logic
-    static let RECUR_SLEEP_DURATION = 0.1 // 100 milliseconds
+    static let RECUR_SLEEP_DURATION = 0.05 // 50 milliseconds
     static let RECUR_DEPTH = 10
     
     static let DEFAULT_UNPOPULATED_APPINFO = "never_populated"

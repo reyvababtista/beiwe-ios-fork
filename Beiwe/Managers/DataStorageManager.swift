@@ -28,6 +28,10 @@ func shortenPathMore(_ path_string: String) -> String {
     return path_string
 }
 
+// file creation errors
+enum DataStorageError: Error {
+    case fileCreationError
+}
 
 //////////////////////////////////////////////////////////// DataStorage Manager //////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////// DataStorage Manager //////////////////////////////////////////////////////
@@ -59,8 +63,8 @@ class DataStorageManager {
                 if let studySettings = study.studySettings {
                     if let publicKey = studySettings.clientPublicKey {
                         return DataStorage(
-                            type: type,  // the file name needs the data type
-                            headers: headers,  // the csv headers
+                            type: type, // the file name needs the data type
+                            headers: headers, // the csv headers
                             patientId: patientId,
                             publicKey: publicKey,
                             keyRef: self.secKeyRef
@@ -351,92 +355,33 @@ class DataStorage {
     var aesKey: Data // the current encryption key
     var filename: URL // the current file name
     var realFilename: URL // the target file name that will be used eventually when the file is moved into the upload folder
-
+    
     // Locks to deal with critical code. We have at-upload-time threading conflicts, and tighter write conflicts.
-    var lock_write = NSLock() // lowest level, locks file seek and file write
-    var lock_exists = NSLock() // locks on the exists check
-    var lock_file_level_operation = NSLock()
+    var op_queue: DispatchQueue
     
     // flag used to implement lazy file creation on at the first write operation.
-    var lazy_reset_active = false
+    var file_exists = false
+    var file_handle: FileHandle
     
     init(type: String, headers: [String], patientId: String, publicKey: String, moveOnClose: Bool = false, keyRef: SecKey?) {
-        self.type = type  // the type of data stream
+        self.type = type // the type of data stream
         self.patientId = patientId
         self.publicKey = publicKey
         self.headers = headers // the headers for the csv file
         self.moveOnClose = moveOnClose
         self.secKeyRef = keyRef
         self.sanitize = false
-
-        // these need to be instantiated due to rules about all values getting instantiated in the init function,
-        // but they are immediately reset in self.reset()
+        self.op_queue = DispatchQueue(label: "org.beiwe.\(self.type).write.queue")
+        
+        //!!! These values are correct but will be reset on first write over in lazy_new_file_setup.
         self.aesKey = Crypto.sharedInstance.newAesKey(Constants.KEYLENGTH)
         self.name = self.patientId + "_" + self.type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
-        self.realFilename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
+        self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
         self.filename = self.realFilename
-
-        self.reset() // properly creates new mutables, sets lazy_reset_active to TRUE
-    }
-    
-    ////////////////////////////////////// Locking, public functions ///////////////////////////////////////
-    
-    /// the write function used for all data streams.
-    public func store(_ data: [String]) {
-        defer {
-            self.lock_file_level_operation.unlock()
-        }
-        self.lock_file_level_operation.lock()
-        self.lazy_new_file_setup() // tests for whether lazy new file operations need to occur.
-        self._store(data)
-    }
-    
-    /// The public reset (create new file) function, all calls that are internal to the class should
-    /// be to _reset() so lock.
-    public func reset() {
-        defer {
-            self.lock_file_level_operation.unlock()
-        }
-        self._reset()
-        self.lock_file_level_operation.lock()
-    }
-    
-    /// To reduce junk file creation we have lazy initial file write.
-    /// This function is called only inside store(), which is the only external function that should be called for writes.
-    private func lazy_new_file_setup() {
-        // do nothing if lazy_reset_active is not true - we could fatalError on that - this works because reset is actually called during init.
-        if self.lazy_reset_active {
-            // clear the flag
-            self.lazy_reset_active = false
-            // generate and write encryptiion key
-            self.aesKey = Crypto.sharedInstance.newAesKey(Constants.KEYLENGTH)
-            self.write_raw_to_end_of_file(self.get_rsa_line())
-            self.encrypted_write(self.headers.joined(separator: Constants.DELIMITER))
-            // log creating new file.
-            self.conditionalApplog(event: "file_init", msg: "Init new data file", d1: self.name)
-        }
-    }
-    
-    /// synchronized function to ensure that a file exists
-    // Keep _ensure_file_exists function from overlapping with itself, keep lock logic clean.
-    // The inner recursive call should be to _ensure_file_exists.
-    private func ensure_file_exists(recur: Int = Constants.RECUR_DEPTH) {
-        defer {
-            self.lock_exists.unlock()
-        }
-        self.lock_exists.lock()
-        self._ensure_file_exists(recur: recur)
-    }
-    
-    /// synchronized with ensure_file_exists
-    /// returns boolean about whether a file exists on the file system for self.
-    private func check_file_exists() -> Bool {
-        // check_file_exists is (hoping for was) ALWAYS in the check_file_exists/ensure_file_exists crashes.
-        defer {
-            self.lock_exists.unlock()
-        }
-        self.lock_exists.lock()
-        return _check_file_exists()
+        
+        // the critical state-management
+        self.file_handle = FileHandle()
+        self.file_exists = false
     }
     
     ////////////////////////////////////// Informational Functions /////////////////////////////////////////
@@ -462,14 +407,6 @@ class DataStorage {
         }
     }
     
-   
-    
-    private func _check_file_exists() -> Bool {
-        // operation profiled on an iphone 8 plus to take roughly 400-450us average/rms, standard deviation of 200us
-        // print("checking that '\(self.filename.path)' exists...")
-        return FileManager.default.fileExists(atPath: self.filename.path)
-    }
-    
     /// Unless self's "type" (data stream) is the ios log, write a message to the ios log.
     private func conditionalApplog(event: String, msg: String = "", d1: String = "", d2: String = "", d3: String = "", d4: String = "") {
         if self.type != "ios_log" {
@@ -477,126 +414,184 @@ class DataStorage {
         }
     }
     
-    /////////////////////////////////// Complex Functions (manages state) ///////////////////////////////////
+    ////////////////////////////////////// Locking, public functions ///////////////////////////////
     
-    // Generally resets all file assets, creates the new filename.
-    // called when max filesize is reached, and in the timer reset files logic
-    private func _reset(recur: Int = Constants.RECUR_DEPTH) {
-        // We don't want to lazy reset while pending a new file due to an existing lazy reset.
-        // (this is the singular file io condition under which we actually want to not do anything.)
-        if self.lazy_reset_active {
-            return
+    /// The write function used for all data streams.
+    /// Handles all encryption and file creation.
+    public func store(_ data: [String]) {
+        self.op_queue.sync {
+            self.lazy_new_file_setup() // tests for whether lazy new file operations need to occur.
+            self._store(data)
         }
-        
-        // log.info("DataStorage.reset called on \(self.name)...")
-        if self.moveOnClose == true {
-            do {
-                // this operation locks with ensure_file_exists
-                if self.lock_exists.try() {
-                    self.lock_exists.unlock()
-                } else {
-                    sentry_warning("YO DataStorage.reset() is blocked on \(self.type) by file_exists lock, backing off and retrying.")
-                    if recur > 0 {
-                        log.error("reset recur at \(recur).")
-                        Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
-                        return self._reset(recur: recur - 1)
-                    }
-                }
-                
-                if self.check_file_exists() {
-                    try FileManager.default.moveItem(at: self.filename, to: self.realFilename)
-                    print("moved temp data file \(shortenPath(self.filename)) to \(shortenPath(self.realFilename))")
-                }
-            } catch {
-                print("\(error)")
-                log.error("Error moving temp data \(shortenPath(self.filename)) to \(shortenPath(self.realFilename))")
-                if recur > 0 {
-                    log.error("reset recur at \(recur).")
-                    Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
-                    return self._reset(recur: recur - 1)
-                }
-                
-                // report errors to sentry including extras
-                if let sentry_client = Client.shared {
-                    sentry_client.snapshotStacktrace {
-                        let event = Event(level: .error)
-                        event.message = "Error moving file on reset after \(Constants.RECUR_DEPTH) tries."
-                        event.environment = Constants.APP_INFO_TAG
-                        
-                        if event.extra == nil {
-                            event.extra = [:]
-                        }
-                        if var extras = event.extra {
-                            extras["from"] = shortenPath(self.filename)
-                            extras["to"] = shortenPath(self.realFilename)
-                            extras["error"] = "\(error)"
-                            extras["user_id"] = self.patientId
-                        }
-                        sentry_client.appendStacktrace(to: event)
-                        sentry_client.send(event: event)
-                    }
-                }
-                fatalError("Error moving temp data \(shortenPath(self.filename)) to \(shortenPath(self.realFilename)) \(error)")
-            }
+    }
+    
+    /// The public reset (create new file / retire the old file) function.
+    /// (technically file instantiation is lazy, due to this we can skip creating multiple files
+    /// if there are multiple calls to reset before there are any calls to store(). )
+    public func reset() {
+        self.op_queue.sync {
+            self.close_file()
+        }
+    }
+    
+    ///////////////////////////////// Private functions, file handling /////////////////////////////
+    
+    /// To reduce junk file creation we have implemented lazy initial file writes.
+    /// Files are only created just before they are written to. The actual initial write
+    /// contains the server-decryptable encryption key.
+    /// This function is called only inside store(), which is the only external function
+    /// that should be called for writes.
+    private func lazy_new_file_setup(recur: Int = Constants.RECUR_DEPTH) {
+        // do nothing if there is already a file
+        if self.file_exists {
+            return
         }
         
         // set new filename and real filename based on move on close
         self.name = self.patientId + "_" + self.type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
         self.realFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
+        
+        // slightly different logic for moveOnClose and non-moveOnClose
         if self.moveOnClose {
             self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.name + DataStorageManager.dataFileSuffix)
         } else {
             self.filename = self.realFilename
         }
         
-        // In an attempt to reduce file spam, the automatic creation of the next file when reset is called
-        // is getting scrapped, we are going to set a flag and only generate and write that next line when
-        // store is called.
-        self.lazy_reset_active = true
+        // generate a new encryption key
+        self.aesKey = Crypto.sharedInstance.newAesKey(Constants.KEYLENGTH)
+        
+        // Trying to make this safe is really really hard
+        do {
+            try self.instantiate_the_file() // inserts the RSA encoded AES key as first line
+        } catch is DataStorageError {
+            if recur == 0 {
+                fatalError("Recursion depth hit in lazy_new_file_setup, file creation failed.")
+            }
+            // guarantee the file has a new name by waiting more than 1 millisecond
+            Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
+            return self.lazy_new_file_setup(recur: recur - 1)
+        } catch {
+            fatalError("Unknown error in lazy_new_file_setup: \(error)")
+        }
+        
+        // writes the csv header as the first normal encrypted line of the file
+        self.encrypted_write(self.headers.joined(separator: Constants.DELIMITER))
+        
+        // log creating new file (doesn't trigger for app log, that would crash).
+        self.conditionalApplog(event: "file_init", msg: "Init new data file", d1: self.name)
+        
+        // new file creation done.
+        self.file_exists = true
     }
     
+    /// Generally resets file assets, creates the new filename.
+    private func close_file() {
+        // close the file handle. if it fails... we ignore it. if this happens at any time
+        // other than app start then try_move_on_close will probably crash.
+        do {
+            try self.file_handle.close()
+        } catch {
+            // nope not even reporting it (it happens at app start for all data streams as nilerror)
+            // io_error_report("file close error?", error: error)
+        }
+        
+        // if no file has been creaed yet, e.g. if the last operation called was the reset function,
+        // don't do the move file operation, we wait for lazy_new_file_setup to do that.
+        if self.file_exists {
+            self.try_move_on_close()
+        }
+        
+        // set the file exists flag to false so that the file is created (and new encryption key
+        // is generated etc.)
+        self.file_exists = false
+    }
     
-    /// unlocked function to ensure that a file exists.
-    private func _ensure_file_exists(recur: Int) {
-        // if there is no file, create it with these permissions and no data
-        if !self._check_file_exists() {
-            print("creating file '\(shortenPath(self.filename))'...")
-            let created = FileManager.default.createFile(
-                atPath: self.filename.path,
-                contents: "".data(using: String.Encoding.utf8),
-                attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
-            )
-            
-            var message = if created { "Create new data file" } else { "Could not create new data file" }
-            self.conditionalApplog(event: "file_create", msg: message, d1: self.name)
-            if !created {
+    /// attempts to move a file to its upload location
+    private func try_move_on_close(recur: Int = Constants.RECUR_DEPTH) {
+        // if move on close fails repeatedly it just gets left in place until the person exits the app.
+        if self.moveOnClose {
+            do {
+                try FileManager.default.moveItem(at: self.filename, to: self.realFilename)
+                print("moved temp data file \(shortenPath(self.filename)) to \(shortenPath(self.realFilename))")
+            } catch {
+                print("Error moving temp data \(shortenPath(self.filename)) to \(shortenPath(self.realFilename))")
                 if recur > 0 {
-                    // log.error("ensure_file_exists recur at \(recur).")
-                    print("COULD NOT CREATE FILE '\(shortenPath(self.filename))'...")
-                    // print("check file exists:", check_file_exists())  //// nooooo lock conflict
                     Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
-                    // fatalError(message)
-                    return self._ensure_file_exists(recur: recur - 1) // needs to actually call the _ version of the function (2.3.1 was incorrect, oops)
+                    return self.try_move_on_close(recur: recur - 1)
                 }
-                // TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
-                if let sentry_client = Client.shared {
-                    sentry_client.snapshotStacktrace {
-                        let event = Event(level: .error)
-                        event.message = "Error creating file inside _ensure_file_exists after \(Constants.RECUR_DEPTH) tries, app will now crash."
-                        event.environment = Constants.APP_INFO_TAG
-                        
-                        if event.extra == nil {
-                            event.extra = [:]
-                        }
-                        if var extras = event.extra {
-                            extras["filename"] = shortenPath(self.filename)
-                            extras["user_id"] = self.patientId
-                        }
-                        sentry_client.appendStacktrace(to: event)
-                        sentry_client.send(event: event)
+                self.io_error_report(
+                    "Error moving file on reset after \(Constants.RECUR_DEPTH) tries.",
+                    error: error,
+                    more: ["from": shortenPath(self.filename), "to": shortenPath(self.realFilename)]
+                )
+            }
+        }
+    }
+    
+    /// Creates the file.
+    private func instantiate_the_file() throws {
+        // create the file, insert first line
+        let created = FileManager.default.createFile(
+            atPath: self.filename.path,
+            contents: self.get_rsa_line(), // write the RSA encrypted key line
+            attributes: [FileAttributeKey(rawValue: FileAttributeKey.protectionKey.rawValue): FileProtectionType.none]
+        )
+        
+        var message = if created { "Create new data file" } else { "Could not create new data file" }
+        if !created {
+            // TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
+            self.io_error_report("file_creation_1")
+            throw DataStorageError.fileCreationError
+        }
+        
+        do {
+            self.file_handle = try FileHandle(forWritingTo: self.filename)
+        } catch {
+            self.io_error_report("file_creation_2", error: error)
+            throw DataStorageError.fileCreationError
+        }
+        self.conditionalApplog(event: "file_create", msg: message, d1: self.name)
+        print("created file '\(shortenPath(self.filename))'...")
+    }
+    
+    // reports an io error to sentry, prints the error too.
+    private func io_error_report(_ message: String, error: Error? = nil, more: [String: String]? = nil) {
+        // These print statements are not showing up reliably?
+        if let error = error {
+            print("io error: \(message) - error: \(error)")
+        } else {
+            print("io error: \(message)")
+        }
+        if let more = more {
+            print("more: \(more)")
+        }
+        
+        if let sentry_client = Client.shared {
+            sentry_client.snapshotStacktrace {
+                let event = Event(level: .error)
+                event.message = message
+                event.environment = Constants.APP_INFO_TAG
+            
+                //setup
+                if event.extra == nil {
+                    event.extra = [:]
+                }
+                // basics
+                if var extras = event.extra {
+                    extras["filename"] = shortenPath(self.filename)
+                    extras[" user_id"] = self.patientId
+                    if let error = error {
+                        extras["error"] = "\(error)"
                     }
                 }
-                fatalError(message)
+                // any extras
+                for (key, value) in more ?? [:] {
+                    event.extra?[key] = value
+                }
+                
+                sentry_client.appendStacktrace(to: event)
+                sentry_client.send(event: event)
             }
         }
     }
@@ -605,7 +600,6 @@ class DataStorage {
     
     /// outer write operation, handles encrypting data and passes it off to the write_raw_to_end_of_file
     private func encrypted_write(_ line: String) {
-        self.ensure_file_exists()
         let iv: Data = Crypto.sharedInstance.randomBytes(16)
         let encrypted = Crypto.sharedInstance.aesEncrypt(iv, key: self.aesKey, plainText: line)
         let base64_data = (
@@ -618,42 +612,9 @@ class DataStorage {
     }
 
     /// Writes a line of data to the end of the current file, has locks to handle single-line-level write contention.
-    private func write_raw_to_end_of_file(_ data: Data, recur: Int = Constants.RECUR_DEPTH) {
-        self.ensure_file_exists()
-        // if file handle instantiated (file open) append data (a line) to the end of the file.
-        // it appears to be the case that lines are constructed ending with \n, so we don't handle that here.
-        if let fileHandle = try? FileHandle(forWritingTo: self.filename) {
-            // this lock blocks a write operation and seek opration, it blocks overlapping writes.
-            defer {
-                fileHandle.closeFile()
-                self.lock_write.unlock()
-            }
-            // (all profiling done on a 5 year old iphone 8 plus)
-            // seeks take on the order of 3us-, but writes are highly variant and depend on the size of the write.
-            // Initial file writes are much longer, on the order of 10s of milliseconds.
-            // The RMS of accelerometer/magnetomiter writes is just under 1ms. We do see writes as low as 10us.
-            // lock/unlock almost always takes less than 3us.
-            self.lock_write.lock()
-            fileHandle.seekToEndOfFile()
-            fileHandle.write(data)
-            // this data variable is a string of the full line in base64 including the iv. (i.e. it is encrypted)
-            // print("write to \(self.filename), length: \(data.count), '\(String(data: data, encoding: String.Encoding.utf8))'")
-        } else {
-            // error opening file, reset and try again
-            if recur > 0 {
-                self._reset() // must call _reset() because we could be inside a locked reset()
-                log.error("write_raw_to_end_of_file ERROR recur at \(recur).")
-                Thread.sleep(forTimeInterval: Constants.RECUR_SLEEP_DURATION)
-                return self.write_raw_to_end_of_file(data, recur: recur - 1)
-            }
-            // retry failed, time to crash :c
-            log.error("Error opening file for writing")
-            self.conditionalApplog(event: "file_err", msg: "Error writing to file", d1: self.name, d2: "Error opening file for writing")
-            fatalError("unable to open file \(self.filename)")
-        }
-        if recur != Constants.RECUR_DEPTH {
-            log.error("write_raw_to_end_of_file recur SUCCESS at \(recur).")
-        }
+    private func write_raw_to_end_of_file(_ data: Data) {
+        self.file_handle.seekToEndOfFile()
+        self.file_handle.write(data)
     }
     
     /// This is the main write function for all write operations from all data streams
@@ -714,6 +675,7 @@ class EncryptedStorage {
         self.debug_shortname = patientId + "_" + data_stream_type + "_" + String(Int64(Date().timeIntervalSince1970 * 1000))
         self.eventualFilename = DataStorageManager.currentDataDirectory().appendingPathComponent(self.debug_shortname + suffix)
         self.filename = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(self.debug_shortname + suffix)
+        
         // encryption setup
         self.aesKey = Crypto.sharedInstance.newAesKey(Constants.KEYLENGTH)
         self.iv = Crypto.sharedInstance.randomBytes(16)
@@ -745,7 +707,7 @@ class EncryptedStorage {
     func write(_ data: NSData?, writeLen: Int) {
         // This is called directly in audio file code
         // log.info("write called on \(self.debug_shortname)...")
-        encryption_queue.sync {
+        self.encryption_queue.sync {
             self.write_actual(data, writeLen: writeLen)
         }
     }
