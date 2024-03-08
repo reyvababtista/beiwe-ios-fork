@@ -95,6 +95,7 @@ class ApiManager {
         device_status_report["battery_state"] = String(UIDevice.current.batteryState.rawValue)
         device_status_report["device_model"] = UIDevice.current.model
         device_status_report["proximity_monitoring_enabled"] = UIDevice.current.isProximityMonitoringEnabled.description
+        device_status_report["on_wifi"] = "\(!NetworkAccessMonitor.network_cellular)"
         
         // Location services configuration
         device_status_report["location_services_enabled"] = Ephemerals.locationServicesEnabledDescription

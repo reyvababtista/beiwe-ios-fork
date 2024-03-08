@@ -52,6 +52,9 @@ class NetworkAccessMonitor {
         // write the current status if it just changed or on first run.
         if first_run || network_cellular != prior_cellular_status {
             if let reachabilityManager = reachabilityManager {
+                // we used to have the abilite to identify no network connectivity, "unreachable"
+                // but that is gone now because it is incredibly difficult unless you make a network
+                // connection to test it.
                 let state = if network_cellular { "cellular" } else { "wifi" }
                 let data: [String] = [
                     String(Int64(Date().timeIntervalSince1970 * 1000)),
