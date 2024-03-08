@@ -261,8 +261,6 @@ class DataStorageManager {
                 self.moveFile(old_current_folder.appendingPathComponent(filename),
                               dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
             }
-        } else {
-            print("oldCurrentDataDirectory does not exist, no files to move.")
         }
         
         let old_upload_folder = DataStorageManager.oldUploadDataDirectory()
@@ -282,8 +280,6 @@ class DataStorageManager {
                 self.moveFile(old_upload_folder.appendingPathComponent(filename),
                               dst: DataStorageManager.uploadDataDirectory().appendingPathComponent(filename))
             }
-        } else {
-            print("oldUploadDataDirectory does not exist, no files to move.")
         }
     }
     

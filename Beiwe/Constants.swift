@@ -43,6 +43,7 @@ let GLOBAL_BACKGROUND_QUEUE = DispatchQueue.global(qos: .background)
 let GLOBAL_UTILITY_QUEUE = DispatchQueue.global(qos: .utility)
 let HEARTBEAT_QUEUE = DispatchQueue(label: "org.beiwe.heartbeat_queue", qos: .userInitiated, attributes: [])
 let BACKGROUND_DEVICE_INFO_QUEUE = DispatchQueue(label: "org.beiwe.background_device_info_queue", qos: .background, attributes: [])
+let BACKGROUND_DEVICE_INFO_FAST_QUEUE = DispatchQueue(label: "org.beiwe.background_device_info_queue", qos: .userInteractive, attributes: [])
 let TIMER_QUEUE = DispatchQueue(label: "org.beiwe.timer_queue", attributes: [])
 let INNER_RECLINE_QUEUE = DispatchQueue(label: "org.beiwe.recline_queue_1", qos: .userInteractive, attributes: []) // setting high on this queue because it is the database.
 let OUTER_RECLINE_QUEUE = DispatchQueue(label: "org.beiwe.recline_queue_2", qos: .userInteractive, attributes: []) // setting high on this queue because it is the database.

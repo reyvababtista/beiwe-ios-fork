@@ -34,9 +34,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     var storyboard: UIStoryboard?
     var currentRootView: String? = "launchScreen"
     
-    // app capability stuff (why do these need to be here? at all?
+    // app capability stuff (why do these need to be here? at all?)
     let motionManager = CMMotionManager()
-    var reachability: Reachability? // tells us about our network access
     
     var canOpenTel = false
     var locationPermission = false
@@ -77,6 +76,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // we still have unnecessary app start setup that deals with waiting for the database to start
         self.setupBackgroundAppRefresh() // setupThatDependsOnDatabase calls scheduleHeartbeats.
         self.setupThatDependsOnDatabase(launchOptions)
+        NetworkAccessMonitor.start_monitor()
         
         // start some background looping for core app functionality
         self.firebaseLoop()
@@ -86,9 +86,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         
         // just set's the launch time variable, but changing refactoring DataStorage causes
         // `AppEventManager.sharedInstance` to crash because the encryption key is not present yet.
-        // Todo: finish refactoring app launch away from the old async garbage, work out where this can safely go.
-        // Todo: WE ARE HANDED THE LAUNCH TIMESTAMP!? see like accelerometer for why we should use it - we can have coordinated timestamps across data streams.
+        // TODO: finish refactoring app launch away from the old async garbage, work out where this can safely go.
+        // TODO: WE ARE HANDED THE LAUNCH TIMESTAMP!? see like accelerometer for why we should use it - we can have coordinated timestamps across data streams.
         AppEventManager.sharedInstance.didLaunch(launchOptions: launchOptions)
+        
+        // self.isLoggedIn = true // uncomment to auto log in
         return true
     }
     
@@ -149,16 +151,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         print("platform: \(platform())")
     }
     
-    /// starts reachability
-    func initializeReachability() {
-        do {
-            self.reachability = Reachability()
-            try self.reachability!.startNotifier()
-        } catch {
-            print("Unable to create or start Reachability")
-        }
-    }
-    
     func printLoadedStudyInfo() {
         print("\n\n\n")
         print("patient id: '\(String(describing: ApiManager.sharedInstance.patientId))'")
@@ -178,7 +170,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         self.setupLogging()
         // setupCrashLytics()  // not currently using crashlytics
         // appStartLog()  // this is too verbose and usually unnecessary, uncomment if you want but don't commit.
-        self.initializeReachability()
         self.initializeUI()
         
         // determine whether phone call bump is available - its just a weird flag we should set early
@@ -250,7 +241,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     func transitionToLoadedAppState() {
         self.transition_count += 1
         Ephemerals.transition_count = self.transition_count
-        print("transitionToLoadedAppState incremented to \(self.transition_count)")
+        // print("transitionToLoadedAppState incremented to \(self.transition_count)")
 
         if let currentStudy = self.currentStudy {
             if currentStudy.participantConsented {

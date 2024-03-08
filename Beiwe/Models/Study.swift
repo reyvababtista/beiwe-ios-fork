@@ -21,8 +21,6 @@ class Study: ReclineObject {
     var nextUploadCheck: Int64?
     var nextSurveyCheck: Int64?
     var nextDeviceSettingsCheck: Int64?
-    var missedSurveyCheck: Bool = false
-    var missedUploadCheck: Bool = false
     var lastBadgeCnt = 0
     var receivedAudioSurveys: Int = 0
     var receivedTrackingSurveys: Int = 0
@@ -71,8 +69,6 @@ class Study: ReclineObject {
         self.receivedTrackingSurveys <- map["receivedTrackingSurveys"]
         self.submittedAudioSurveys <- map["submittedAudioSurveys"]
         self.submittedTrackingSurveys <- map["submittedTrackingSurveys"]
-        self.missedSurveyCheck <- map["missedSurveyCheck"]
-        self.missedUploadCheck <- map["missedUploadCheck"]
         self.customApiUrl <- map["customApiUrl"]
         self.fuzzGpsLongitudeOffset <- map["fuzzGpsLongitudeOffset"]
         self.fuzzGpsLatitudeOffset <- map["fuzzGpsLatitudeOffset"]

@@ -7,7 +7,6 @@ import ObjectMapper
 import ReachabilitySwift
 import Sentry
 
-
 /// Contains all sorts of miiscellaneous study related functionality - this is badly factored and should be refactored into classes that contain their own well-defirned things
 class StudyManager {
     static let sharedInstance = StudyManager() // singleton reference
@@ -105,7 +104,7 @@ class StudyManager {
         
         if self.sensorsStartedEver {
             self.timerManager.clearPollTimer()
-            self.timerManager.stop_all_services()  // it's a little weird but the Timers actually holds the list of data services
+            self.timerManager.stop_all_services() // it's a little weird but the Timers actually holds the list of data services
             self.timerManager.clear()
         }
         
@@ -466,9 +465,6 @@ class StudyManager {
             return
         }
         
-        // check the uploadOverCellular study detail.
-        let reachable = studySettings.uploadOverCellular ?
-            self.appDelegate.reachability!.isReachable : self.appDelegate.reachability!.isReachableViaWiFi
         let now_int: Int64 = Int64(now_date.timeIntervalSince1970)
         
         // Todo - make these TimeIntervals (doubles)
@@ -476,36 +472,35 @@ class StudyManager {
         let nextUpload = currentStudy.nextUploadCheck ?? 0
         let nextDeviceSettings = currentStudy.nextDeviceSettingsCheck ?? 0
         
-        // print("reachable: \(reachable), missedSurveyCheck: \(currentStudy.missedSurveyCheck), missedUploadCheck: \(currentStudy.missedUploadCheck)")
         // print("now: \(now), nextSurvey: \(nextSurvey), nextUpload: \(nextUpload), nextDeviceSettings: \(nextDeviceSettings)")
         
         // logic for checking for surveys
-        if now_int > nextSurvey || (reachable && currentStudy.missedSurveyCheck) {
-            // This (missedSurveyCheck?) will be saved because setNextSurveyTime saves the study
-            currentStudy.missedSurveyCheck = !reachable // if not reachable we missed the survey check
+        if now_int > nextSurvey {
             self.setNextSurveyTime()
-            if reachable {
-                self.checkForNewSurveys()
-            }
+            self.checkForNewSurveys() // asynchronous, returns ~immediately
         }
         
         // logic for running uploads code
-        if now_int > nextUpload || (reachable && currentStudy.missedUploadCheck) {
-            // This (missedUploadCheck?) will be saved because setNextUpload saves the study
-            currentStudy.missedUploadCheck = !reachable // if not reachable we missed the upload check
+        if now_int > nextUpload {
             self.setNextUploadTime()
-            if reachable {
+            if studySettings.uploadOverCellular {
+                // case: we are allowed to upload over, so we upload.
                 UPLOAD_DISPATCH_QUEUE.async {
-                    self.upload() // this is actually pretty fast, alamofire doesn't block
+                    self.upload() // long running operation
+                }
+            } else if !NetworkAccessMonitor.network_cellular {
+                // case: we are not allowed to upload over cellular, and we are not on cellular. upload.
+                UPLOAD_DISPATCH_QUEUE.async {
+                    self.upload() // long running operation
                 }
             }
         }
         
         // logic for updating the study's device settings.
-        if now_int > nextDeviceSettings && reachable {
+        if now_int > nextDeviceSettings {
             // print("Checking for updated device settings...")
             self.setNextDeviceSettingsTime()
-            self.updateDeviceSettings()
+            self.updateDeviceSettings() // asynchronous, returns ~immediately
         }
         
         Recline.shared.save(currentStudy)
@@ -664,7 +659,6 @@ class StudyManager {
             }
         )
     }
-    
     
     ////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////// UPDATE DEVICE SETTINGS /////////////////////////////////////////
@@ -949,14 +943,12 @@ class StudyManager {
     ///
     /// It would be _nice_ if we could fix this, but it shouldn't be a huge issue.
     
-    
     // after sticking upload dispatch on a queue (with a file-in-flight count maximum) we no longer
     // need this list to block overlapping runs by caching the names, could use a counter. But,
     // then we have no info?
     var files_in_flight = [String]() // the files we are currently trying to upload.
     var files_with_encoding_errors = [String]()
     let files_in_flight_lock = NSLock()
-    
     
     /// This function always runs on the POST_UPLOAD_QUEUE
     /// Beiwe servers only respond with statuscodes on data upload. 200 means it was uploaded
@@ -1030,9 +1022,9 @@ class StudyManager {
         while let filename = fileEnumerator.nextObject() as? String {
             if DataStorageManager.sharedInstance.isUploadFile(filename) {
                 // don't actually know if this can cause a thread confict, don't care, wrapping.
-                files_in_flight_lock.lock()
+                self.files_in_flight_lock.lock()
                 let skip = self.files_in_flight.contains(filename)
-                files_in_flight_lock.unlock()
+                self.files_in_flight_lock.unlock()
                 
                 // this skip check should never fire because we are on a queue.
                 if skip {
@@ -1040,7 +1032,7 @@ class StudyManager {
                     print("skipping \(just_the_filename) because its already being uploaded right now")
                     continue
                 } else {
-                    dispatch_upload(filename)
+                    self.dispatch_upload(filename)
                 }
                 
                 self.files_in_flight_lock.lock()
@@ -1110,9 +1102,9 @@ class StudyManager {
                 }
             }
         )
-        files_in_flight_lock.lock()
+        self.files_in_flight_lock.lock()
         self.files_in_flight.append(filename)
-        files_in_flight_lock.unlock()
+        self.files_in_flight_lock.unlock()
         // print("upload for \(filename) dispatched")
     }
     

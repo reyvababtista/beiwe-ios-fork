@@ -20,7 +20,6 @@ extension DispatchQueue {
     // queue.asyncAfter(deadline: .now() + delay, execute: { background_task() })
 }
 
-
 func dateFormat(_ date: Date) -> String {
     let dateFormatter = DateFormatter()
     dateFormatter.dateFormat = "y-MM-dd HH:mm:ss"
@@ -103,7 +102,7 @@ public func print(_ items: Any..., separator: String = " ", terminator: String =
             let d = item as! Date
             // convert Date object to be in America/New_York time
             let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "y-MM-dd HH:mm:ss.SS"  // its a custom format specifically for printing
+            dateFormatter.dateFormat = "y-MM-dd HH:mm:ss.SS" // its a custom format specifically for printing
             dateFormatter.timeZone = TimeZone(identifier: DEV_TIMEZONE)
             Swift.print(dateFormatter.string(from: d) + "(ET)", separator: "", terminator: "")
             Swift.print(separator, separator: "", terminator: "")
@@ -114,10 +113,6 @@ public func print(_ items: Any..., separator: String = " ", terminator: String =
     }
     Swift.print(terminator, separator: "", terminator: "")
 }
-
-
-
-
 
 func sentry_warning(_ title: String, _ extra1: String? = nil, _ extra2: String? = nil, _ extra3: String? = nil) {
     if let sentry_client = Client.shared {
