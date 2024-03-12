@@ -80,7 +80,7 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
             && CLLocationManager.authorizationStatus() == .authorizedAlways
     }
     
-    /// starts GPS
+    /// starts GPS - enrolls app (rather, this class) in the LocationManager updates loop.
     func startGps() {
         self.locationManager.delegate = self // assigns this instance of the class as the gps delegate class
         self.locationManager.activityType = CLActivityType.other // most permissive I think
@@ -108,7 +108,11 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
         AppEventManager.sharedInstance.logAppEvent(event: "gps stopped due to app termination")
     }
  
-    /// this misnamed function records a single location datapoint but safely - this is an overridden function afaik
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////// Location Manager Functons ///////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    /// records a single location datapoint (though in principal it could provide more)
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         // we don't record data when a recording session is not active
         if self.isCollectingGps && StudyManager.sharedInstance.timerManager.areServicesRunning {
@@ -189,6 +193,7 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
             log.error("GPS not enabled.  Not initializing collection")
             return false
         }
+        self.dataStorage = DataStorageManager.sharedInstance.createStore("gps", headers: gps_headers)
         self.isCollectingGps = false
         return true
     }
