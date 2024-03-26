@@ -42,12 +42,28 @@ let gps_headers = [
 // self.locationManager.distanceFilter = kCLDistanceFilterNone
 
 // set the desired
-let THE_DESIRED_ACTIVE_ACCURACY = kCLLocationAccuracyBest
+// let THE_DESIRED_ACTIVE_ACCURACY = kCLLocationAccuracyKilometer
+let THE_DESIRED_ACTIVE_ACCURACY = kCLLocationAccuracyHundredMeters
+// let THE_DESIRED_ACTIVE_ACCURACY = kCLLocationAccuracyNearestTenMeters
+// let THE_DESIRED_ACTIVE_ACCURACY = kCLLocationAccuracyBest
 let THE_DESIRED_ACTIVE_DISTANCE_FILTER = kCLDistanceFilterNone
 
-let THE_DESIRED_INACTIVE_ACCURACY = kCLLocationAccuracyBest
+// let THE_DESIRED_INACTIVE_ACCURACY = kCLLocationAccuracyKilometer
+let THE_DESIRED_INACTIVE_ACCURACY = kCLLocationAccuracyHundredMeters  // 2024.21 -- less frequent than best
+// let THE_DESIRED_INACTIVE_ACCURACY = kCLLocationAccuracyNearestTenMeters  // seems identical to best
+// let THE_DESIRED_INACTIVE_ACCURACY = kCLLocationAccuracyBest
 let THE_DESIRED_INACTIVE_DISTANCE_FILTER = kCLDistanceFilterNone
 
+
+// testing with kCLDistanceFilterNone while stationary
+// kCLLocationAccuracyBest: 1 update per second
+// kCLLocationAccuracyNearestTenMeters: also one update per second.
+// kCLLocationAccuracyHundredMeters: one update every 15 seconds.
+//   WOW ok my personal tests indicate this is a battery life improvement over Best by about 1/3 - eg
+//   battery drain is about 2/3 overall compared to Best.  sweet.
+// kCLLocationAccuracyKilometer: started as one update every 15 seconds to start, but then esp if the app is backgrounded
+//   it becomes whenever the user gets updates, which can be when they turn on the screen...  Next try did not start with
+//   data points every 15 seconds to start despite remaining in the app.
 
 /// The GPS Manager.
 /// The GPSManager is a critical component of app persistence, it is instantiated even if the study
@@ -115,6 +131,7 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
     /// records a single location datapoint (though in principal it could provide more)
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         // we don't record data when a recording session is not active
+        // print("hey a location: \(locations)")
         if self.isCollectingGps && StudyManager.sharedInstance.timerManager.areServicesRunning {
             self.recordGpsData(manager, locations: locations)
         }
@@ -156,7 +173,6 @@ class GPSManager: NSObject, CLLocationManagerDelegate, DataServiceProtocol {
 
     /// records a single line of data to the gps csv, implements gps fuzzing
     func recordGpsData(_ manager: CLLocationManager, locations: [CLLocation]) {
-        // print("Record locations: \(locations)")
         for loc in locations {
             var data: [String] = []
             var lat = loc.coordinate.latitude

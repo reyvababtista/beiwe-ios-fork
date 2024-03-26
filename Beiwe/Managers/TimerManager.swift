@@ -25,7 +25,7 @@ class TimerManager {
     var expected_wakeup: Date = Date(timeIntervalSince1970: 0)
     var nextSurveyDisplayUpdate: Date = Date(timeIntervalSince1970: 0)
     var nextDataServicesCheck: Date = Date(timeIntervalSince1970: 0)
-    var nextHeartbeat: Date = Date(timeIntervalSince1970: 0)
+    // var nextHeartbeat: Date = Date(timeIntervalSince1970: 0)
     var nextNewFiles: Date = Date(timeIntervalSince1970: 0)
     var nextPersistentTasks: Date = Date(timeIntervalSince1970: 0)
     
@@ -86,13 +86,13 @@ class TimerManager {
         self.timer = Timer() // clear out the old timer object, make a new one
     }
     
-    func heartbeatTimerCheck(_ now: Date) -> Date {
-        if now > self.nextHeartbeat {
-            StudyManager.sharedInstance.heartbeat("Timer logic")
-            return Date(timeIntervalSince1970: now.timeIntervalSince1970 + Constants.HEARTBEAT_INTERVAL)
-        }
-        return self.nextHeartbeat
-    }
+    // func heartbeatTimerCheck(_ now: Date) -> Date {
+    //     if now > self.nextHeartbeat {
+    //         StudyManager.sharedInstance.heartbeat("Timer logic")
+    //         return Date(timeIntervalSince1970: now.timeIntervalSince1970 + Constants.HEARTBEAT_INTERVAL)
+    //     }
+    //     return self.nextHeartbeat
+    // }
     
     func nextNewFilesCheck(_ now: Date) -> Date {
         // reset files periodically - exact behavior varies by data stream.
@@ -201,7 +201,7 @@ class TimerManager {
         
         /// set the next service date (its a timeInterval object) to the next event time
         self.nextDataServicesCheck = self.runDataCollectionServicesToggleLogic(now_interval)
-        self.nextHeartbeat = self.heartbeatTimerCheck(now)
+        // self.nextHeartbeat = self.heartbeatTimerCheck(now)
         self.nextNewFiles = self.nextNewFilesCheck(now)
         self.nextSurveyDisplayUpdate = self.nextSurveyAvailabilityCheck(now)
         
