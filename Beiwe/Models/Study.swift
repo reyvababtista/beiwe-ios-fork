@@ -22,8 +22,6 @@ class Study: ReclineObject {
     var nextSurveyCheck: Int64?
     var nextDeviceSettingsCheck: Int64?
     var lastBadgeCnt = 0
-    var receivedAudioSurveys: Int = 0
-    var receivedTrackingSurveys: Int = 0
     var submittedAudioSurveys: Int = 0 // TODO: what is this and is it breaking uploads
     var submittedTrackingSurveys: Int = 0 // TODO: what is this and is it breaking uploads
 
@@ -65,8 +63,6 @@ class Study: ReclineObject {
         self.surveys <- map["surveys"]
         self.activeSurveys <- map["active_surveys"]
         self.registerDate <- (map["registerDate"], TransformOf<Int64, NSNumber>(fromJSON: { $0?.int64Value }, toJSON: { $0.map { NSNumber(value: $0) } }))
-        self.receivedAudioSurveys <- map["receivedAudioSurveys"]
-        self.receivedTrackingSurveys <- map["receivedTrackingSurveys"]
         self.submittedAudioSurveys <- map["submittedAudioSurveys"]
         self.submittedTrackingSurveys <- map["submittedTrackingSurveys"]
         self.customApiUrl <- map["customApiUrl"]

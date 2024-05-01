@@ -114,7 +114,7 @@ public func print(_ items: Any..., separator: String = " ", terminator: String =
     Swift.print(terminator, separator: "", terminator: "")
 }
 
-func sentry_warning(_ title: String, _ extra1: String? = nil, _ extra2: String? = nil, _ extra3: String? = nil) {
+func sentry_warning(_ title: String, _ extra1: String? = nil, _ extra2: String? = nil, _ extra3: String? = nil, crash: Bool) {
     if let sentry_client = Client.shared {
         sentry_client.snapshotStacktrace {
             let event = Event(level: .warning)

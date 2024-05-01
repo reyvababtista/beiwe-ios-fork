@@ -112,7 +112,6 @@ class StudyManager {
         
         // legacy case - we were using a bad location, the CACHE directory, and we may
         // still have files there. adding this on 2024-2-20.
-        DataStorageManager.sharedInstance.moveUnknownJunkToUpload()
         DataStorageManager.sharedInstance.moveOldUnknownJunkToUpload()
         
         // There may be files in the current data directory, this should only happen if the app crashed,
@@ -216,7 +215,7 @@ class StudyManager {
             // get the survey data and write it out
             var trackingSurvey: TrackingSurveyPresenter
             if surveyPresenter == nil {
-                print("hitting case where we were expiring the survey timings? what the fuck?")
+                // print("hitting case where we were 'expiring' the survey timings?")
                 // expiration logic? what is "expired?"
                 trackingSurvey = TrackingSurveyPresenter(surveyId: surveyId, activeSurvey: activeSurvey, survey: survey)
                 trackingSurvey.addTimingsEvent("expired", question: nil)
@@ -293,18 +292,10 @@ class StudyManager {
             
             if from_notification || survey.alwaysAvailable {
                 let activeSurvey = ActiveSurvey(survey: survey)
-                // when we receive a notification we need to record that, this is used to sort surveys on the main screen (I think)
+                // when we receive a notification we need to record that, this is used to sort
+                // surveys on the main screen (I think)
                 if from_notification {
                     activeSurvey.received = sentTime
-                    // FIXME: study.receivedAudioSurveys and study.receivedTrackingSurveys are junk, they are assigned but never used.
-                    if let surveyType = survey.surveyType {
-                        switch surveyType {
-                        case .AudioSurvey:
-                            study.receivedAudioSurveys = (study.receivedAudioSurveys) + 1
-                        case .TrackingSurvey:
-                            study.receivedTrackingSurveys = (study.receivedTrackingSurveys) + 1
-                        }
-                    }
                 }
                 study.activeSurveys[surveyId] = activeSurvey
             }
@@ -421,27 +412,27 @@ class StudyManager {
         guard let study = currentStudy, let studySettings = study.studySettings else {
             return
         }
-        if let t = study.nextUploadCheck { print("previous study.nextUploadCheck:", study.nextUploadCheck!, Date(timeIntervalSince1970: Double(t))) }
+        // if let t = study.nextUploadCheck { print("previous study.nextUploadCheck:", study.nextUploadCheck!, Date(timeIntervalSince1970: Double(t))) }
         study.nextUploadCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.uploadDataFileFrequencySeconds)
-        if let t = study.nextUploadCheck { print("updated study.nextUploadCheck:", study.nextUploadCheck!, Date(timeIntervalSince1970: Double(t))) }
+        // if let t = study.nextUploadCheck { print("updated study.nextUploadCheck:", study.nextUploadCheck!, Date(timeIntervalSince1970: Double(t))) }
     }
     
     func setNextSurveyTime() {
         guard let study = currentStudy, let studySettings = study.studySettings else {
             return
         }
-        if let t = study.nextSurveyCheck { print("previous study.nextSurveyCheck:", study.nextSurveyCheck!, Date(timeIntervalSince1970: Double(t))) }
+        // if let t = study.nextSurveyCheck { print("previous study.nextSurveyCheck:", study.nextSurveyCheck!, Date(timeIntervalSince1970: Double(t))) }
         study.nextSurveyCheck = Int64(Date().timeIntervalSince1970) + Int64(studySettings.checkForNewSurveysFreqSeconds)
-        if let t = study.nextSurveyCheck { print("updated study.nextSurveyCheck:", study.nextSurveyCheck!, Date(timeIntervalSince1970: Double(t))) }
+        // if let t = study.nextSurveyCheck { print("updated study.nextSurveyCheck:", study.nextSurveyCheck!, Date(timeIntervalSince1970: Double(t))) }
     }
     
     func setNextDeviceSettingsTime() {
         guard let study = currentStudy else {
             return
         }
-        if let t = study.nextDeviceSettingsCheck { print("previous study.nextDeviceSettingsCheck:", study.nextDeviceSettingsCheck!, Date(timeIntervalSince1970: Double(t))) }
+        // if let t = study.nextDeviceSettingsCheck { print("previous study.nextDeviceSettingsCheck:", study.nextDeviceSettingsCheck!, Date(timeIntervalSince1970: Double(t))) }
         study.nextDeviceSettingsCheck = Int64(Date().timeIntervalSince1970) + DEVICE_SETTINGS_INTERVAL
-        if let t = study.nextDeviceSettingsCheck { print("updated study.nextDeviceSettingsCheck:", study.nextDeviceSettingsCheck!, Date(timeIntervalSince1970: Double(t))) }
+        // if let t = study.nextDeviceSettingsCheck { print("updated study.nextDeviceSettingsCheck:", study.nextDeviceSettingsCheck!, Date(timeIntervalSince1970: Double(t))) }
     }
     
     //////////////////////////////////////////////////////////////////////////////////////////////////////////

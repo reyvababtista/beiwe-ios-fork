@@ -39,9 +39,9 @@ var LEFT_BEHIND_FILES = [String]()
 let LEFT_BEHIND_FILES_LOCK = NSLock()
 
 
-//////////////////////////////////////////////////////////// DataStorage Manager //////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////// DataStorage Manager //////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////// DataStorage Manager //////////////////////////////////////////////////////
+//////////////////////////////////////// DataStorage Manager ///////////////////////////////////////
+//////////////////////////////////////// DataStorage Manager ///////////////////////////////////////
+//////////////////////////////////////// DataStorage Manager ///////////////////////////////////////
 class DataStorageManager {
     static let sharedInstance = DataStorageManager()
     static let dataFileSuffix = ".csv"
@@ -49,7 +49,7 @@ class DataStorageManager {
     var secKeyRef: SecKey?
     var initted = false
 
-    ///////////////////////////////////////////////// Setup //////////////////////////////////////////////////////
+    ////////////////////////////////////////// Setup ///////////////////////////////////////////////
     
     /// instantiates your DataStorage object - called in every manager
     // All of these error cases are going to crash the app. If you hit these, you did something wrong.
@@ -92,7 +92,7 @@ class DataStorageManager {
     func dataStorageManagerInit(_ study: Study, secKeyRef: SecKey?) {
         self.initted = true
         self.secKeyRef = secKeyRef
-        // this function used to be called setCurrentStudy, but there was a looked-like-a-race-condition
+        // this function used to be called in setCurrentStudy, but there was a looked-like-a-race-condition
         // in stashing these variables early on during app start, and then trying to access them later.
         // Fully removing the stashing of `self.secKeyRef` resulted in
         //   StudyManager().currentStudy?.keyRef
@@ -166,7 +166,7 @@ class DataStorageManager {
         }
     }
     
-    ///////////////////////////////////////////////// Informational //////////////////////////////////////////////////////
+    ////////////////////////////////////// Informational ///////////////////////////////////////////
     
     // for years we used the .cache directory. wtaf.
     static func currentDataDirectory() -> URL {
@@ -193,9 +193,12 @@ class DataStorageManager {
         return filename.hasSuffix(DataStorageManager.dataFileSuffix) || filename.hasSuffix(".mp4") || filename.hasSuffix(".wav")
     }
     
-    ///////////////////////////////////////////////// Upload //////////////////////////////////////////////////////
+    ///////////////////////////////////////////////// Upload ///////////////////////////////////////
     
+    
+    /// Moves any left behinde files in the data directory. Called just before upload.
     func moveLeftBehindFilesToUpload() {
+        // safely get reference so that it can't be cleared or updated out from under us
         LEFT_BEHIND_FILES_LOCK.lock()
         let left_behind_files = LEFT_BEHIND_FILES
         LEFT_BEHIND_FILES = []
@@ -218,6 +221,8 @@ class DataStorageManager {
         }
     }
     
+    
+    /// called at app start, moves any uploadable files that were never moved to upload to upload folder
     func moveUnknownJunkToUpload() {
         var filesToUpload: [String] = []
         if let enumerator = FileManager.default.enumerator(atPath: DataStorageManager.currentDataDirectory().path) {
@@ -283,18 +288,19 @@ class DataStorageManager {
         }
     }
     
-    // move file function with retry logic, fails silently but that is ok because it is only used prepareForUpload_actual
+    // move file function with retry logic, fails silently but that is ok because it is
+    // only used prepareForUpload_actual.
     private func moveFile(_ src: URL, dst: URL, recur: Int = Constants.RECUR_DEPTH) {
         do {
             try FileManager.default.moveItem(at: src, to: dst)
         } catch CocoaError.fileNoSuchFile {
             print("File not found (for moving)? \(shortenPath(src))")
-            sentry_warning("File not found (for moving).", shortenPath(src))
+            sentry_warning("File not found (for moving).", shortenPath(src), crash:false)
         } catch CocoaError.fileWriteFileExists {
-            print("File already exists (for moving) \(shortenPath(dst)), giving up for now because that's crazy?")
-            sentry_warning("File already exists (for moving).", shortenPath(dst))
+            // print("File already exists (for moving) \(shortenPath(dst)), giving up for now because that's crazy?")
+            sentry_warning("File already exists (for moving).", shortenPath(dst), crash:false)
         } catch CocoaError.fileWriteOutOfSpace {
-            print("Out of space (for moving) \(shortenPath(dst))")
+            // print("Out of space (for moving) \(shortenPath(dst))")
             // sentry_warning("Out of space (for moving).", shortenPath(dst)) // never report out of space like this.
         } catch {
             // known and not handling: fileWriteVolumeReadOnly, fileWriteInvalidFileName
@@ -311,7 +317,7 @@ class DataStorageManager {
             if let sentry_client = Client.shared {
                 sentry_client.snapshotStacktrace {
                     let event = Event(level: .error)
-                    event.message = "Error moving file 1"
+                    event.message = "not a crash - Error moving file 1"
                     event.environment = Constants.APP_INFO_TAG
                     
                     if event.extra == nil {
@@ -536,7 +542,7 @@ class DataStorage {
         
         do {
             try FileManager.default.moveItem(at: self.filename, to: target_location)
-            print("moved temp data file \(shortenPath(self.filename)) to \(shortenPath(target_location))")
+            // print("moved temp data file \(shortenPath(self.filename)) to \(shortenPath(target_location))")
         } catch {
             print("Error moving temp data \(shortenPath(self.filename)) to \(shortenPath(target_location))")
             if recur > 0 {
@@ -546,7 +552,8 @@ class DataStorage {
             self.io_error_report(
                 "Error moving file on reset after \(Constants.RECUR_DEPTH) tries.",
                 error: error,
-                more: ["from": shortenPath(self.filename), "to": shortenPath(target_location)]
+                more: ["from": shortenPath(self.filename), "to": shortenPath(target_location)],
+                crash: false
             )
             LEFT_BEHIND_FILES_LOCK.lock()
             LEFT_BEHIND_FILES.append(self.filename.path)
@@ -565,15 +572,16 @@ class DataStorage {
         
         var message = if created { "Create new data file" } else { "Could not create new data file" }
         if !created {
-            // TODO; this is a really bad fatal error, need to not actually crash the app in this scenario
-            self.io_error_report("file_creation_1")
+            // does not crash the app but it is a nasty problem
+            self.io_error_report("file_creation_1", crash: false)
             throw DataStorageError.fileCreationError
         }
         
         do {
             self.file_handle = try FileHandle(forWritingTo: self.filename)
         } catch {
-            self.io_error_report("file_creation_2", error: error)
+            // does not crash the app but it is a nasty problem too
+            self.io_error_report("file_creation_2", error: error, crash: false)
             throw DataStorageError.fileCreationError
         }
         self.conditionalApplog(event: "file_create", msg: message, d1: self.name)
@@ -581,7 +589,7 @@ class DataStorage {
     }
     
     // reports an io error to sentry, prints the error too.
-    private func io_error_report(_ message: String, error: Error? = nil, more: [String: String]? = nil) {
+    private func io_error_report(_ message: String, error: Error? = nil, more: [String: String]? = nil, crash: Bool) {
         // These print statements are not showing up reliably?
         if let error = error {
             print("io error: \(message) - error: \(error)")
@@ -595,7 +603,12 @@ class DataStorage {
         if let sentry_client = Client.shared {
             sentry_client.snapshotStacktrace {
                 let event = Event(level: .error)
-                event.message = message
+                // this is actually really important for error triage
+                if crash {
+                    event.message = message
+                } else {
+                    event.message = "not a crash - " + message
+                }
                 event.environment = Constants.APP_INFO_TAG
             
                 //setup
@@ -605,7 +618,7 @@ class DataStorage {
                 // basics
                 if var extras = event.extra {
                     extras["filename"] = shortenPath(self.filename)
-                    extras[" user_id"] = self.patientId
+                    extras["user_id"] = self.patientId
                     if let error = error {
                         extras["error"] = "\(error)"
                     }

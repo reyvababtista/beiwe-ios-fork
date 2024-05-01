@@ -6,7 +6,7 @@ enum SurveyTypes: String {
     case TrackingSurvey = "tracking_survey"
 }
 
-struct Survey: Mappable {
+struct Survey: Mappable, Equatable {
     var surveyId: String?
     var surveyType: SurveyTypes?
     var name = ""
@@ -38,5 +38,49 @@ struct Survey: Mappable {
         self.audioBitrate <- map["settings.bit_rate"]
         self.questions <- map["content"]
         self.alwaysAvailable <- map["settings.always_available"]
+    }
+    
+    static func == (lhs: Survey, rhs: Survey) -> Bool {
+        let surveyId = lhs.surveyId == rhs.surveyId
+        let surveyType = lhs.surveyType == rhs.surveyType
+        let name = lhs.name == rhs.name
+        let timings = lhs.timings == rhs.timings
+        let triggerOnFirstDownload = lhs.triggerOnFirstDownload == rhs.triggerOnFirstDownload
+        let randomize = lhs.randomize == rhs.randomize
+        let numberOfRandomQuestions = lhs.numberOfRandomQuestions == rhs.numberOfRandomQuestions
+        let randomizeWithMemory = lhs.randomizeWithMemory == rhs.randomizeWithMemory
+        let questions = lhs.questions == rhs.questions
+        let audioSurveyType = lhs.audioSurveyType == rhs.audioSurveyType
+        let audioSampleRate = lhs.audioSampleRate == rhs.audioSampleRate
+        let audioBitrate = lhs.audioBitrate == rhs.audioBitrate
+        let alwaysAvailable = lhs.alwaysAvailable == rhs.alwaysAvailable
+        
+        if !surveyId { print(lhs.surveyId, "!=", rhs.surveyId) }
+        if !surveyType { print(lhs.surveyType, "!=", rhs.surveyType) }
+        if !name { print(lhs.name, "!=", rhs.name) }
+        if !timings { print(lhs.timings, "!=", rhs.timings) }
+        if !triggerOnFirstDownload { print(lhs.triggerOnFirstDownload, "!=", rhs.triggerOnFirstDownload) }
+        if !randomize { print(lhs.randomize, "!=", rhs.randomize) }
+        if !numberOfRandomQuestions { print(lhs.numberOfRandomQuestions, "!=", rhs.numberOfRandomQuestions) }
+        if !randomizeWithMemory { print(lhs.randomizeWithMemory, "!=", rhs.randomizeWithMemory) }
+        if !questions { print(lhs.questions, "!=", rhs.questions) }
+        if !audioSurveyType { print(lhs.audioSurveyType, "!=", rhs.audioSurveyType) }
+        if !audioSampleRate { print(lhs.audioSampleRate, "!=", rhs.audioSampleRate) }
+        if !audioBitrate { print(lhs.audioBitrate, "!=", rhs.audioBitrate) }
+        if !alwaysAvailable { print(lhs.alwaysAvailable, "!=", rhs.alwaysAvailable) }
+        
+        return surveyId &&
+            surveyType &&
+            name &&
+            timings &&
+            triggerOnFirstDownload &&
+            randomize &&
+            numberOfRandomQuestions &&
+            randomizeWithMemory &&
+            questions &&
+            audioSurveyType &&
+            audioSampleRate &&
+            audioBitrate &&
+            alwaysAvailable
     }
 }
