@@ -14,7 +14,11 @@ enum ApiErrors: Error {
     case fileNotFound
 }
 
-/// One(?) of the request types... no clue how this works yet, but mappables magically convert json
+/// This is what we ended up using for our post requests after the promisekit purge, I thought it
+/// was part of Alamofire. It isn't. It just takes the output of the request and sticks it on a
+/// .body property. Complete garbage intermidiate object.
+/// Fixme: kill this class, why are we even using a mappable that's insane. Call the correct
+/// Mappable that you need on the body output of the api requests explicitly.
 struct BodyResponse: Mappable {
     var body: String?
 
