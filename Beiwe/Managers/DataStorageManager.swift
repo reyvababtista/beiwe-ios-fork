@@ -3,6 +3,8 @@ import IDZSwiftCommonCrypto
 import Security
 import Sentry
 
+var FILE_WRITE_FILE_EXISTS_COUNTER = 0
+
 enum DataStorageErrors: Error {
     case cantCreateFile
     case notInitialized
@@ -298,7 +300,11 @@ class DataStorageManager {
             sentry_warning("File not found (for moving).", shortenPath(src), crash:false)
         } catch CocoaError.fileWriteFileExists {
             // print("File already exists (for moving) \(shortenPath(dst)), giving up for now because that's crazy?")
-            sentry_warning("File already exists (for moving).", shortenPath(dst), crash:false)
+            // we are getting a huge number of these reported, so throttle by 10x?
+            FILE_WRITE_FILE_EXISTS_COUNTER += 1
+            if FILE_WRITE_FILE_EXISTS_COUNTER % 10 == 0 {
+                sentry_warning("File already exists (for moving).", shortenPath(dst), crash:false)
+            }
         } catch CocoaError.fileWriteOutOfSpace {
             // print("Out of space (for moving) \(shortenPath(dst))")
             // sentry_warning("Out of space (for moving).", shortenPath(dst)) // never report out of space like this.
