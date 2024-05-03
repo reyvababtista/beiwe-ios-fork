@@ -41,46 +41,46 @@ struct Survey: Mappable, Equatable {
     }
     
     static func == (lhs: Survey, rhs: Survey) -> Bool {
-        let surveyId = lhs.surveyId == rhs.surveyId
-        let surveyType = lhs.surveyType == rhs.surveyType
-        let name = lhs.name == rhs.name
-        let timings = lhs.timings == rhs.timings
-        let triggerOnFirstDownload = lhs.triggerOnFirstDownload == rhs.triggerOnFirstDownload
-        let randomize = lhs.randomize == rhs.randomize
-        let numberOfRandomQuestions = lhs.numberOfRandomQuestions == rhs.numberOfRandomQuestions
-        let randomizeWithMemory = lhs.randomizeWithMemory == rhs.randomizeWithMemory
-        let questions = lhs.questions == rhs.questions
-        let audioSurveyType = lhs.audioSurveyType == rhs.audioSurveyType
-        let audioSampleRate = lhs.audioSampleRate == rhs.audioSampleRate
-        let audioBitrate = lhs.audioBitrate == rhs.audioBitrate
-        let alwaysAvailable = lhs.alwaysAvailable == rhs.alwaysAvailable
+        let surveyId_unchanged = lhs.surveyId == rhs.surveyId
+        let surveyType_unchanged = lhs.surveyType == rhs.surveyType
+        let name_unchanged = lhs.name == rhs.name
+        let timings_unchanged = lhs.timings == rhs.timings
+        let triggerOnFirstDownload_unchanged = lhs.triggerOnFirstDownload == rhs.triggerOnFirstDownload
+        let randomize_unchanged = lhs.randomize == rhs.randomize
+        let numberOfRandomQuestions_unchanged = lhs.numberOfRandomQuestions == rhs.numberOfRandomQuestions
+        let randomizeWithMemory_unchanged = lhs.randomizeWithMemory == rhs.randomizeWithMemory
+        let questions_unchanged = lhs.questions == rhs.questions
+        let audioSurveyType_unchanged = lhs.audioSurveyType == rhs.audioSurveyType
+        let audioSampleRate_unchanged = lhs.audioSampleRate == rhs.audioSampleRate
+        let audioBitrate_unchanged = lhs.audioBitrate == rhs.audioBitrate
+        let alwaysAvailable_unchanged = lhs.alwaysAvailable == rhs.alwaysAvailable
         
-        if !surveyId { print(lhs.surveyId, "!=", rhs.surveyId) }
-        if !surveyType { print(lhs.surveyType, "!=", rhs.surveyType) }
-        if !name { print(lhs.name, "!=", rhs.name) }
-        if !timings { print(lhs.timings, "!=", rhs.timings) }
-        if !triggerOnFirstDownload { print(lhs.triggerOnFirstDownload, "!=", rhs.triggerOnFirstDownload) }
-        if !randomize { print(lhs.randomize, "!=", rhs.randomize) }
-        if !numberOfRandomQuestions { print(lhs.numberOfRandomQuestions, "!=", rhs.numberOfRandomQuestions) }
-        if !randomizeWithMemory { print(lhs.randomizeWithMemory, "!=", rhs.randomizeWithMemory) }
-        if !questions { print(lhs.questions, "!=", rhs.questions) }
-        if !audioSurveyType { print(lhs.audioSurveyType, "!=", rhs.audioSurveyType) }
-        if !audioSampleRate { print(lhs.audioSampleRate, "!=", rhs.audioSampleRate) }
-        if !audioBitrate { print(lhs.audioBitrate, "!=", rhs.audioBitrate) }
-        if !alwaysAvailable { print(lhs.alwaysAvailable, "!=", rhs.alwaysAvailable) }
+        if !surveyId_unchanged { print(lhs.surveyId, "!=", rhs.surveyId) }
+        if !surveyType_unchanged { print(lhs.surveyType, "!=", rhs.surveyType) }
+        if !name_unchanged { print(lhs.name, "!=", rhs.name) }
+        if !timings_unchanged { print(lhs.timings, "!=", rhs.timings) }
+        if !triggerOnFirstDownload_unchanged { print(lhs.triggerOnFirstDownload, "!=", rhs.triggerOnFirstDownload) }
+        if !randomize_unchanged { print(lhs.randomize, "!=", rhs.randomize) }
+        if !numberOfRandomQuestions_unchanged { print(lhs.numberOfRandomQuestions, "!=", rhs.numberOfRandomQuestions) }
+        if !randomizeWithMemory_unchanged { print(lhs.randomizeWithMemory, "!=", rhs.randomizeWithMemory) }
+        if !questions_unchanged { print(lhs.questions, "!=", rhs.questions) }
+        if !audioSurveyType_unchanged { print(lhs.audioSurveyType, "!=", rhs.audioSurveyType) }
+        if !audioSampleRate_unchanged { print(lhs.audioSampleRate, "!=", rhs.audioSampleRate) }
+        if !audioBitrate_unchanged { print(lhs.audioBitrate, "!=", rhs.audioBitrate) }
+        if !alwaysAvailable_unchanged { print(lhs.alwaysAvailable, "!=", rhs.alwaysAvailable) }
         
-        return surveyId &&
-            surveyType &&
-            name &&
-            timings &&
-            triggerOnFirstDownload &&
-            randomize &&
-            numberOfRandomQuestions &&
-            randomizeWithMemory &&
-            questions &&
-            audioSurveyType &&
-            audioSampleRate &&
-            audioBitrate &&
-            alwaysAvailable
+        return surveyId_unchanged &&
+            surveyType_unchanged &&
+            name_unchanged &&
+            timings_unchanged &&
+            triggerOnFirstDownload_unchanged &&
+            randomize_unchanged &&
+            numberOfRandomQuestions_unchanged &&
+            randomizeWithMemory_unchanged &&
+            questions_unchanged &&
+            audioSurveyType_unchanged &&
+            audioSampleRate_unchanged &&
+            audioBitrate_unchanged &&
+            alwaysAvailable_unchanged
     }
 }

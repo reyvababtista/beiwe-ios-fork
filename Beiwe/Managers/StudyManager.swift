@@ -212,6 +212,7 @@ class StudyManager {
         let activeSurveysModified_1 = self.clear_out_completed_surveys()
         let activeSurveysModified_2 = self.ensure_always_and_trigger_surveys()
         let activeSurveysModified_3 = self.remove_deleted_surveys()
+        let activeSurveysModified_4 = self.update_any_changed_active_surveys() // should go last
         self.updateBadgerCount()
         
         // save survey data?
@@ -221,7 +222,7 @@ class StudyManager {
     }
     
     /// Removes completed surveys from study.activeSurveys, resets completed always-available
-    /// surveys, implements magic (terrible) logic for trigger-on-download surveys.
+    /// surveys, implements magic (OBSCURE, it's not great) logic for trigger-on-download surveys.
     func clear_out_completed_surveys() -> Bool {
         guard let study = currentStudy else {
             return false
@@ -241,7 +242,7 @@ class StudyManager {
             if activeSurvey.isComplete {
                 if activeSurvey.survey!.alwaysAvailable {
                     print("clear_out_completed_surveys - resetting always available survey \(activeSurvey.survey!.surveyId!)")
-                    activeSurvey.reset(activeSurvey.survey)
+                    activeSurvey.reset(activeSurvey.survey!)
                     surveyDataModified = true
                 } else if !activeSurvey.survey!.triggerOnFirstDownload {
                     // case: a non-trigger, non-always-avaiilable survey, is complete, remove entirely.
@@ -282,23 +283,6 @@ class StudyManager {
             }
         }
         return surveyDataModified
-    }
-        
-    /// Set the badger count - a count of untaken surveys, excluding always-available surveys.
-    func updateBadgerCount() {
-        guard let study = self.currentStudy else {
-            return
-        }
-        
-        var bdgrCnt = 0
-        for activeSurvey in study.activeSurveys.values where activeSurvey.survey != nil {
-            // if survey is not complete and the survey is not an always available survey
-            if !activeSurvey.isComplete && !activeSurvey.survey!.alwaysAvailable {
-                bdgrCnt += 1
-            }
-        }
-        // print("updateBadgerCount - Setting badge count to: \(bdgrCnt)")
-        UIApplication.shared.applicationIconBadgeNumber = bdgrCnt
     }
     
     /// 1) These ActiveSurveys in study.activeSurveys are _persistent objects_, they are restored
@@ -360,6 +344,52 @@ class StudyManager {
         return surveyDataModified
     }
     
+    /// Finds surveys that have changed and replaces them. Has obscure handling for trigger
+    /// on first download surveys.
+    func update_any_changed_active_surveys() -> Bool {
+        guard let study = self.currentStudy else {
+            return false
+        }
+        var any_surveys_updated = false
+        print("update_any_changed_active_surveys")
+        // the dumb loop again
+        // If a survey does not have a surveyId... skip? buh? it's stupid that its optional
+        for target_possibly_updated_survey in study.surveys {
+            if let survey_id = target_possibly_updated_survey.surveyId {
+                if (study.activeSurveys[survey_id] == nil) {
+                    continue // survey not an active survey
+                }
+                
+                // get the corresponding active survey
+                let the_activesurvey = study.activeSurveys[survey_id]!
+                let activesurvey_survey = the_activesurvey.survey!
+                
+                // Special case of triggerOnFirstDownload surveys - these are retained in the
+                // active survey list (like an always-available survey) but instead of getting
+                // automatically reset is just... stays there forever. We don't want to update
+                // that survey because that will cause it to become visible again. 
+                // We just skip it here. This works because the only way for a completed trigger
+                // survey to be reloaded is for it to be activated via push notification
+                // in activate_surveys, which will reload it from scratch.
+                // Surveys that are trigger AND always available should be treated as normal.
+                if the_activesurvey.isComplete && activesurvey_survey.triggerOnFirstDownload && !activesurvey_survey.alwaysAvailable {
+                    print("update_any_changed_active_surveys - survey '\(target_possibly_updated_survey.name)' is a trigger survey and is complete, skipping.")
+                    continue
+                }
+                
+                // run the full survey comparison woo!
+                if activesurvey_survey != target_possibly_updated_survey {
+                    print("update_any_changed_active_surveys - survey '\(target_possibly_updated_survey.name)' changed.")
+                    study.activeSurveys[survey_id] = ActiveSurvey(survey: target_possibly_updated_survey)
+                    any_surveys_updated = true
+                } else {
+                    print("update_any_changed_active_surveys - survey '\(target_possibly_updated_survey.name)' did not change.")
+                }
+            }
+        }
+        return any_surveys_updated
+    }
+    
     /// loads a list of surveys into active surveys so that they will be displayed.
     func activate_surveys(surveyIds: [String], sentTime: TimeInterval) -> Bool {
         guard let study = self.currentStudy else {
@@ -387,6 +417,23 @@ class StudyManager {
         StudyManager.sharedInstance.surveysUpdatedEvent.emit(0)
         Recline.shared.save(study)
         return updated_survey_state
+    }
+    
+    /// Set the badger count - a count of untaken surveys, excluding always-available surveys.
+    func updateBadgerCount() {
+        guard let study = self.currentStudy else {
+            return
+        }
+        
+        var bdgrCnt = 0
+        for activeSurvey in study.activeSurveys.values where activeSurvey.survey != nil {
+            // if survey is not complete and the survey is not an always available survey
+            if !activeSurvey.isComplete && !activeSurvey.survey!.alwaysAvailable {
+                bdgrCnt += 1
+            }
+        }
+        // print("updateBadgerCount - Setting badge count to: \(bdgrCnt)")
+        UIApplication.shared.applicationIconBadgeNumber = bdgrCnt
     }
     
     ////////////////////////////////////////////////////////////////////////////////////////////////
