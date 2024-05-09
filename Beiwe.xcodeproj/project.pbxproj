@@ -84,6 +84,7 @@
 		AA63EFB729C2E0FE0074F735 /* DataService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA63EFB629C2E0FE0074F735 /* DataService.swift */; };
 		AA774E3B29DFA9440085BDF8 /* UpdateDeviceSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA774E3A29DFA9440085BDF8 /* UpdateDeviceSettings.swift */; };
 		AA92FB6729D5D1800009F620 /* TimerManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA92FB6629D5D1800009F620 /* TimerManager.swift */; };
+		AA9EE0CE2BEBD96E00F53756 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = AA9EE0CD2BEBD96E00F53756 /* PrivacyInfo.xcprivacy */; };
 		AAA8A3912B63C22400D20000 /* Common.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAA8A3902B63C22400D20000 /* Common.swift */; };
 		AAEA006E2B7150B2008DDDC7 /* BeiweBackgroundTasks.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAEA006D2B7150B2008DDDC7 /* BeiweBackgroundTasks.swift */; };
 		ED3081F77ECC8C876F5EF53A /* Pods_Beiwe.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A42DC84D7FED35C57E1B1EE0 /* Pods_Beiwe.framework */; };
@@ -190,6 +191,7 @@
 		AA63EFB629C2E0FE0074F735 /* DataService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataService.swift; sourceTree = "<group>"; };
 		AA774E3A29DFA9440085BDF8 /* UpdateDeviceSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateDeviceSettings.swift; sourceTree = "<group>"; };
 		AA92FB6629D5D1800009F620 /* TimerManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerManager.swift; sourceTree = "<group>"; };
+		AA9EE0CD2BEBD96E00F53756 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		AAA8A3902B63C22400D20000 /* Common.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Common.swift; sourceTree = "<group>"; };
 		AAEA006D2B7150B2008DDDC7 /* BeiweBackgroundTasks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeiweBackgroundTasks.swift; sourceTree = "<group>"; };
 		B58A34E5862CE908C83EB133 /* Pods-Beiwe.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Beiwe.release.xcconfig"; path = "Target Support Files/Pods-Beiwe/Pods-Beiwe.release.xcconfig"; sourceTree = "<group>"; };
@@ -398,6 +400,7 @@
 		83F98C2D1C923C3600E0B64B = {
 			isa = PBXGroup;
 			children = (
+				AA9EE0CD2BEBD96E00F53756 /* PrivacyInfo.xcprivacy */,
 				C222DB6B2786C1ED00ACB3EC /* README.md */,
 				83F98C381C923C3600E0B64B /* Beiwe */,
 				5EEADFF9AED027E0BE53BF6C /* Frameworks */,
@@ -526,6 +529,7 @@
 				329DD4D426011335006E517F /* GoogleService-Info.plist in Resources */,
 				832FFC281CC86A0800F2E1EF /* Assets.xcassets in Resources */,
 				83AB51391F9FDBAF0058F3B0 /* Config-Prod2.plist in Resources */,
+				AA9EE0CE2BEBD96E00F53756 /* PrivacyInfo.xcprivacy in Resources */,
 				59912EB3230EF09400CAF7EB /* Localizable.strings in Resources */,
 				83F98C3F1C923C3600E0B64B /* Main.storyboard in Resources */,
 				84CACB8E2835A44B00663065 /* GoogleService-Info.plist in Resources */,
@@ -879,7 +883,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2024.23;
+				CURRENT_PROJECT_VERSION = 2024.24;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6M52R5C7FT;
 				ENABLE_BITCODE = NO;
@@ -979,7 +983,7 @@
 				CODE_SIGN_ENTITLEMENTS = Beiwe/Beiwe2Release2.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2024.23;
+				CURRENT_PROJECT_VERSION = 2024.24;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6M52R5C7FT;
 				ENABLE_BITCODE = NO;
@@ -1146,7 +1150,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2024.23;
+				CURRENT_PROJECT_VERSION = 2024.24;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6M52R5C7FT;
 				ENABLE_BITCODE = NO;
@@ -1184,7 +1188,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Distribution";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution: Onnela Lab LLC (6M52R5C7FT)";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2024.23;
+				CURRENT_PROJECT_VERSION = 2024.24;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6M52R5C7FT;
 				ENABLE_BITCODE = NO;
