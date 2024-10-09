@@ -1,11 +1,12 @@
 import Eureka
 import ObjectMapper
 import Alamofire
-import Firebase
 import PKHUD
 import Sentry
 import SwiftValidator
 import UIKit
+import FirebaseCore
+import FirebaseMessaging
 
 
 class RegisterViewController: FormViewController {

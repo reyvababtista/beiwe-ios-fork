@@ -1,11 +1,11 @@
 import Alamofire
-import Crashlytics
 import EmitterKit
-import Firebase
 import Foundation
 import ObjectMapper
-import ReachabilitySwift
 import Sentry
+import FirebaseCore
+import FirebaseMessaging
+import FirebaseInstallations
 
 /// Contains all sorts of miiscellaneous study related functionality - this is badly factored and should be refactored into classes that contain their own well-defirned things
 class StudyManager {

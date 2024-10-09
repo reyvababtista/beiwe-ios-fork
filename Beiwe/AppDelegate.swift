@@ -1,17 +1,15 @@
 import Alamofire
 import BackgroundTasks
 import CoreMotion
-import Crashlytics
 import EmitterKit
-import Fabric
-import Firebase
 import Foundation
 import ObjectMapper
-import ReachabilitySwift
 import ResearchKit
 import Sentry
 import UIKit
 import XCGLogger
+import FirebaseCore
+import FirebaseMessaging
 
 let log = XCGLogger(identifier: "advancedLogger", includeDefaultDestinations: false)
 
