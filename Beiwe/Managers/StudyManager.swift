@@ -6,6 +6,7 @@ import Sentry
 import FirebaseCore
 import FirebaseMessaging
 import FirebaseInstallations
+import Reachability
 
 /// Contains all sorts of miiscellaneous study related functionality - this is badly factored and should be refactored into classes that contain their own well-defirned things
 class StudyManager {
@@ -91,7 +92,7 @@ class StudyManager {
         self.setApiCredentials()
         DataStorageManager.sharedInstance.dataStorageManagerInit(self.currentStudy!, secKeyRef: self.keyRef)
         self.prepareDataServices() // prepareDataServices was 90% of the function body
-        NotificationCenter.default.addObserver(self, selector: #selector(self.reachabilityChanged), name: ReachabilityChangedNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(self.reachabilityChanged), name: .reachabilityChanged, object: nil)
         
         self.heartbeat_on_dispatch_queue()
     }
@@ -1127,7 +1128,7 @@ class StudyManager {
         self.timerManager.clear()
         
         // kill notifications
-        NotificationCenter.default.removeObserver(self, name: ReachabilityChangedNotification, object: nil)
+        NotificationCenter.default.removeObserver(self, name: .reachabilityChanged, object: nil)
         UIApplication.shared.cancelAllLocalNotifications()
         
         // clear out remaining active study objects
@@ -1166,12 +1167,6 @@ class StudyManager {
         // clear the study, patient id
         self.currentStudy = nil // self.isStudyLoaded will now fail
         ApiManager.sharedInstance.patientId = ""
-        
-        // I don't know what this is and I don't think it matters.
-        let instance = InstanceID.instanceID()
-        instance.deleteID { (error: Error?) in
-            log.error(error.debugDescription)
-        }
     }
     
     /// deletes all studies - used in registration for some reason
