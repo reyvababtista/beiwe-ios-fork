@@ -761,19 +761,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     func setupSentry() {
         // loads sentry key, prints an error if it doesn't work.
-        do {
-            let dsn = SentryConfiguration.sharedInstance.settings["sentry-dsn"] as? String ?? "dev"
-            if dsn == "release" {
-                Client.shared = try Client(dsn: SentryKeys.release_dsn)
-            } else if dsn == "dev" {
-                Client.shared = try Client(dsn: SentryKeys.development_dsn)
-            } else {
-                throw "Invalid Sentry configuration"
-            }
-            try Client.shared?.startCrashHandler()
-        } catch let error {
-            print("\(error)")
-        }
+//        do {
+//            let dsn = SentryConfiguration.sharedInstance.settings["sentry-dsn"] as? String ?? "dev"
+//            if dsn == "release" {
+//                Client.shared = try Client(dsn: SentryKeys.release_dsn)
+//            } else if dsn == "dev" {
+//                Client.shared = try Client(dsn: SentryKeys.development_dsn)
+//            } else {
+//                throw "Invalid Sentry configuration"
+//            }
+//            try Client.shared?.startCrashHandler()
+//        } catch let error {
+//            print("\(error)")
+//        }
     }
 }
 

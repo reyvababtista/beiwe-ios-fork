@@ -1027,25 +1027,25 @@ class StudyManager {
                 // report this error to Sentry (but only once per app launch, by checking/appending
                 // file name to a list)
                 if !self.files_with_encoding_errors.contains(filename) {
-                    if let sentry_client = Client.shared {
-                        sentry_client.snapshotStacktrace {
-                            let event = Sentry.Event(level: .error)
-                            event.message = "Encountered encoding error while uploading file"
-                            event.environment = Constants.APP_INFO_TAG
-                            
-                            // todo does this always exist?
-                            if event.extra == nil {
-                                event.extra = [:]
-                            }
-                            if var extras = event.extra {
-                                extras["error"] = "\(error)"
-                                extras["filename"] = filename
-                                extras["user_id"] = self.currentStudy!.patientId
-                            }
-                            sentry_client.appendStacktrace(to: event)
-                            sentry_client.send(event: event)
-                        }
-                    }
+//                    if let sentry_client = Client.shared {
+//                        sentry_client.snapshotStacktrace {
+//                            let event = Sentry.Event(level: .error)
+//                            event.message = "Encountered encoding error while uploading file"
+//                            event.environment = Constants.APP_INFO_TAG
+//                            
+//                            // todo does this always exist?
+//                            if event.extra == nil {
+//                                event.extra = [:]
+//                            }
+//                            if var extras = event.extra {
+//                                extras["error"] = "\(error)"
+//                                extras["filename"] = filename
+//                                extras["user_id"] = self.currentStudy!.patientId
+//                            }
+//                            sentry_client.appendStacktrace(to: event)
+//                            sentry_client.send(event: event)
+//                        }
+//                    }
                     self.files_with_encoding_errors.append(filename)
                 }
             }

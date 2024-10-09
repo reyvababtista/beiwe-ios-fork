@@ -204,7 +204,7 @@ class RegisterViewController: FormViewController {
                 let registerStudyRequest = RegisterStudyRequest(patientId: patientId, phoneNumber: phoneNumber, newPassword: newPassword)
                 
                 // sets tags for Sentry
-                Client.shared?.tags = ["user_id": patientId, "server_url": server]
+//                Client.shared?.tags = ["user_id": patientId, "server_url": server]
                 ApiManager.sharedInstance.password = tempPassword ?? ""
                 ApiManager.sharedInstance.patientId = patientId
                 ApiManager.sharedInstance.customApiUrl = server
