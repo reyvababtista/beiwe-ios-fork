@@ -811,8 +811,8 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
 
 // refresh_token code
 extension AppDelegate: MessagingDelegate {
-    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String) {
-        let dataDict: [String: String] = ["token": fcmToken]
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        let dataDict: [String: String] = ["token": fcmToken ?? ""]
         NotificationCenter.default.post(name: Notification.Name("FCMToken"), object: nil, userInfo: dataDict)
         // Note: This callback is fired at each app startup and whenever a new token is generated.
 
@@ -821,16 +821,7 @@ extension AppDelegate: MessagingDelegate {
             while ApiManager.sharedInstance.patientId == "" {
                 sleep(1)
             }
-            self.sendFCMToken(fcmToken: fcmToken)
+            self.sendFCMToken(fcmToken: fcmToken ?? "")
         }
-    }
-
-    // ios 10 data message
-    // Receive data messages on iOS 10+ directly from FCM (bypassing APNs) when the app is in the foreground.
-    // To enable direct data messages, you can set Messaging.messaging().shouldEstablishDirectChannel to true.
-    func messaging(_ messaging: Messaging, didReceive remoteMessage: MessagingRemoteMessage) {
-        // FIXME: what even is this function
-        log.error("Received data message: \(remoteMessage.appData)")
-        // remoteMessage.messageID
     }
 }
