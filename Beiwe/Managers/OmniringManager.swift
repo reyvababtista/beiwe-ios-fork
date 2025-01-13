@@ -3,7 +3,7 @@
 //  Beiwe
 //
 //  Created by Babtista, Reyva on 10/10/24.
-//  Copyright © 2024 Rocketfarm Studios. All rights reserved.
+//  Copyright © 2024 Reyva Babtista. All rights reserved.
 //
 
 import CoreBluetooth
