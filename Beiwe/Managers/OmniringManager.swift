@@ -9,10 +9,15 @@
 import CoreBluetooth
 
 private let omniring_headers = [
+    // Timestamp
     "timestamp",
+    
+    // Photoplethysmography (PPG) sensor signals (red, green, infrared)
     "PPG_red",
     "PPG_IR",
     "PPG_Green",
+    
+    // Inertial Measurement Unit (IMU) sensor signals (accelerometer, gyroscope, magnitude)
     "IMU_Accel_x",
     "IMU_Accel_y",
     "IMU_Accel_z",
@@ -22,7 +27,11 @@ private let omniring_headers = [
     "IMU_Mag_x",
     "IMU_Mag_y",
     "IMU_Mag_z",
+    
+    // Temperature sensor signal
     "temperature",
+    
+    // Timestamp on ring (time elapsed since boot)
     "timestamp"
 ]
 
