@@ -25,14 +25,19 @@ class BluetoothManager: NSObject, CBCentralManagerDelegate, DataServiceProtocol 
     private let storeType = "bluetoothLog"
     private var dataStorage: DataStorage?
     private var datapoints = [BluetoothDataPoint]()
+    // See (01/13/24): https://developer.apple.com/documentation/corebluetooth/cbmanagerstate
     private var currentCBState: CBManagerState?
     private let cacheLock = NSLock()
     private var collecting = false
     
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         self.currentCBState = central.state
-        if self.collecting {
-            self.bluetoothManager?.scanForPeripherals(withServices: nil, options: ["CBCentralManagerScanOptionAllowDuplicatesKey": false])
+        
+        switch self.currentCBState {
+            case .poweredOn:
+                self.startCollecting()
+            default:
+                self.finishCollecting()
         }
     }
     
@@ -64,14 +69,17 @@ class BluetoothManager: NSObject, CBCentralManagerDelegate, DataServiceProtocol 
     
     func startCollecting() {
         print("start bluetooth")
-        guard let state = self.currentCBState, state == CBManagerState.poweredOn else {
-            self.bluetoothManager = CBCentralManager.init(delegate: self, queue: nil)
-            return
+        switch self.bluetoothManager?.state {
+            case .poweredOff:
+                self.bluetoothManager = CBCentralManager.init(delegate: self, queue: nil)
+                return
+            case .poweredOn:
+                self.bluetoothManager?.scanForPeripherals(withServices: nil, options: ["CBCentralManagerScanOptionAllowDuplicatesKey": false])
+                self.collecting = true
+                AppEventManager.sharedInstance.logAppEvent(event: "bt_on", msg: "Bluetooth scanning on")
+            default:
+                return
         }
-        
-        self.bluetoothManager?.scanForPeripherals(withServices: nil, options: ["CBCentralManagerScanOptionAllowDuplicatesKey": false])
-        self.collecting = true
-        AppEventManager.sharedInstance.logAppEvent(event: "bt_on", msg: "Bluetooth scanning on")
     }
     
     func pauseCollecting() {
