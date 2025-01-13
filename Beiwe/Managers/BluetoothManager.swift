@@ -63,7 +63,6 @@ class BluetoothManager: NSObject, CBCentralManagerDelegate, DataServiceProtocol 
     func initCollecting() -> Bool {
         print("init bluetooth")
         self.dataStorage = DataStorageManager.sharedInstance.createStore(self.storeType, headers: bluetooth_headers)
-        self.bluetoothManager = CBCentralManager.init(delegate: self, queue: nil)
         return true
     }
     
