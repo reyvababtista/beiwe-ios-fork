@@ -114,6 +114,7 @@ class OmniringManager: NSObject, CBCentralManagerDelegate, CBPeripheralDelegate,
         return data.withUnsafeBytes { $0.load(as: Float.self) }
     }
     
+    // Decoding bytes to float. There are 14 data points in total from 3 sensors (PPG, IMU, and temperature).
     func decodeByteData(_ byteData: Data?) -> [Float] {
         if byteData == nil {
             return []
